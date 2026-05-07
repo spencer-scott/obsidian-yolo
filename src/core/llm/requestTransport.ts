@@ -13,7 +13,7 @@ type RequestTransportSettings = {
 }
 
 const AUTO_OBSIDIAN_MEMORY_TTL_MS = 24 * 60 * 60 * 1000
-const AUTO_STREAM_ATTEMPT_FIRST_CHUNK_TIMEOUT_MS = 3000
+const AUTO_STREAM_ATTEMPT_FIRST_CHUNK_TIMEOUT_MS = 90000
 
 type RequestTransportMemoryEntry = {
   preferredMode: AutoPromotedTransportMode
