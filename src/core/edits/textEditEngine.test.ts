@@ -204,12 +204,12 @@ describe('materializeTextEditPlan', () => {
     const content = [
       '# Notes',
       '',
-      '### Knowledge Distillation & Consolidation',
-      'The main purpose of a journal is learning and reflection. Do not create entries blindly; only record when a valuable topic arises or entirely new knowledge is learned.',
+      '### 知识提炼与沉淀 (Knowledge Distillation & Consolidation)',
+      '日记的主要功能是学习和反思，不要盲目创建日记，仅当产生有价值的话题，亦或学习到全新知识时记录。',
       '',
-      'Your core competitive advantage lies not in initial settings, but in the structured consolidation of interaction data.',
+      '你的核心竞争力不在于初始设定，而在于对交互数据的结构化沉淀。',
       '',
-      'Tail remains unchanged.',
+      '尾部保持不变。',
     ].join('\n')
 
     const result = materializeTextEditPlan({
@@ -219,12 +219,12 @@ describe('materializeTextEditPlan', () => {
           {
             type: 'replace',
             oldText: [
-              '### Knowledge Distillation & Consolidation',
-              'The main purpose of a journal is learning and reflection. Do not create entries blindly; only record when a valuable topic arises or new knowledge is learned.',
+              '### 知识提炼与沉淀 (Knowledge Distillation & Consolidation)',
+              '日记的主要功能是学习与反思，不要盲目创建日记，仅当产生有价值的话题，或学习到全新知识时记录。',
               '',
-              'Your core competitive advantage lies not in initial settings, but in the structured consolidation of interaction data.',
+              '你的核心竞争力不在于初始设定，而在于对交互数据的结构化沉淀。',
             ].join('\n'),
-            newText: '### Knowledge Distillation\n\nUpdated specification.',
+            newText: '### 知识提炼与沉淀\n\n已更新的规范。',
           },
         ],
       },
@@ -233,15 +233,15 @@ describe('materializeTextEditPlan', () => {
     expect(result.appliedCount).toBe(1)
     expect(result.errors).toEqual([])
     expect(result.operationResults[0]?.matchMode).toBe('fuzzyUniqueParagraph')
-    expect(result.newContent).toContain('Updated specification.')
-    expect(result.newContent).toContain('Tail remains unchanged.')
+    expect(result.newContent).toContain('已更新的规范。')
+    expect(result.newContent).toContain('尾部保持不变。')
   })
 
   it('rejects fuzzy replacement when multiple paragraph candidates exceed threshold', () => {
     const content = [
-      'Paragraph A: Keep the same text for ambiguity testing, and ensure enough words to trigger the fuzzy matching mechanism.',
+      '段落A：保持同样文本用于歧义测试，并确保字数足够长以触发模糊匹配机制。',
       '',
-      'Paragraph A: Keep the same text for ambiguity testing, and ensure enough words to trigger the fuzzy matching mechanism.',
+      '段落A：保持同样文本用于歧义测试，并确保字数足够长以触发模糊匹配机制。',
     ].join('\n')
 
     const result = materializeTextEditPlan({
@@ -251,8 +251,8 @@ describe('materializeTextEditPlan', () => {
           {
             type: 'replace',
             oldText:
-              'Paragraph A: Keep the same text for ambiguity testing, and ensure enough words to trigger the fuzzy matching mechanism!',
-            newText: 'Unique replacement target.',
+              '段落A：保持同样文本用于歧义测试，并确保字数足够长以触发模糊匹配机制！',
+            newText: '唯一替换目标。',
           },
         ],
       },

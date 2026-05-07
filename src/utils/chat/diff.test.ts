@@ -225,52 +225,54 @@ describe('createInlineDiffLines', () => {
     })
   })
 
-  it('shows fine-grained inline replacements for minor wording edits', () => {
+  it('shows fine-grained inline replacements for chinese wording edits', () => {
     const [line] = createInlineDiffLines(
-      ['Today I walked in the park, then bought coffee.'],
-      ['Today I jogged in the park, then bought hot coffee.'],
+      ['今天去公园散步，然后买咖啡。'],
+      ['今天去公园慢跑，然后买热咖啡。'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: 'Today I ' },
-        { type: 'del', text: 'walked' },
-        { type: 'add', text: 'jogged' },
-        { type: 'same', text: ' in the park, then bought ' },
-        { type: 'add', text: 'hot ' },
-        { type: 'same', text: 'coffee.' },
+        { type: 'same', text: '今天去公园' },
+        { type: 'del', text: '散步' },
+        { type: 'add', text: '慢跑' },
+        { type: 'same', text: '，然后买' },
+        { type: 'add', text: '热' },
+        { type: 'same', text: '咖啡。' },
       ],
     })
   })
 
-  it('uses segmenter-aware word diff for lines with clear token boundaries', () => {
+  it('uses segmenter-aware word diff for cjk lines with clear token boundaries', () => {
     const [line] = createInlineDiffLines(
-      ['Please open the settings panel, then save the current draft.'],
-      ['Please open the preference settings panel, then save the current draft.'],
+      ['请先打开设置面板，然后保存当前草稿。'],
+      ['请先打开偏好设置面板，然后保存当前草稿。'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: 'Please open the ' },
-        { type: 'add', text: 'preference ' },
-        { type: 'same', text: 'settings panel, then save the current draft.' },
+        { type: 'same', text: '请先打开' },
+        { type: 'add', text: '偏好' },
+        { type: 'same', text: '设置面板，然后保存当前草稿。' },
       ],
     })
   })
 
-  it('splits long additions into smaller punctuation-based change tokens', () => {
+  it('splits long CJK additions into smaller punctuation-based change tokens', () => {
     const [line] = createInlineDiffLines(
-      ['Genshin achieved success.'],
-      ['Genshin achieved success. The world-building enriches Teyvat. Teyvat is worth long-term exploration.'],
+      ['原神获得成功。'],
+      ['原神获得成功。世界观让提瓦特大陆更加丰满。提瓦特大陆值得长期探索。'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: 'Genshin achieved success.' },
-        { type: 'add', text: ' The world-building enriches Teyvat. Teyvat is worth long-term exploration.' },
+        { type: 'same', text: '原神获得成功' },
+        { type: 'add', text: '。世界观让提瓦特大陆更加丰满。' },
+        { type: 'add', text: '提瓦特大陆值得长期探索' },
+        { type: 'same', text: '。' },
       ],
     })
   })
