@@ -41,18 +41,18 @@ const getBranchStateLabel = (
   t: (keyPath: string, fallback?: string) => string,
 ) => {
   if (state === 'streaming') {
-    return t('chat.toolCall.status.running', '生成中')
+    return t('chat.toolCall.status.running', 'Generating')
   }
   if (state === 'waiting-approval') {
-    return t('common.agentStatusWaitingApproval', '待审批')
+    return t('common.agentStatusWaitingApproval', 'Pending approval')
   }
   if (state === 'error') {
-    return t('chat.toolCall.status.failed', '失败')
+    return t('chat.toolCall.status.failed', 'Failed')
   }
   if (state === 'aborted') {
-    return t('chat.toolCall.status.aborted', '已中止')
+    return t('chat.toolCall.status.aborted', 'Aborted')
   }
-  return t('chat.toolCall.status.completed', '已完成')
+  return t('chat.toolCall.status.completed', 'Completed')
 }
 
 const BranchStateIcon = ({
@@ -674,8 +674,8 @@ export default function AssistantToolMessageGroupItem({
               conversationId={effectiveConversationId}
               showRunningFooter={false}
               onMessageUpdate={() => {
-                // 异步派遣结果是终态消息，UI 内部不会触发 update；
-                // 万一调到这里也不持久化（result message 有自己的存储路径）。
+                // Async dispatch results are terminal messages; the UI will not trigger update internally.
+                // Even if this is called, it will not be persisted (result messages have their own storage path).
               }}
             />
           </div>

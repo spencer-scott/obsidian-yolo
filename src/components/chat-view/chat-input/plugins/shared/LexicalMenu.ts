@@ -225,10 +225,10 @@ export function useDynamicPositioning(
           ? getScrollParent(rootElement, false)
           : getNodeBody(targetElement)
 
-      // Position tracking: 由 Floating UI 的 autoUpdate 统一处理 resize、
-      // 祖先 scroll、ResizeObserver,以及 animationFrame 轮询
-      // (后者是关键 —— Quick Ask 浮窗拖拽改的是内联 left/top,既不触发 resize
-      // 也不触发 scroll,只能靠 rAF 比对 getBoundingClientRect 才能感知)。
+      // Position tracking: handled uniformly by Floating UI's autoUpdate for resize,
+      // ancestor scroll, ResizeObserver, and animationFrame polling.
+      // (The latter is key - Quick Ask floating panel drag changes inline left/top,
+      // which triggers neither resize nor scroll; only rAF comparing getBoundingClientRect can detect it).
       const cleanupAutoUpdate = autoUpdate(
         targetElement,
         targetElement,
@@ -236,8 +236,8 @@ export function useDynamicPositioning(
         { animationFrame: true },
       )
 
-      // Visibility tracking: trigger 滚出最近 scroll container 时关闭菜单。
-      // autoUpdate 不负责这个语义,所以单独保留一个轻量 scroll handler。
+      // Visibility tracking: close the menu when the trigger scrolls out of the nearest scroll container.
+      // autoUpdate does not handle this semantic, so a lightweight scroll handler is kept separately.
       let previousIsInView = isTriggerVisibleInNearestScrollContainer(
         targetElement,
         rootScrollParent,
@@ -544,10 +544,11 @@ export function useMenuAnchorRef(
 ): MutableRefObject<HTMLElement> {
   const [editor] = useLexicalComposerContext()
   const anchorElementRef = useRef<HTMLElement>(document.createElement('div'))
-  // 缓存上一次写入 containerDiv 的位置,autoUpdate animationFrame 模式下每帧都会
-  // 调用 positionMenu;若坐标未变则跳过 updateDynamicStyleClass,避免样式 churn。
-  // 菜单关闭时(useEffect cleanup)必须重置为 null —— containerDiv 会被 remove,
-  // 重新打开时若坐标恰好相同会被错误跳过,导致新 containerDiv 无内联样式。
+  // Cache the last position written to containerDiv. In autoUpdate animationFrame mode,
+  // positionMenu is called every frame; skip updateDynamicStyleClass if coordinates haven't
+  // changed to avoid style churn. Must reset to null on menu close (useEffect cleanup) because
+  // containerDiv will be removed; if coordinates happen to match when reopening, the write
+  // would be incorrectly skipped, leaving the new containerDiv without inline styles.
   const lastWrittenPositionRef = useRef<{
     left: number
     top: number
@@ -573,7 +574,7 @@ export function useMenuAnchorRef(
       anchorElementRef.current = containerDiv
     }
 
-    // 通过动态样式类固定定位弹窗容器
+    // Use dynamic style class to position the popup container with fixed positioning
     containerDiv.classList.remove(
       'smtcmp-menu-above',
       'smtcmp-menu-right-align',
@@ -638,9 +639,9 @@ export function useMenuAnchorRef(
         const menuWidth = Math.round(rect.width + ring * 2)
         const menuTop = Math.round(rect.top - offsetTop)
 
-        // 与上次写入的坐标相同则跳过,避免 animationFrame 模式下每帧重写样式。
-        // menuEle 也要复检 —— 它的 absolute 定位完全依赖 containerDiv,
-        // 但 menuEle 的内容/可见性可能变,所以这里只跳过 containerDiv 的写。
+        // Skip if coordinates match the last write, avoiding per-frame style rewrites in animationFrame mode.
+        // menuEle also needs re-checking - its absolute positioning depends entirely on containerDiv,
+        // but menuEle's content/visibility may change, so we only skip writing to containerDiv.
         const last = lastWrittenPositionRef.current
         const positionUnchanged =
           last !== null &&
@@ -759,7 +760,7 @@ export function useMenuAnchorRef(
         if (containerDiv?.firstChild instanceof HTMLElement) {
           clearDynamicStyleClass(containerDiv.firstChild)
         }
-        // 重置位置缓存:containerDiv 已被 remove,下次打开必须重新写样式。
+        // Reset position cache: containerDiv has been removed, styles must be rewritten on next open.
         lastWrittenPositionRef.current = null
       }
     }

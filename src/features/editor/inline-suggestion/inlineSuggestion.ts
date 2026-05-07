@@ -40,15 +40,15 @@ class ThinkingIndicatorWidget extends WidgetType {
     const container = document.createElement('span')
     container.className = 'smtcmp-thinking-indicator-inline'
 
-    // 创建思考动画容器
+    // Create thinking animation container
     const loader = document.createElement('span')
     loader.className = 'smtcmp-thinking-loader'
 
-    // 图标容器
+    // Icon container
     const icon = document.createElement('span')
     icon.className = 'smtcmp-thinking-icon'
 
-    // SVG 图标 (Sparkles)
+    // SVG icon (Sparkles)
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('width', '12')
     svg.setAttribute('height', '12')
@@ -82,7 +82,7 @@ class ThinkingIndicatorWidget extends WidgetType {
 
     icon.appendChild(svg)
 
-    // 文字
+    // Text
     const textEl = document.createElement('span')
     textEl.className = 'smtcmp-thinking-text'
     textEl.textContent = this.label

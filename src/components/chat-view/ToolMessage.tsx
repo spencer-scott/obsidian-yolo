@@ -214,8 +214,8 @@ export const getToolLabels = (t?: TranslateFn): ToolLabels => {
 }
 
 /**
- * 判断工具调用是否为 delegate_external_agent。
- * 完整 tool name 形如 yolo_local__delegate_external_agent。
+ * Check whether a tool call is delegate_external_agent.
+ * The full tool name looks like yolo_local__delegate_external_agent.
  */
 const isDelegateExternalAgentRequest = (request: ToolRequestLike): boolean => {
   try {
@@ -334,10 +334,10 @@ const formatBatchPathSummary = ({
 }): string => {
   const sharedParentPath = getSharedParentPath(paths)
   if (sharedParentPath) {
-    return `${actionLabel} ${sharedParentPath} 下 ${paths.length} 个${noun}`
+    return `${actionLabel} ${paths.length} ${noun} in ${sharedParentPath}`
   }
 
-  return `${actionLabel} ${paths.length} 个${noun}`
+  return `${actionLabel} ${paths.length} ${noun}`
 }
 
 const formatBatchMoveSummary = (
@@ -353,10 +353,10 @@ const formatBatchMoveSummary = (
 
   const targetParentPath = getSharedParentPath(newPaths)
   if (targetParentPath) {
-    return `移动 ${items.length} 项到 ${targetParentPath}`
+    return `Move ${items.length} items to ${targetParentPath}`
   }
 
-  return `移动 ${items.length} 项`
+  return `Move ${items.length} items`
 }
 
 const getFsReadOperationSummary = ({
@@ -375,7 +375,7 @@ const getFsReadOperationSummary = ({
   }
 
   // Determine isPdf from the first request path (used purely for the label
-  // suffix — "页" vs "行"). Mixed batches use the first path's extension; the
+  // suffix — "pages" vs "lines"). Mixed batches use the first path's extension; the
   // headline only renders a single batch summary anyway, not per-file ranges.
   const requestArguments = parseToolArguments(request.arguments)
   const rawPaths = requestArguments?.paths
@@ -491,11 +491,11 @@ export const getHeadlineDisplayInfo = ({
 }
 
 /**
- * delegate_external_agent 折叠态 summary：
- * - Running/Pending：provider | prompt 前 80 字（让用户一眼看到派了啥任务）
- * - Success：provider | stdout 前 80 字（直接看模型最终回答）
- * - Aborted（含已采集输出）：provider | stdout 前 80 字
- * - Error：provider | error 前 80 字（直接看为啥失败）
+ * delegate_external_agent collapsed summary:
+ * - Running/Pending: provider | first 80 chars of prompt (quick glance at the dispatched task)
+ * - Success: provider | first 80 chars of stdout (see the model's final answer)
+ * - Aborted (with collected output): provider | first 80 chars of stdout
+ * - Error: provider | first 80 chars of error (see why it failed)
  */
 const DELEGATE_SUMMARY_MAX_CHARS = 80
 
@@ -521,14 +521,14 @@ const getDelegateExternalAgentSummary = ({
   ) {
     mainText = response.data.text?.trim() ?? ''
   }
-  // Running / PendingApproval / Aborted-without-data / 没拿到 mainText 时回退 prompt
+  // Running / PendingApproval / Aborted-without-data / fall back to prompt when mainText is unavailable
   if (!mainText) {
     const prompt =
       typeof argsObject?.prompt === 'string' ? argsObject.prompt.trim() : ''
     mainText = prompt
   }
 
-  // 多行折叠成单行，避免 headline 被换行符撑高
+  // Collapse multiple lines into a single line to prevent newlines from expanding the headline
   const collapsedMain = mainText
     ? truncateText(mainText.replace(/\s+/g, ' '), DELEGATE_SUMMARY_MAX_CHARS)
     : ''
@@ -620,23 +620,23 @@ const getLocalToolSummaryText = ({
     if (batchItems && batchItems.length > 0) {
       const pathKey =
         toolName === 'fs_create_file' || toolName === 'fs_delete_file'
-          ? '文件'
-          : '文件夹'
+          ? 'files'
+          : 'folders'
       const actionLabel =
         toolName === 'fs_create_file' || toolName === 'fs_create_dir'
-          ? '在'
-          : '删除'
+          ? 'Create in'
+          : 'Delete'
       const paths = batchItems
         .map((item) => (typeof item.path === 'string' ? item.path : ''))
         .filter((path) => path.length > 0)
 
       if (paths.length === batchItems.length) {
-        if (actionLabel === '在') {
+        if (actionLabel === 'Create in') {
           const sharedParentPath = getSharedParentPath(paths)
           if (sharedParentPath) {
-            return `在 ${sharedParentPath} 下创建 ${paths.length} 个${pathKey}`
+            return `Create ${paths.length} ${pathKey} in ${sharedParentPath}`
           }
-          return `创建 ${paths.length} 个${pathKey}`
+          return `Create ${paths.length} ${pathKey}`
         }
 
         return formatBatchPathSummary({
@@ -903,7 +903,7 @@ function ToolCallItem({
       getToolCallArgumentsText(request.arguments) ?? toolLabels.noParameters
     )
   }, [request.arguments, toolLabels.noParameters])
-  // 是否禁用"始终允许"按钮（某些高危工具每次必须人审）
+  // Whether to disable the "always allow" button (certain high-risk tools require approval each time)
   const isAlwaysAllowDisabled = useMemo(() => {
     try {
       const { toolName } = parseToolName(request.name)
@@ -1055,7 +1055,7 @@ function ToolCallItem({
             <ObsidianCodeBlock language="json" content={parameters} />
           </div>
           {isDelegateExternalAgentRequest(request) ? (
-            // delegate_external_agent 专属卡片：流式输出 + 状态徽章
+            // delegate_external_agent dedicated card: streaming output + status badge
             <ExternalAgentToolCard
               toolCallId={request.id}
               response={response}
@@ -1096,7 +1096,7 @@ function ToolCallItem({
           <span>
             {t(
               'chat.compaction.pendingStatus',
-              '正在整理上下文，稍后将从新的上下文继续。',
+              'Organizing context, will continue with the new context shortly.',
             )}
           </span>
         </div>
@@ -1118,7 +1118,7 @@ function ToolCallItem({
             {footerMode === 'pending' && (
               <div className="smtcmp-toolcall-footer-actions">
                 {isAlwaysAllowDisabled ? (
-                  // 始终允许已禁用：直接渲染普通按钮，不展示下拉菜单
+                  // Always-allow is disabled: render a plain button instead of a dropdown menu
                   <button
                     type="button"
                     onClick={() => {
@@ -1191,7 +1191,7 @@ function useToolCall(
   const plugin = usePlugin()
   const showReloadNotice = useCallback(() => {
     new Notice(
-      '该工具调用来自已结束或已重载的会话，无法继续执行，请重新发起请求。',
+      'This tool call belongs to a session that has ended or been reloaded and cannot continue. Please submit a new request.',
     )
   }, [])
 

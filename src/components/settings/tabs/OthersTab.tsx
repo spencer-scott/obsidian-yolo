@@ -151,10 +151,10 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
               />
             </ObsidianSetting>
             <ObsidianSetting
-              name={t('settings.etc.mentionDisplayMode', '引用内容显示位置')}
+              name={t('settings.etc.mentionDisplayMode', 'Mention display location')}
               desc={t(
                 'settings.etc.mentionDisplayModeDesc',
-                '选择 @ 文件引用和 / 技能选择是在输入框内显示，还是在输入框顶部以徽章显示。',
+                'Choose whether @ file mentions and / skill selections are displayed inline in the input box or as badges at the top of the input box.',
               )}
               className="smtcmp-settings-card"
             >
@@ -163,9 +163,9 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 options={{
                   inline: t(
                     'settings.etc.mentionDisplayModeInline',
-                    '输入框内',
+                    'Inline',
                   ),
-                  badge: t('settings.etc.mentionDisplayModeBadge', '顶部徽章'),
+                  badge: t('settings.etc.mentionDisplayModeBadge', 'Top badges'),
                 }}
                 onChange={handleMentionDisplayModeChange}
               />
@@ -173,28 +173,28 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
             <ObsidianSetting
               name={t(
                 'settings.etc.mentionContextMode',
-                '@ 文件上下文注入模式',
+                '@ File context injection mode',
               )}
               desc={t(
                 'settings.etc.mentionContextModeDesc',
-                '控制 @ 文件注入到模型的方式，在轻量模式下将会注入引用文件的路径、笔记属性和 Markdown 结构，鼓励 Agent 只读取必要的内容。',
+                'Controls how @ file content is injected into the model. In light mode, only the file path, note properties, and Markdown structure are injected, encouraging the Agent to read only what is necessary.',
               )}
               className="smtcmp-settings-card"
             >
               <ObsidianDropdown
                 value={settings.chatOptions.mentionContextMode ?? 'light'}
                 options={{
-                  light: t('settings.etc.mentionContextModeLight', '轻量模式'),
-                  full: t('settings.etc.mentionContextModeFull', '全量模式'),
+                  light: t('settings.etc.mentionContextModeLight', 'Light mode'),
+                  full: t('settings.etc.mentionContextModeFull', 'Full mode'),
                 }}
                 onChange={handleMentionContextModeChange}
               />
             </ObsidianSetting>
             <ObsidianSetting
-              name={t('settings.etc.chatApplyMode', 'Chat 应用修改方式')}
+              name={t('settings.etc.chatApplyMode', 'Chat apply mode')}
               desc={t(
                 'settings.etc.chatApplyModeDesc',
-                '仅影响 Chat 侧边栏中的“应用”。可选择先进入内联审阅，或直接写入文件。关闭审阅后，点击应用将不再需要二次审批。',
+                'Only affects “Apply” in the Chat sidebar. Choose to enter inline review first, or write directly to the file. When review is disabled, clicking Apply will no longer require a second approval.',
               )}
               className="smtcmp-settings-card"
             >
@@ -203,11 +203,11 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 options={{
                   'review-required': t(
                     'settings.etc.chatApplyModeReviewRequired',
-                    '先审阅后应用',
+                    'Review before applying',
                   ),
                   'direct-apply': t(
                     'settings.etc.chatApplyModeDirectApply',
-                    '直接写入文件',
+                    'Write directly to file',
                   ),
                 }}
                 onChange={handleChatApplyModeChange}
@@ -216,11 +216,11 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
             <ObsidianSetting
               name={t(
                 'settings.etc.persistSelectionHighlight',
-                '保留选区块高亮',
+                'Persist selection block highlight',
               )}
               desc={t(
                 'settings.etc.persistSelectionHighlightDesc',
-                '在侧边栏 Chat 或 Quick Ask 交互时，持续显示编辑器中已选内容的块级高亮。',
+                'Persistently display block-level highlighting of selected content in the editor during sidebar Chat or Quick Ask interactions.',
               )}
               className="smtcmp-settings-card"
             >

@@ -311,11 +311,11 @@ export function ContinuationSection({ app: _app }: ContinuationSectionProps) {
                 <ObsidianSetting
                   name={t(
                     'settings.continuation.selectionChatAutoDock',
-                    '自动停靠到右上角',
+                    'Auto-dock to top right',
                   )}
                   desc={t(
                     'settings.continuation.selectionChatAutoDockDesc',
-                    '发送问题后自动移动到编辑器右上角（拖动后不再自动跟随）。',
+                    'Automatically move to the top right of the editor after sending a question (no longer follows automatically after dragging).',
                   )}
                   className="smtcmp-settings-card"
                 >

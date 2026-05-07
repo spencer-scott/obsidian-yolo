@@ -1,9 +1,11 @@
-// 外部 CLI 子进程执行器
+// External CLI subprocess runner
 //
-// 此模块由 external-cli/index.ts 在 Platform.isDesktop 守卫后通过
-// `await import('./runner')` 懒加载，因此对 mobile 不可达。可以顶级静态 import
-// node 内置模块（esbuild 已外部化为 require）；不要改用 dynamic `await import('node:...')`，
-// 那会被 cjs 输出保留为 ES dynamic import 并在 Electron renderer 里失败：
+// This module is lazy-loaded by external-cli/index.ts via
+// `await import('./runner')` behind a Platform.isDesktop guard, so it is
+// unreachable on mobile. Top-level static imports of node built-in modules
+// are safe (esbuild externalizes them to require); do NOT switch to dynamic
+// `await import('node:...')` as that would be preserved as an ES dynamic
+// import in the cjs output and fail in the Electron renderer:
 // "Failed to fetch dynamically imported module: node:xxx"
 /* eslint-disable import/no-nodejs-modules -- desktop-only module, lazy-loaded behind Platform.isDesktop */
 import { spawn } from 'node:child_process'
@@ -16,10 +18,12 @@ import { isAbsolute } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 /* eslint-enable import/no-nodejs-modules */
 
-// cross-spawn 仅在 Windows 分支调用：npm 全局安装的 claude / codex 是 .cmd
-// 包装脚本，Node 17+ 出于 CVE-2024-27980 默认拒绝直接 spawn .cmd/.bat。
-// cross-spawn 处理了 Windows 下 .cmd quoting（含空格、非 ASCII、shell 元字符）
-// 的边角情况，比 `shell: true` 更可靠，是 Node 生态事实标准。
+// cross-spawn is only used on the Windows branch: npm globally installed
+// claude / codex are .cmd wrapper scripts, and Node 17+ rejects direct
+// spawn of .cmd/.bat by default due to CVE-2024-27980.
+// cross-spawn handles Windows .cmd quoting edge cases (spaces, non-ASCII,
+// shell metacharacters) more reliably than `shell: true` and is the de
+// facto standard in the Node ecosystem.
 import { spawn as crossSpawn } from 'cross-spawn'
 import { shellEnvSync } from 'shell-env'
 
@@ -31,21 +35,21 @@ import { externalCliStreamBus } from './streamBus'
 import { stripAnsi } from './stripAnsi'
 import { which } from './which'
 
-// ────────── 常量 ──────────
+// ────────── Constants ──────────
 const MAX_OUTPUT_BYTES = 1 * 1024 * 1024 // 1MB
 const TRUNCATE_HEAD_BYTES = 256 * 1024 // 256KB
 const TRUNCATE_TAIL_BYTES = 256 * 1024 // 256KB
 const MAX_CONCURRENT = 3
 const SIGKILL_DELAY_MS = 3000
 
-// codex 允许的 sandboxMode 枚举
+// Allowed sandboxMode values for codex
 const CODEX_SANDBOX_MODES = new Set([
   'read-only',
   'workspace-write',
   'danger-full-access',
 ])
 
-// claude-code 允许的 sandboxMode 枚举
+// Allowed sandboxMode values for claude-code
 const CLAUDE_SANDBOX_MODES = new Set([
   'default',
   'acceptEdits',
@@ -53,10 +57,10 @@ const CLAUDE_SANDBOX_MODES = new Set([
   'plan',
 ])
 
-// model 字段白名单正则
+// Whitelist regex for the model field
 const MODEL_PATTERN = /^[A-Za-z0-9._-]+$/
 
-// ────────── 类型 ──────────
+// ────────── Types ──────────
 export type ExternalAgentProvider = 'codex' | 'claude-code'
 
 export type RunExternalAgentParams = {
@@ -68,15 +72,15 @@ export type RunExternalAgentParams = {
   model?: string
   timeoutSeconds?: number
   signal?: AbortSignal
-  /** 执行模式；默认 sync */
+  /** Execution mode; defaults to sync */
   mode?: 'sync' | 'async'
-  /** async 模式必需：任务唯一 ID */
+  /** Required for async mode: unique task ID */
   taskId?: string
-  /** async 模式必需：关联的会话 ID */
+  /** Required for async mode: associated conversation ID */
   conversationId?: string
-  /** async 模式必需：任务来源 */
+  /** Required for async mode: task source */
   source?: TaskSource
-  /** async 模式：供 UI 显示的短标题（从 prompt 截取） */
+  /** Async mode: short title for UI display (derived from prompt) */
   title?: string
 }
 
@@ -93,12 +97,12 @@ export type RunExternalAgentResult = {
   stdout: string
   stderr: string
   exitCode: number | null
-  /** stdout 双端截断元数据；未截断时为 undefined */
+  /** stdout head+tail truncation metadata; undefined when not truncated */
   truncated?: {
     totalBytes: number
     omittedBytes: number
   }
-  /** stderr 双端截断元数据；未截断时为 undefined */
+  /** stderr head+tail truncation metadata; undefined when not truncated */
   stderrTruncated?: {
     totalBytes: number
     omittedBytes: number
@@ -106,67 +110,73 @@ export type RunExternalAgentResult = {
   timedOut?: boolean
 }
 
-// ────────── 活跃进程集合（供 plugin unload 清理） ──────────
+// ────────── Active process set (for cleanup on plugin unload) ──────────
 const activeProcesses = new Set<() => void>()
 
-/** plugin unload 时调用，杀光所有活跃子进程 */
+/** Called on plugin unload to kill all active child processes */
 export function killAllActiveExternalCli(): void {
   for (const killFn of activeProcesses) {
     try {
       killFn()
     } catch {
-      // 忽略单个失败，继续清理其他
+      // Ignore individual failures, continue cleaning up the rest
     }
   }
   activeProcesses.clear()
 }
 
-// ────────── UTF-8 safe 字节截断 ──────────
+// ────────── UTF-8 safe byte truncation ──────────
 
 /**
- * 修剪 Buffer 末尾不完整的 UTF-8 多字节序列。
- * 从末尾找到最后一个起始字节（leading byte），检查其需要的 continuation bytes
- * 是否完整；若不完整则截掉整个序列。
+ * Trim incomplete UTF-8 multibyte sequences from the end of a Buffer.
+ * Scans backward to find the last leading byte, then checks whether its
+ * required continuation bytes are present; if not, the entire sequence
+ * is removed.
  *
- * 用于 buf.length <= maxBytes 时也需要保证末尾合法的场景（如采集阶段 chunk 被切断）。
+ * Used even when buf.length <= maxBytes to ensure a valid ending (e.g.,
+ * when a chunk boundary falls mid-character during collection).
  */
 function trimUtf8End(buf: Buffer): Buffer {
   let end = buf.length
-  // 从后往前跳过 continuation bytes，找最后一个起始字节
+  // Skip backward past continuation bytes to find the last leading byte
   let i = end - 1
   while (i >= 0 && (buf[i] & 0xc0) === 0x80) {
     i--
   }
   if (i < 0) return buf.subarray(0, 0)
-  // 检查最后一个起始字节需要多少 continuation bytes
+  // Determine how many continuation bytes the last leading byte requires
   const lead = buf[i]
   let expectedLen = 1
   if ((lead & 0x80) === 0x00) expectedLen = 1
   else if ((lead & 0xe0) === 0xc0) expectedLen = 2
   else if ((lead & 0xf0) === 0xe0) expectedLen = 3
   else if ((lead & 0xf8) === 0xf0) expectedLen = 4
-  const actualCont = end - 1 - i // 实际跟在起始字节后面的连续字节数
+  const actualCont = end - 1 - i // Actual number of continuation bytes after the leading byte
   const neededCont = expectedLen - 1
   if (actualCont < neededCont) {
-    // 序列不完整，截掉这个起始字节及其不足的 continuation bytes
+    // Sequence is incomplete; remove this leading byte and its insufficient continuation bytes
     end = i
   }
   return buf.subarray(0, end)
 }
 
 /**
- * 将 Buffer 截断到 maxBytes，并确保截断点是合法 UTF-8 字符边界。
+ * Truncate a Buffer to maxBytes, ensuring the cut point falls on a valid
+ * UTF-8 character boundary.
  *
- * 若截断点落在 continuation byte 上，向前回退到该多字节序列的起始字节，
- * 然后截掉整个序列（保守截断，确保末尾是完整字符）。
+ * If the cut point lands on a continuation byte, walk backward to the
+ * leading byte of that multibyte sequence, then remove the entire
+ * sequence (conservative truncation to ensure a complete character at
+ * the end).
  *
- * 若 buf.length <= maxBytes，则调用 trimUtf8End 修剪末尾可能的不完整序列。
+ * If buf.length <= maxBytes, calls trimUtf8End to trim any trailing
+ * incomplete sequence.
  */
 function trimToUtf8Boundary(buf: Buffer, maxBytes: number): Buffer {
   if (buf.length <= maxBytes) {
     return trimUtf8End(buf)
   }
-  // 截断点可能落在 continuation byte 上，向前找起始字节
+  // The cut point may land on a continuation byte; walk backward to the leading byte
   let cutAt = maxBytes
   while (cutAt > 0 && (buf[cutAt] & 0xc0) === 0x80) {
     cutAt--
@@ -175,8 +185,9 @@ function trimToUtf8Boundary(buf: Buffer, maxBytes: number): Buffer {
 }
 
 /**
- * 从前端跳过 continuation byte，找到第一个合法的 UTF-8 字符起始位置。
- * 防止 tail 前端出现半截多字节字符导致 toString 出现 replacement char。
+ * Skip past leading continuation bytes to find the first valid UTF-8
+ * character start position. Prevents partial multibyte characters at
+ * the front of the tail from producing replacement chars in toString.
  */
 function trimUtf8Front(buf: Buffer): Buffer {
   let start = 0
@@ -187,22 +198,25 @@ function trimUtf8Front(buf: Buffer): Buffer {
 }
 
 /**
- * 流式采集器：
- * - 当 totalBytes <= MAX_OUTPUT_BYTES 时：全量保留所有 chunks，finalize 直接拼接。
- * - 一旦 totalBytes 超过 MAX_OUTPUT_BYTES：切换到 head+tail 双端模式，
- *   内存稳态上限 ≈ TRUNCATE_HEAD_BYTES + TRUNCATE_TAIL_BYTES（512KB）。
+ * Streaming output collector:
+ * - When totalBytes <= MAX_OUTPUT_BYTES: keeps all chunks in full; finalize
+ *   concatenates them directly.
+ * - Once totalBytes exceeds MAX_OUTPUT_BYTES: switches to head+tail mode
+ *   with a steady-state memory cap of approx.
+ *   TRUNCATE_HEAD_BYTES + TRUNCATE_TAIL_BYTES (512KB).
  *
- * 语义保证：≤ MAX_OUTPUT_BYTES 的输出全量返回，不丢数据；
- *           > MAX_OUTPUT_BYTES 才进行双端截断并标记 truncated metadata。
+ * Guarantee: output <= MAX_OUTPUT_BYTES is returned in full with no data
+ *            loss; only output > MAX_OUTPUT_BYTES is head+tail truncated
+ *            and marked with truncated metadata.
  */
 class CappedOutputCollector {
-  // 全量模式：totalBytes <= MAX_OUTPUT_BYTES 时使用
+  // Full mode: used when totalBytes <= MAX_OUTPUT_BYTES
   private fullChunks: Buffer[] = []
-  // 双端模式：超过 MAX_OUTPUT_BYTES 后使用
+  // Head+tail mode: used after exceeding MAX_OUTPUT_BYTES
   private headChunks: Buffer[] = []
   private tailChunks: Buffer[] = []
   private tailBytes = 0
-  // 是否已进入双端模式
+  // Whether head+tail mode has been entered
   private capped = false
   totalBytes = 0
 
@@ -211,19 +225,21 @@ class CappedOutputCollector {
 
     if (!this.capped) {
       if (this.totalBytes <= MAX_OUTPUT_BYTES) {
-        // 全量模式：直接追加
+        // Full mode: append directly
         this.fullChunks.push(chunk)
         return
       }
-      // 首次超过 MAX_OUTPUT_BYTES：把已收集 chunks **加上当前 chunk** 一起当作"目前为止全部"
-      // 来切分，否则首个大 chunk 触发跨阈值时 head 会是空的。
+      // First time exceeding MAX_OUTPUT_BYTES: treat all collected chunks
+      // **plus the current chunk** as "everything so far" to split from,
+      // otherwise head would be empty when the first large chunk crosses
+      // the threshold.
       this.capped = true
       const allSoFar = Buffer.concat([...this.fullChunks, chunk])
       this.fullChunks = []
-      // 填充 head（最多 TRUNCATE_HEAD_BYTES）
+      // Fill head (up to TRUNCATE_HEAD_BYTES)
       const headPart = allSoFar.subarray(0, TRUNCATE_HEAD_BYTES)
       this.headChunks.push(headPart)
-      // 剩余部分放入 tail，复用 _trimTail 控制上限
+      // Put the remainder into tail, reuse _trimTail to enforce the cap
       if (allSoFar.length > TRUNCATE_HEAD_BYTES) {
         const leftover = allSoFar.subarray(TRUNCATE_HEAD_BYTES)
         this.tailChunks.push(leftover)
@@ -233,22 +249,22 @@ class CappedOutputCollector {
       return
     }
 
-    // 双端模式：head 已满，新 chunk 直接进 tail
+    // Head+tail mode: head is full, new chunks go directly to tail
     this.tailChunks.push(chunk)
     this.tailBytes += chunk.length
     this._trimTail()
   }
 
   private _trimTail(): void {
-    // 从前面 shift 直到 tailBytes <= TRUNCATE_TAIL_BYTES
+    // Shift from the front until tailBytes <= TRUNCATE_TAIL_BYTES
     while (this.tailBytes > TRUNCATE_TAIL_BYTES && this.tailChunks.length > 0) {
       const front = this.tailChunks[0]
       if (this.tailBytes - front.length >= TRUNCATE_TAIL_BYTES) {
-        // 整块丢弃
+        // Discard the entire chunk
         this.tailBytes -= front.length
         this.tailChunks.shift()
       } else {
-        // 部分丢弃：只保留尾部
+        // Partial discard: keep only the tail portion
         const keep = TRUNCATE_TAIL_BYTES - (this.tailBytes - front.length)
         this.tailChunks[0] = front.subarray(front.length - keep)
         this.tailBytes = TRUNCATE_TAIL_BYTES
@@ -262,47 +278,53 @@ class CappedOutputCollector {
     truncated?: { totalBytes: number; omittedBytes: number }
   } {
     if (!this.capped) {
-      // 全量模式：直接拼接，不截断
+      // Full mode: concatenate directly, no truncation
       const text = Buffer.concat(this.fullChunks).toString('utf8')
       return { text }
     }
 
-    // 双端模式：修剪 UTF-8 边界后拼接
+    // Head+tail mode: trim UTF-8 boundaries then concatenate
     const headBuf = trimToUtf8Boundary(
       Buffer.concat(this.headChunks),
       TRUNCATE_HEAD_BYTES,
     )
     const rawTail = Buffer.concat(this.tailChunks)
-    // 修剪 tail 前端的 continuation byte，防止拼接后出现 replacement char
+    // Trim leading continuation bytes from tail to prevent replacement chars after joining
     const tailBuf = trimToUtf8Boundary(
       trimUtf8Front(rawTail),
       TRUNCATE_TAIL_BYTES,
     )
 
     const omittedBytes = this.totalBytes - headBuf.length - tailBuf.length
-    const marker = `\n\n... [输出过长，中间 ${omittedBytes} 字节已省略] ...\n\n`
+    const marker = `\n\n... [output too long, ${omittedBytes} bytes omitted from the middle] ...\n\n`
     const text = headBuf.toString('utf8') + marker + tailBuf.toString('utf8')
     return { text, truncated: { totalBytes: this.totalBytes, omittedBytes } }
   }
 }
 
-// 从 prompt 截取短标题（去换行合并空白，最多 60 字符）
+// Derive a short title from the prompt (collapse whitespace, max 60 chars)
 function deriveTitleFromPrompt(prompt: string): string {
   return prompt.replace(/\s+/g, ' ').trim().slice(0, 60)
 }
 
 /**
- * 创建跨平台进程树 kill 函数。
+ * Create a cross-platform process tree kill function.
  *
- * - POSIX: 子进程以 `detached: true` 启动成为新进程组 leader，发负 PID 信号
- *   能覆盖整个进程组（SIGTERM 温和，3s 后 SIGKILL 强制）。
- * - Windows: 没有进程组语义，且 .cmd 包装会再 fork node.exe。用 `taskkill /T /F`
- *   递归强杀整个进程树。Windows 没有"温柔退出"对应物，直接强杀务实，无两段式。
+ * - POSIX: the child process is spawned with `detached: true` making it
+ *   the leader of a new process group; sending a signal to the negative
+ *   PID covers the entire group (SIGTERM graceful, SIGKILL forced after
+ *   3 seconds).
+ * - Windows: there is no process group semantics, and .cmd wrappers fork
+ *   node.exe. Use `taskkill /T /F` to recursively force-kill the entire
+ *   process tree. Windows has no graceful shutdown equivalent, so a
+ *   direct force-kill is pragmatic with no two-phase approach.
  *
- * 幂等：多次调用（timeout / abort / unload 同时触发）只会发一次 kill。
+ * Idempotent: multiple calls (timeout / abort / unload firing
+ * simultaneously) will only send one kill.
  *
- * 兜底：Windows 下若 taskkill spawn 失败（极端情况：PATH 没 taskkill），
- * 退化到 `child.kill()`（runtime 等价于 TerminateProcess），至少能让 close 触发。
+ * Fallback: on Windows, if taskkill spawn fails (edge case: taskkill not
+ * in PATH), falls back to `child.kill()` (runtime equivalent of
+ * TerminateProcess), at least triggering the close event.
  */
 function createKillProcess(child: ChildProcessWithoutNullStreams): {
   killProcess: () => void
@@ -324,14 +346,15 @@ function createKillProcess(child: ChildProcessWithoutNullStreams): {
     if (child.pid === undefined) return
 
     if (process.platform === 'win32') {
-      // Windows: taskkill /T 递归杀进程树，/F 强制（无温和信号语义）
+      // Windows: taskkill /T recursively kills the process tree, /F forces (no graceful signal semantics)
       const fallbackKill = () => {
-        // child.kill() 在 Windows runtime 等价 TerminateProcess，对 cmd.exe 顶层
-        // 进程仍然有效；子进程残留极少见，不再做更进一步兜底。
+        // child.kill() is the Windows runtime equivalent of TerminateProcess
+        // and is still effective for the top-level cmd.exe process; orphaned
+        // child processes are rare, no further fallback is needed.
         try {
           child.kill()
         } catch {
-          // 已退出，忽略
+          // Already exited, ignore
         }
       }
       try {
@@ -339,10 +362,11 @@ function createKillProcess(child: ChildProcessWithoutNullStreams): {
           windowsHide: true,
           stdio: 'ignore',
         })
-        // 'error' 事件：taskkill 二进制找不到 / 启动失败
+        // 'error' event: taskkill binary not found / failed to start
         tk.once('error', fallbackKill)
-        // 'close' 事件：taskkill 启动成功但退出码非 0（如权限不足、PID 已退出）
-        // PID 已退出场景下 child.kill() 是 no-op，无害；否则给一次额外杀机会。
+        // 'close' event: taskkill started but exited non-zero (e.g., permission
+        // denied, PID already exited). In the "already exited" case child.kill()
+        // is a no-op and harmless; otherwise it gives one extra kill attempt.
         tk.once('close', (code) => {
           if (code !== 0) fallbackKill()
         })
@@ -352,18 +376,18 @@ function createKillProcess(child: ChildProcessWithoutNullStreams): {
       return
     }
 
-    // POSIX: SIGTERM 进程组 → 3s 后 SIGKILL 兜底
+    // POSIX: SIGTERM the process group, then SIGKILL fallback after 3s
     try {
       process.kill(-child.pid, 'SIGTERM')
     } catch {
-      // 进程可能已退出，忽略
+      // Process may have already exited, ignore
     }
     killTimer = setTimeout(() => {
       if (child.pid === undefined) return
       try {
         process.kill(-child.pid, 'SIGKILL')
       } catch {
-        // 已退出，忽略
+        // Already exited, ignore
       }
     }, SIGKILL_DELAY_MS)
   }
@@ -371,7 +395,7 @@ function createKillProcess(child: ChildProcessWithoutNullStreams): {
   return { killProcess, cancelPendingKill }
 }
 
-// ────────── 主函数 ──────────
+// ────────── Main function ──────────
 export async function runExternalAgent(
   params: RunExternalAgentParams,
 ): Promise<RunExternalAgentResult | AsyncPlaceholderResult> {
@@ -391,12 +415,12 @@ export async function runExternalAgent(
     title,
   } = params
 
-  // ── signal.aborted 早检查（必修 5）──
+  // ── Early check for signal.aborted ──
   if (externalSignal?.aborted) {
     throw new Error('Aborted before start')
   }
 
-  // ── sandboxMode 枚举校验（提前到占槽之前，避免 placeholder 泄漏，必修 6）──
+  // ── Validate sandboxMode enum (before slot reservation to avoid placeholder leak) ──
   const allowedSandboxModes =
     provider === 'codex' ? CODEX_SANDBOX_MODES : CLAUDE_SANDBOX_MODES
   if (!allowedSandboxModes.has(sandboxMode)) {
@@ -406,16 +430,17 @@ export async function runExternalAgent(
     )
   }
 
-  // ── model 字段校验（提前到占槽之前，避免 placeholder 泄漏，必修 6）──
+  // ── Validate model field (before slot reservation to avoid placeholder leak) ──
   if (model !== undefined && !MODEL_PATTERN.test(model)) {
     throw new Error(
       `model "${model}" contains invalid characters. Only [A-Za-z0-9._-] are allowed.`,
     )
   }
 
-  // ── workingDirectory 校验：必须是绝对路径，且指向存在的目录 ──
-  // 在并发占槽之前抛错，避免泄漏占槽；错误信息明确，避免 spawn 报 ENOENT 时
-  // 把锅甩给 cli 二进制路径（实际 cwd 不存在）造成误导。
+  // ── Validate workingDirectory: must be an absolute path pointing to an existing directory ──
+  // Throw before reserving a concurrency slot to avoid leaking the slot;
+  // clear error messages prevent confusion with ENOENT from spawn
+  // (which would misleadingly blame the CLI binary path when cwd is missing).
   if (!isAbsolute(workingDirectory)) {
     throw new Error(
       `workingDirectory must be an absolute path: ${workingDirectory}`,
@@ -451,23 +476,25 @@ export async function runExternalAgent(
     )
   }
 
-  // ── 并发上限（先占槽再 await，避免并发调用同时通过检查）──
+  // ── Concurrency limit (reserve slot before any await to prevent race conditions) ──
   if (activeProcesses.size >= MAX_CONCURRENT) {
     throw new Error('too many concurrent external agents (max 3)')
   }
-  // 在第一个 await 之前立即占槽（placeholder），后续替换为真实 kill 函数
+  // Reserve a slot immediately before the first await (placeholder), later replaced with the real kill function
   const placeholder: () => void = () => {}
   activeProcesses.add(placeholder)
 
-  // 占槽之后所有路径（含 await 与同步 throw）必须保证 placeholder 释放，
-  // 否则连续启动失败会塞满并发槽。统一用一个 try 包到替换为 killProcess 为止。
+  // After reserving a slot, all code paths (including await and synchronous
+  // throw) must ensure the placeholder is released, otherwise consecutive
+  // startup failures will fill up the concurrency slots. A single try block
+  // covers everything up to the replacement with killProcess.
   let env: NodeJS.ProcessEnv
   let cliPath: string | null
   try {
-    // ── 加载 shell env ──
+    // ── Load shell environment ──
     env = shellEnvSync()
 
-    // ── 查找 CLI 可执行文件 ──
+    // ── Find CLI executable ──
     const cliName = provider === 'codex' ? 'codex' : 'claude'
     cliPath = await which(cliName, env)
     if (!cliPath) {
@@ -482,7 +509,7 @@ export async function runExternalAgent(
     throw err
   }
 
-  // ── 构造命令参数 ──
+  // ── Build command arguments ──
   const modelArgs: string[] = model ? ['--model', model] : []
 
   let args: string[]
@@ -493,10 +520,10 @@ export async function runExternalAgent(
       sandboxMode,
       '--skip-git-repo-check',
       ...modelArgs,
-      '-', // prompt 通过 stdin 传入
+      '-', // prompt is passed via stdin
     ]
   } else {
-    // claude-code：启用 stream-json 模式以获取实时进度
+    // claude-code: enable stream-json mode for real-time progress
     args = [
       '-p',
       '--output-format',
@@ -509,18 +536,19 @@ export async function runExternalAgent(
     ]
   }
 
-  // ── 初始化流式总线状态 ──
+  // ── Initialize stream bus state ──
   externalCliStreamBus.push({ type: 'status', toolCallId, status: 'starting' })
 
-  // ── spawn 与 stdin.write 也必须释放 placeholder，否则 spawn 同步抛错
-  // / pipe 错误都会泄漏并发槽。 ──
+  // ── spawn and stdin.write must also release the placeholder, otherwise
+  // a synchronous spawn error / pipe error would leak the concurrency slot. ──
   //
-  // 平台分支：
-  //  - POSIX: detached: true 让子进程成为新进程组 leader，配合
-  //    `process.kill(-pid)` 进程组语义实现进程树 kill。
-  //  - Windows: 用 cross-spawn 处理 .cmd 包装脚本与 quoting；不需要 detached
-  //    （Windows 没有进程组语义），杀进程树由 taskkill /T 完成；windowsHide
-  //    避免弹独立控制台窗口。
+  // Platform branches:
+  //  - POSIX: detached: true makes the child the leader of a new process
+  //    group, enabling process tree kill via `process.kill(-pid)`.
+  //  - Windows: use cross-spawn to handle .cmd wrapper scripts and quoting;
+  //    detached is not needed (Windows has no process group semantics),
+  //    process tree kill is done by taskkill /T; windowsHide prevents
+  //    a separate console window from appearing.
   const isWindows = process.platform === 'win32'
   const spawnOptions: SpawnOptions = isWindows
     ? {
@@ -544,12 +572,14 @@ export async function runExternalAgent(
       spawnOptions,
     ) as ChildProcessWithoutNullStreams
 
-    // 向 stdin 写入 prompt，写完立即关闭防止死锁
+    // Write the prompt to stdin, then close immediately to prevent deadlock
     if (child.stdin) {
-      // 监听 stdin error（如目标进程秒退导致 EPIPE），避免冒泡成
-      // unhandled rejection。子进程退出码会通过 close 事件如实反映失败。
+      // Listen for stdin errors (e.g., EPIPE when the target process exits
+      // immediately) to prevent them from bubbling up as unhandled rejections.
+      // The child process exit code will faithfully reflect the failure via
+      // the close event.
       child.stdin.on('error', () => {
-        // 静默：错误信息已通过 stderr/exitCode 传出，stdin 错误本身无需上报
+        // Silent: error info is already conveyed via stderr/exitCode; the stdin error itself needs no reporting
       })
       child.stdin.write(prompt, 'utf8')
       child.stdin.end()
@@ -561,7 +591,7 @@ export async function runExternalAgent(
 
   externalCliStreamBus.push({ type: 'status', toolCallId, status: 'running' })
 
-  // ── async 模式：注册 registry，最终 resolve 后在后台继续跑 ──
+  // ── Async mode: register in the registry, continue running in the background after resolve ──
   const isAsync = mode === 'async'
   const resolvedTitle = title ?? deriveTitleFromPrompt(prompt)
 
@@ -569,7 +599,7 @@ export async function runExternalAgent(
   let effectiveSignal = externalSignal
   if (isAsync && taskId && conversationId && source) {
     const abortController = new AbortController()
-    // 如果外部传了 signal，串联到我们自己的 abortController
+    // If an external signal was provided, chain it to our own abortController
     externalSignal?.addEventListener('abort', () => abortController.abort(), {
       once: true,
     })
@@ -587,15 +617,15 @@ export async function runExternalAgent(
       abortController,
     }
     asyncTaskRegistry.register(asyncRecord)
-    // 用 asyncRecord 的 abortController.signal 作为进程中止信号
+    // Use asyncRecord's abortController.signal as the process abort signal
     effectiveSignal = abortController.signal
   }
 
-  // ── 采集输出（字节级，内存上限 ≈ 512KB per stream） ──
+  // ── Collect output (byte-level, memory cap approx. 512KB per stream) ──
   const stderrCollector = new CappedOutputCollector()
 
   if (provider === 'codex') {
-    // codex：stdout 直接作为最终结果文本
+    // codex: stdout is used directly as the final result text
     const stdoutCollector = new CappedOutputCollector()
 
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -624,14 +654,14 @@ export async function runExternalAgent(
       }
     })
 
-    // ── 进程树 kill 函数（跨平台 + 幂等）──
+    // ── Process tree kill function (cross-platform + idempotent) ──
     const { killProcess, cancelPendingKill } = createKillProcess(child)
 
-    // 将占位符替换为真实 kill 函数
+    // Replace the placeholder with the real kill function
     activeProcesses.delete(placeholder)
     activeProcesses.add(killProcess)
 
-    // ── 后台完成处理（async 模式 close 后 emit task-completed）──
+    // ── Background completion handler (emit task-completed after close in async mode) ──
     const handleClose = (code: number | null, timedOut: boolean) => {
       if (!asyncRecord) return
       const { text: stdoutText } = stdoutCollector.finalize()
@@ -640,7 +670,7 @@ export async function runExternalAgent(
 
       let finalStatus: AsyncTaskRecord['status']
       if (asyncRecord.abortController.signal.aborted) {
-        // 判断是 plugin unload 导致的 abortAll 还是用户主动取消
+        // Determine whether this was caused by plugin unload (abortAll) or user-initiated cancel
         finalStatus = 'cancelled'
       } else if (timedOut) {
         finalStatus = 'timed_out'
@@ -669,7 +699,7 @@ export async function runExternalAgent(
       }
     }
 
-    // ── 返回 Promise ──
+    // ── Return Promise ──
     const syncPromise = new Promise<RunExternalAgentResult>(
       (resolve, reject) => {
         let timedOut = false
@@ -735,7 +765,7 @@ export async function runExternalAgent(
     )
 
     if (isAsync && asyncRecord) {
-      // 后台跑，不 await；错误不上抛（子进程失败已通过 task-completed 事件传出）
+      // Run in background, do not await; errors are not thrown (subprocess failures are conveyed via task-completed events)
       syncPromise.catch(() => {})
       return {
         accepted: true,
@@ -750,7 +780,7 @@ export async function runExternalAgent(
     return syncPromise
   }
 
-  // ── claude-code 分支：stream-json 解析 ──
+  // ── claude-code branch: stream-json parsing ──
   const finalTextCollector = new CappedOutputCollector()
 
   const claudeParser = new ClaudeStreamParser({
@@ -781,7 +811,7 @@ export async function runExternalAgent(
     },
   })
 
-  // 用 StringDecoder 流式解码，避免 Buffer 切在多字节字符（中文/emoji）中间产生 �。
+  // Use StringDecoder for streaming decode to prevent replacement chars when Buffer splits mid-multibyte character (CJK/emoji).
   const stdoutDecoder = new StringDecoder('utf8')
   let parserFinished = false
   const finishParserOnce = () => {
@@ -811,14 +841,14 @@ export async function runExternalAgent(
     })
   })
 
-  // ── 进程树 kill 函数（跨平台 + 幂等）──
+  // ── Process tree kill function (cross-platform + idempotent) ──
   const { killProcess, cancelPendingKill } = createKillProcess(child)
 
-  // 将占位符替换为真实 kill 函数
+  // Replace the placeholder with the real kill function
   activeProcesses.delete(placeholder)
   activeProcesses.add(killProcess)
 
-  // ── 后台完成处理（async 模式 close 后 emit task-completed）──
+  // ── Background completion handler (emit task-completed after close in async mode) ──
   const handleCloseAsync = (code: number | null, timedOut: boolean) => {
     if (!asyncRecord) return
     const { text: stdoutText } = finalTextCollector.finalize()
@@ -855,11 +885,13 @@ export async function runExternalAgent(
     }
   }
 
-  // ── 返回 Promise ──
+  // ── Return Promise ──
   const claudeSyncPromise = new Promise<RunExternalAgentResult>(
     (resolve, reject) => {
-      // 超时标志（必修 4）：不在 setTimeout 里 reject，让 close 事件正常 resolve。
-      // 仅当显式传入 timeoutSeconds 时启用 timer；不传则不超时（劳务派遣类任务可能跑很久，由用户主动取消）。
+      // Timeout flag: do not reject inside setTimeout; let the close event
+      // resolve normally. Only enable the timer when timeoutSeconds is
+      // explicitly provided; otherwise no timeout (long-running delegated
+      // tasks may run indefinitely and are cancelled by the user).
       let timedOut = false
       const timeoutId: ReturnType<typeof setTimeout> | undefined =
         timeoutSeconds !== undefined
@@ -869,10 +901,10 @@ export async function runExternalAgent(
             }, timeoutSeconds * 1000)
           : undefined
 
-      // 外部 abort signal
+      // External abort signal
       const onAbort = () => {
         killProcess()
-        // resolve（而非 reject）以便调用方获取已采集的输出
+        // resolve (not reject) so the caller can access the output collected so far
         clearTimeout(timeoutId)
       }
       effectiveSignal?.addEventListener('abort', onAbort, { once: true })

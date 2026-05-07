@@ -1,9 +1,10 @@
-// 把异步派遣完成的内部消息（ChatExternalAgentResultMessage）合成成一条
-// 普通的 ChatToolMessage，喂给 <ToolMessage> 组件复用整套 UI（可折叠
-// header、headline summary、展开后的 ExternalAgentToolCard 等）。
+// Synthesize an internal async dispatch result message (ChatExternalAgentResultMessage)
+// into a regular ChatToolMessage, feeding it to the <ToolMessage> component to reuse
+// the full UI (collapsible header, headline summary, expanded ExternalAgentToolCard, etc.).
 //
-// 这样异步结果的视觉与同步派遣完成的工具卡片完全一致，唯一区别是
-// 状态徽章显示「已完成 / 失败 / 取消 / 超时」而非「执行中」。
+// This way the visual appearance of async results is identical to synchronously completed
+// tool cards. The only difference is the status badge shows "completed / failed / cancelled / timed out"
+// instead of "running".
 
 import { getLocalFileToolServerName } from '../../../core/mcp/localFileTools'
 import { getToolName } from '../../../core/mcp/tool-name-utils'
@@ -32,14 +33,14 @@ export function buildSynthToolMessageFromResult(
 function buildSynthRequest(
   message: ChatExternalAgentResultMessage,
 ): ToolCallRequest {
-  // 用 taskId 作为 toolCallId — 不会命中 stream bus snapshot，自然走 fallback。
-  // arguments 仅放 provider + 一个简短 prompt（title），让 headline summary
-  // 能拼出 "{provider} | {title}" 而不是裸 stdout 的前 80 字。
+  // Use taskId as toolCallId - will not match stream bus snapshot, naturally falls back.
+  // arguments only contain provider + a short prompt (title), so headline summary
+  // can compose "{provider} | {title}" instead of the raw first 80 chars of stdout.
   return {
     id: `result-${message.taskId}`,
-    // 必须用完整 server-qualified 名（如 yolo_local__delegate_external_agent），
-    // 否则 ToolMessage 的 parseToolName / displayNames 找不到友好标签，
-    // headline 会退化成 raw tool name。
+    // Must use the full server-qualified name (e.g. yolo_local__delegate_external_agent),
+    // otherwise ToolMessage's parseToolName / displayNames cannot find the friendly label,
+    // and the headline will degrade to the raw tool name.
     name: getToolName(getLocalFileToolServerName(), 'delegate_external_agent'),
     arguments: {
       kind: 'complete',
@@ -56,8 +57,8 @@ function buildSynthResponse(
 ): ToolCallResponse {
   const stdout = message.stdout ?? ''
   const stderr = message.stderr ?? ''
-  // ExternalAgentToolCard 在 fallback 路径下只会读 response.data.text，
-  // 所以把 stderr 作为 progress 上下文拼到 stdout 前面，再用 --- 分隔。
+  // ExternalAgentToolCard in the fallback path only reads response.data.text,
+  // so prepend stderr as progress context before stdout, separated by ---.
   const combined =
     stderr && stdout ? `${stderr}\n---\n${stdout}` : stderr || stdout
 

@@ -1,4 +1,4 @@
-// AsyncTaskRegistry 单元测试
+// AsyncTaskRegistry unit tests
 
 import type { AsyncTaskRecord } from './async-task-registry'
 import { AsyncTaskRegistry } from './async-task-registry'

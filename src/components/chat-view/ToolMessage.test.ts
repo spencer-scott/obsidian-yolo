@@ -49,9 +49,9 @@ describe('ToolMessage headline helpers', () => {
       delete_dir: 'Delete folder',
       move: 'Move path',
     },
-    readFull: '全文',
+    readFull: 'Full',
     readLineRange: (startLine: number, endLine: number, isPdf: boolean) =>
-      `${startLine}-${endLine}${isPdf ? '页' : '行'}`,
+      `${startLine}-${endLine}${isPdf ? ' pages' : ' lines'}`,
     target: 'Target',
     scope: 'Scope',
     query: 'Query',
@@ -162,7 +162,7 @@ describe('ToolMessage headline helpers', () => {
         },
         labels,
       }).summaryText,
-    ).toBe('docs/plan.md | 全文')
+    ).toBe('docs/plan.md | Full')
   })
 
   it('adds line-range mode to successful fs_read headlines (markdown)', () => {
@@ -202,10 +202,10 @@ describe('ToolMessage headline helpers', () => {
         },
         labels,
       }).summaryText,
-    ).toBe('docs/plan.md | 12-61行')
+    ).toBe('docs/plan.md | 12-61 lines')
   })
 
-  it('uses 页 suffix and single-page range for PDF fs_read headlines', () => {
+  it('uses pages suffix and single-page range for PDF fs_read headlines', () => {
     expect(
       getHeadlineDisplayInfo({
         request: {
@@ -242,7 +242,7 @@ describe('ToolMessage headline helpers', () => {
         },
         labels,
       }).summaryText,
-    ).toBe('docs/paper.pdf | 1-1页')
+    ).toBe('docs/paper.pdf | 1-1 pages')
   })
 
   it('omits range while fs_read response is pending', () => {
@@ -339,7 +339,7 @@ describe('ToolMessage headline helpers', () => {
       }),
     ).toEqual({
       displayName: 'Create file',
-      summaryText: '在 docs 下创建 2 个文件',
+      summaryText: 'Create 2 files in docs',
     })
   })
 
@@ -362,7 +362,7 @@ describe('ToolMessage headline helpers', () => {
       }),
     ).toEqual({
       displayName: 'Move path',
-      summaryText: '移动 3 项到 docs',
+      summaryText: 'Move 3 items to docs',
     })
   })
 
@@ -385,7 +385,7 @@ describe('ToolMessage headline helpers', () => {
       }),
     ).toEqual({
       displayName: 'Delete file',
-      summaryText: '删除 docs 下 3 个文件',
+      summaryText: 'Delete 3 files in docs',
     })
   })
 
@@ -407,7 +407,7 @@ describe('ToolMessage headline helpers', () => {
       }),
     ).toEqual({
       displayName: 'Create file',
-      summaryText: '创建 2 个文件',
+      summaryText: 'Create 2 files',
     })
   })
 })

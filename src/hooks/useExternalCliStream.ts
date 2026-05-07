@@ -1,5 +1,5 @@
-// 订阅外部 CLI 流式事件的 React hook
-// 先通过 getSnapshot 补齐历史，再订阅后续 push；50ms 节流避免每 chunk 一次 setState
+// React hook for subscribing to external CLI streaming events
+// First backfill history via getSnapshot, then subscribe to subsequent pushes; 50ms throttle to avoid setState per chunk
 
 import { App } from 'obsidian'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -22,12 +22,12 @@ export type ExternalCliViewSnapshot =
     }
 
 /**
- * 订阅指定 toolCallId 的流式输出，支持历史会话从磁盘缓存加载进度日志。
+ * Subscribe to streaming output for a given toolCallId, with support for loading progress logs from disk cache for historical conversations.
  *
- * 返回语义：
- * - `null`  → 历史会话且磁盘无缓存，应走静态渲染路径
- * - source === 'live'       → 当前正在运行或已结束的实时快照
- * - source === 'historical' → 历史会话，从磁盘缓存加载的进度日志
+ * Return semantics:
+ * - `null`  -> historical conversation with no disk cache, should use static render path
+ * - source === 'live'       -> currently running or finished live snapshot
+ * - source === 'historical' -> historical conversation, progress logs loaded from disk cache
  */
 export function useExternalCliStream(
   toolCallId: string,
@@ -43,7 +43,7 @@ export function useExternalCliStream(
     },
   )
 
-  // 节流定时器 ref
+  // Throttle timer ref
   const pendingRef = useRef<ExternalCliSnapshot | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -70,11 +70,11 @@ export function useExternalCliStream(
       setSnapshot({ ...initial, source: 'live' })
     } else {
       setSnapshot(null)
-      // 历史会话：异步从磁盘缓存加载进度日志
+      // Historical conversation: asynchronously load progress logs from disk cache
       void loadExternalAgentProgress({ app, settings, toolCallId })
         .then((stored) => {
           if (cancelled) return
-          // 防御：load 完成时若 bus 已出现 live snapshot，让 subscribe 回调驱动，不要被 historical 盖掉
+          // Guard: if a live snapshot appeared on the bus by the time load completes, let the subscribe callback drive state instead of overwriting with historical data
           if (externalCliStreamBus.getSnapshot(toolCallId) !== null) return
           if (!stored) return
           setSnapshot({
@@ -86,11 +86,11 @@ export function useExternalCliStream(
           })
         })
         .catch(() => {
-          // load 失败保持 null
+          // On load failure, keep null
         })
     }
 
-    // 始终订阅：即使初始无 snapshot，runner 后续也可能 push（防御历史 → live 的边角 race）
+    // Always subscribe: even without an initial snapshot, the runner may push later (guards against historical-to-live edge-case race)
     const unsubscribe = externalCliStreamBus.subscribe(toolCallId, () => {
       pendingRef.current = externalCliStreamBus.getSnapshot(toolCallId)
       if (!timerRef.current) {

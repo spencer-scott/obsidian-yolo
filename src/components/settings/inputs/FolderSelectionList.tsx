@@ -147,24 +147,24 @@ export function FolderSelectionList({
     <div className="smtcmp-folder-selection">
       <div className="smtcmp-folder-selection-toolbar">
         <div className="smtcmp-folder-selection-title">
-          {title ?? t('settings.rag.selectedFolders', '已选择的文件夹')}
+          {title ?? t('settings.rag.selectedFolders', 'Selected folders')}
         </div>
         <div className="smtcmp-folder-selection-actions">
           <button
-            aria-label={t('common.add', '添加')}
-            title={t('common.add', '添加')}
+            aria-label={t('common.add', 'Add')}
+            title={t('common.add', 'Add')}
             onClick={() => handleAdd()}
             className="smtcmp-folder-selection-btn"
           >
             +
           </button>
           <button
-            aria-label={t('common.clear', '清空')}
-            title={t('common.clear', '清空')}
+            aria-label={t('common.clear', 'Clear')}
+            title={t('common.clear', 'Clear')}
             onClick={() => handleClear()}
             className="smtcmp-folder-selection-btn"
           >
-            {t('common.clear', '清空')}
+            {t('common.clear', 'Clear')}
           </button>
         </div>
       </div>
@@ -179,11 +179,11 @@ export function FolderSelectionList({
               (allowFiles
                 ? t(
                     'settings.rag.selectFilesOrFoldersPlaceholder',
-                    '点击此处选择文件或文件夹（留空表示全库）',
+                    'Click here to select files or folders (leave empty for the entire vault)',
                   )
                 : t(
                     'settings.rag.selectFoldersPlaceholder',
-                    '点击此处选择文件夹（留空则默认包含全部）',
+                    'Click here to select folders (leave empty to include all)',
                   ))}
           </div>
         ) : (
@@ -204,7 +204,7 @@ export function FolderSelectionList({
                 </span>
                 <span
                   role="button"
-                  aria-label={t('common.remove', '移除')}
+                  aria-label={t('common.remove', 'Remove')}
                   tabIndex={0}
                   onClick={(e) => {
                     e.stopPropagation()

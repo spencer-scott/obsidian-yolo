@@ -9,7 +9,7 @@ export function FileUploadButton({
   onUpload: (files: File[]) => void
 }) {
   const { t } = useLanguage()
-  const label = t('chat.uploadFile', '添加文件')
+  const label = t('chat.uploadFile', 'Add file')
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])

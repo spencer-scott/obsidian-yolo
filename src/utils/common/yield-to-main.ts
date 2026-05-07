@@ -1,6 +1,6 @@
 /**
- * 让步给主线程，防止长时间运行的任务阻塞 UI
- * 使用 setTimeout(0) 将控制权交还给事件循环
+ * Yield to the main thread to prevent long-running tasks from blocking the UI.
+ * Uses setTimeout(0) to hand control back to the event loop.
  */
 export function yieldToMain(): Promise<void> {
   return new Promise((resolve) => {
@@ -9,8 +9,8 @@ export function yieldToMain(): Promise<void> {
 }
 
 /**
- * 带条件的让步：每 N 次调用让步一次
- * 用于在循环中减少让步频率，平衡性能和响应性
+ * Conditional yield: yields once every N calls.
+ * Used to reduce yield frequency in loops, balancing performance and responsiveness.
  */
 export function createYieldController(yieldEvery = 10) {
   let counter = 0

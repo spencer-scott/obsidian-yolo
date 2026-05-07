@@ -12,7 +12,7 @@ import { normalizeChatConversationCompactionState } from '../../types/chat'
 import { ToolCallResponseStatus } from '../../types/tool-call.types'
 import { serializeMentionable } from '../../utils/chat/mentionable'
 
-const DEFAULT_UNTITLED_CONVERSATION_TITLE = '新对话'
+const DEFAULT_UNTITLED_CONVERSATION_TITLE = 'New Conversation'
 const CHAT_HISTORY_UPDATED_EVENT = 'smtcmp:chat-history-updated'
 
 const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {

@@ -131,7 +131,7 @@ export default function MarkdownCodeComponent({
   }, [codeContent, parsedPlan, streamingPreviewContent])
 
   const streamingStatusLabel = useMemo(() => {
-    return t('chat.codeBlock.locatingTarget', '正在定位待替换内容...')
+    return t('chat.codeBlock.locatingTarget', 'Locating content to replace...')
   }, [t])
 
   useEffect(() => {

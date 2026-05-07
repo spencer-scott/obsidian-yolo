@@ -390,7 +390,7 @@ export const smartComposerSettingsSchema = z.object({
 
   notificationOptions: notificationOptionsSchema,
 
-  // Continuation (续写) options
+  // Continuation options
   continuationOptions: z
     .object({
       // dedicated continuation model

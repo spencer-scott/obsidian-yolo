@@ -5,7 +5,7 @@ export const migrateFrom16To17: SettingMigration['migrate'] = (data) => {
   const newData = { ...data }
   newData.version = 17
 
-  // 为现有的助手添加默认图标
+  // Add default icons to existing assistants
   if (Array.isArray(newData.assistants)) {
     newData.assistants = newData.assistants.map((assistant) => {
       if (!assistant || typeof assistant !== 'object') {
@@ -14,12 +14,12 @@ export const migrateFrom16To17: SettingMigration['migrate'] = (data) => {
 
       const assistantObj = assistant as Record<string, unknown>
 
-      // 如果助手已经有图标，保持不变
+      // If the assistant already has an icon, keep it unchanged
       if (assistantObj.icon) {
         return assistantObj
       }
 
-      // 否则添加默认图标
+      // Otherwise add the default icon
       return {
         ...assistantObj,
         icon: DEFAULT_ASSISTANT_ICON,

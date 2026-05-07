@@ -543,13 +543,13 @@ function SmartSpacePanelBody({
       const sections: Section[] = []
 
       const categoryTitles: Record<string, string> = {
-        suggestions: t('chat.customContinueSections.suggestions.title', '建议'),
-        writing: t('chat.customContinueSections.writing.title', '撰写'),
+        suggestions: t('chat.customContinueSections.suggestions.title', 'Suggestions'),
+        writing: t('chat.customContinueSections.writing.title', 'Writing'),
         thinking: t(
           'chat.customContinueSections.thinking.title',
-          '思考 · 询问 · 对话',
+          'Thinking, Asking, Conversation',
         ),
-        custom: t('chat.customContinueSections.custom.title', '自定义'),
+        custom: t('chat.customContinueSections.custom.title', 'Custom'),
       }
 
       for (const [category, items] of Object.entries(categorizedActions)) {
@@ -816,7 +816,7 @@ function SmartSpacePanelBody({
         setError(
           err instanceof Error
             ? err.message
-            : t('chat.customContinueError', '智能续写失败，请重试'),
+            : t('chat.customContinueError', 'Smart continuation failed, please try again'),
         )
       } finally {
         setIsSubmitting(false)
@@ -984,7 +984,7 @@ function SmartSpacePanelBody({
 
   const handleQuickActionsPointerMove = useCallback(() => {
     if (!isKeyboardNavigationActive) return
-    // 鼠标开始移动时恢复 hover 行为
+    // Restore hover behavior when mouse starts moving
     deactivateKeyboardNavigation()
   }, [deactivateKeyboardNavigation, isKeyboardNavigationActive])
 
@@ -1043,8 +1043,8 @@ function SmartSpacePanelBody({
                   isSubmitConfirmPending) && (
                   <div className="smtcmp-smart-space-input-hint">
                     {isSubmitConfirmPending
-                      ? t('chat.customContinueConfirmHint', '⏎ 是否确认提交？')
-                      : t('chat.customContinueHint', '⏎ 提交')}
+                      ? t('chat.customContinueConfirmHint', 'Press Enter again to confirm')
+                      : t('chat.customContinueHint', 'Press Enter to submit')}
                   </div>
                 )}
               </div>
@@ -1074,7 +1074,7 @@ function SmartSpacePanelBody({
                       }, 0)
                     }}
                     onKeyDown={(event, isMenuOpen) => {
-                      // 如果菜单已打开，只处理 Escape，其他键交给 Radix UI
+                      // If menu is open, only handle Escape; pass other keys to Radix UI
                       if (isMenuOpen) {
                         if (event.key === 'Escape') {
                           event.preventDefault()
@@ -1083,30 +1083,30 @@ function SmartSpacePanelBody({
                         return
                       }
 
-                      // 菜单未打开时的键盘导航
+                      // Keyboard navigation when menu is not open
                       if (event.key === 'Escape') {
                         event.preventDefault()
                         onClose()
                       } else if (event.key === 'ArrowLeft') {
-                        // 左方向键返回输入框
+                        // Left arrow returns to input field
                         event.preventDefault()
                         contentEditableRef.current?.focus()
                       } else if (event.key === 'ArrowRight') {
-                        // 右方向键移动到工具按钮（如果存在）
+                        // Right arrow moves to tool button (if present)
                         event.preventDefault()
                         if (webSearchButtonRef.current) {
                           webSearchButtonRef.current.focus()
                         } else {
-                          // 如果没有工具按钮，回到输入框
+                          // If no tool button, go back to input field
                           contentEditableRef.current?.focus()
                         }
                       }
                     }}
                     side="top"
                     align="end"
-                    // 24 = 12px 卡片内边距 + 12px 面板间距，保证与下方快捷选项的间距一致
+                    // 24 = 12px card padding + 12px panel gap, ensuring consistent spacing with quick options below
                     sideOffset={24}
-                    // 负偏移让弹层右侧与输入框右缘（16px 内边距）保持对齐
+                    // Negative offset to align the popover right edge with the input field right edge (16px padding)
                     alignOffset={-16}
                     container={containerRef?.current ?? undefined}
                     popover={{
@@ -1142,11 +1142,11 @@ function SmartSpacePanelBody({
                           event.preventDefault()
                           onClose()
                         } else if (event.key === 'ArrowLeft') {
-                          // 左方向键返回模型选择框
+                          // Left arrow returns to model select
                           event.preventDefault()
                           modelSelectRef.current?.focus()
                         } else if (event.key === 'ArrowRight') {
-                          // 右方向键移动到下一个工具按钮
+                          // Right arrow moves to next tool button
                           event.preventDefault()
                           urlContextButtonRef.current?.focus()
                         }
@@ -1186,11 +1186,11 @@ function SmartSpacePanelBody({
                           event.preventDefault()
                           onClose()
                         } else if (event.key === 'ArrowLeft') {
-                          // 左方向键返回上一个工具按钮
+                          // Left arrow returns to previous tool button
                           event.preventDefault()
                           webSearchButtonRef.current?.focus()
                         } else if (event.key === 'ArrowRight') {
-                          // 右方向键返回输入框（循环）
+                          // Right arrow returns to input field (cycle)
                           event.preventDefault()
                           contentEditableRef.current?.focus()
                         }
@@ -1330,7 +1330,7 @@ export class SmartSpaceWidget extends WidgetType {
     anchor.setAttribute('aria-hidden', 'true')
     this.anchor = anchor
 
-    // 保存当前实例的引用
+    // Save a reference to the current instance
     SmartSpaceWidget.currentInstance = this
 
     this.mountOverlay()
@@ -1341,7 +1341,7 @@ export class SmartSpaceWidget extends WidgetType {
   }
 
   destroy(): void {
-    // 清除当前实例引用
+    // Clear current instance reference
     if (SmartSpaceWidget.currentInstance === this) {
       SmartSpaceWidget.currentInstance = null
     }
@@ -1413,7 +1413,7 @@ export class SmartSpaceWidget extends WidgetType {
     return root
   }
 
-  // 静态方法：从外部触发当前实例的关闭动画
+  // Static method: trigger close animation on the current instance from outside
   static closeCurrentWithAnimation(): boolean {
     if (SmartSpaceWidget.currentInstance) {
       SmartSpaceWidget.currentInstance.closeWithAnimation()
@@ -1427,20 +1427,20 @@ export class SmartSpaceWidget extends WidgetType {
     this.isClosing = true
     this.hasBlockingOverlay = false
 
-    // 添加关闭动画类
+    // Add closing animation class
     if (this.overlayContainer) {
       this.overlayContainer.classList.add('closing')
     }
 
-    // 等待动画完成后执行真正的关闭
+    // Wait for animation to complete before actually closing
     this.closeAnimationTimeout = window.setTimeout(() => {
       this.closeAnimationTimeout = null
       this.options.onClose()
-    }, 200) // 与 CSS 动画时长一致
+    }, 200) // Match CSS animation duration
   }
 
   private mountOverlay() {
-    // 将浮层挂载到编辑器 DOM 内部，使其层级/裁剪行为更接近正文内容，避免遮挡标题栏
+    // Mount the overlay inside the editor DOM so its stacking/clipping behavior is closer to body content, avoiding title bar occlusion
     const overlayHost = this.options.view.dom ?? document.body
     this.overlayHost = overlayHost
 

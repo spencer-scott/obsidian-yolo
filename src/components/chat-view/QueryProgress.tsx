@@ -27,7 +27,7 @@ export type IndexProgress = {
   totalChunks: number
   totalFiles: number
   waitingForRateLimit?: boolean
-  // 文件夹级别的进度信息（可选，向后兼容）
+  // Folder-level progress info (optional, backward compatible)
   currentFolder?: string
   currentFile?: string
   completedFiles?: number
@@ -40,7 +40,7 @@ export type IndexProgress = {
       totalChunks: number
     }
   >
-  // 文件分类统计
+  // File classification statistics
   newFilesCount?: number
   updatedFilesCount?: number
   removedFilesCount?: number

@@ -178,7 +178,7 @@ export class RagIndexService {
               failureKind: shouldRecover ? 'transient' : 'unknown',
               failureMessage: this.t(
                 'settings.rag.previousRunInterrupted',
-                '上次索引未正常完成。',
+                'The previous index run did not complete normally.',
               ),
               updatedAt: Date.now(),
             }
@@ -466,22 +466,22 @@ export class RagIndexService {
 
   private buildActivityTitle(): string {
     if (this.snapshot.status === 'retry_scheduled') {
-      return this.t('statusBar.ragAutoUpdateRunning', '知识库等待重试')
+      return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base waiting to retry')
     }
     if (this.snapshot.status === 'failed') {
-      return this.t('statusBar.ragAutoUpdateFailed', '知识库索引失败')
+      return this.t('statusBar.ragAutoUpdateFailed', 'Knowledge base indexing failed')
     }
     if (this.snapshot.mode === 'rebuild') {
-      return this.t('notices.rebuildingIndex', '正在重建知识库索引')
+      return this.t('notices.rebuildingIndex', 'Rebuilding knowledge base index')
     }
-    return this.t('statusBar.ragAutoUpdateRunning', '知识库正在后台更新')
+    return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base updating in the background')
   }
 
   private buildActivityDetail(): string {
     if (this.snapshot.status === 'retry_scheduled') {
       const retryAtLabel = this.snapshot.retryAt
         ? new Date(this.snapshot.retryAt).toLocaleTimeString()
-        : this.t('common.retry', '重试')
+        : this.t('common.retry', 'Retry')
       return this.snapshot.failureMessage
         ? `${this.snapshot.failureMessage} · ${retryAtLabel}`
         : retryAtLabel
@@ -491,7 +491,7 @@ export class RagIndexService {
         this.snapshot.failureMessage ??
         this.t(
           'statusBar.ragAutoUpdateFailedDetail',
-          '最近一次后台同步失败，请稍后重试。',
+          'The last background sync failed. Please try again later.',
         )
       )
     }
@@ -506,7 +506,7 @@ export class RagIndexService {
     }
     return this.t(
       'statusBar.ragAutoUpdateRunningDetail',
-      '正在增量同步知识库索引。',
+      'Incrementally syncing knowledge base index.',
     )
   }
 

@@ -821,15 +821,15 @@ describe('local fs tool action helpers', () => {
     const root = Object.assign(new TFolder(), { path: '' })
     const files = [
       Object.assign(new TFile(), {
-        path: '2.工作/3.工作流专项/1月/✅ 0109 Workflow 体系总览.md',
+        path: '2.Work/3.Workflow-Special/Jan/✅ 0109 Workflow Overview.md',
         stat: { size: 20 },
       }),
       Object.assign(new TFile(), {
-        path: '2.工作/3.工作流专项/2月/✅ 0210 工作流复盘模块项目规划.md',
+        path: '2.Work/3.Workflow-Special/Feb/✅ 0210 Workflow Review Module Project Plan.md',
         stat: { size: 20 },
       }),
       Object.assign(new TFile(), {
-        path: '2.工作/普通项目/普通笔记.md',
+        path: '2.Work/General-Projects/General-Note.md',
         stat: { size: 20 },
       }),
     ]
@@ -847,7 +847,7 @@ describe('local fs tool action helpers', () => {
       args: {
         mode: 'keyword',
         scope: 'files',
-        query: 'workflow 工作流程 工作流',
+        query: 'workflow process flow',
         maxResults: 10,
       },
     })
@@ -862,17 +862,17 @@ describe('local fs tool action helpers', () => {
       requestedMode: 'keyword',
       effectiveMode: 'keyword',
       scope: 'files',
-      query: 'workflow 工作流程 工作流',
+      query: 'workflow process flow',
       path: '',
       results: [
         {
           kind: 'file',
-          path: '2.工作/3.工作流专项/1月/✅ 0109 Workflow 体系总览.md',
+          path: '2.Work/3.Workflow-Special/Jan/✅ 0109 Workflow Overview.md',
           source: 'keyword',
         },
         {
           kind: 'file',
-          path: '2.工作/3.工作流专项/2月/✅ 0210 工作流复盘模块项目规划.md',
+          path: '2.Work/3.Workflow-Special/Feb/✅ 0210 Workflow Review Module Project Plan.md',
           source: 'keyword',
         },
       ],
@@ -901,8 +901,8 @@ describe('local fs tool action helpers', () => {
             .fn()
             .mockImplementation(async (file: TFile) =>
               file.path === 'a.md'
-                ? 'workflow 工作流 双命中'
-                : '只有 workflow 单命中',
+                ? 'workflow process double hit'
+                : 'only workflow single hit',
             ),
         },
       } as unknown as App,
@@ -910,7 +910,7 @@ describe('local fs tool action helpers', () => {
       args: {
         mode: 'keyword',
         scope: 'content',
-        query: 'workflow 工作流',
+        query: 'workflow process',
         maxResults: 10,
       },
     })
@@ -1462,14 +1462,14 @@ describe('local fs tool action helpers', () => {
       settings,
       toolName: 'memory_add',
       args: {
-        content: '用户希望回答保持简洁',
+        content: 'User prefers concise answers',
         category: 'preferences',
       },
     })
     expect(addResult.status).toBe('success')
     const assistantMemoryPath = 'YOLO/memory/Helper Agent.md'
     expect(contents.get(assistantMemoryPath) ?? '').toContain(
-      'Preference_1: 用户希望回答保持简洁',
+      'Preference_1: User prefers concise answers',
     )
 
     const updateResult = await callLocalFileTool({
@@ -1478,7 +1478,7 @@ describe('local fs tool action helpers', () => {
       toolName: 'memory_update',
       args: {
         id: 'Preference_1',
-        new_content: '用户希望回答保持简洁并直接',
+        new_content: 'User prefers concise and direct answers',
       },
     })
     expect(updateResult.status).toBe('success')
@@ -1560,7 +1560,7 @@ describe('local fs tool action helpers', () => {
       args: {
         items: [
           {
-            content: '批量记录 1',
+            content: 'Batch record 1',
             category: 'other',
           },
           {
@@ -1568,7 +1568,7 @@ describe('local fs tool action helpers', () => {
             category: 'other',
           },
           {
-            content: '批量记录 2',
+            content: 'Batch record 2',
             category: 'other',
           },
         ],
@@ -2121,7 +2121,7 @@ describe('fs_read PDF vision-downgrade warning', () => {
     }
     expect(payload.results[0]?.effectiveModality).toBe('text')
     expect(payload.results[0]?.warning).toBe(
-      '当前模型不支持图像输入，已自动降级为文本读取',
+      'The current model does not support image input; automatically downgraded to text reading',
     )
   })
 

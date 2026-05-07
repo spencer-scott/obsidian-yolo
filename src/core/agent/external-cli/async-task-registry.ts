@@ -93,5 +93,5 @@ export class AsyncTaskRegistry {
   }
 }
 
-// 单例
+// Singleton
 export const asyncTaskRegistry = new AsyncTaskRegistry()

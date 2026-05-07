@@ -10,14 +10,14 @@
   border: 0;
 }
 
-/* OpenAI-Style Thinking Loader - OpenAI 风格思考动画 */
+/* OpenAI-Style Thinking Loader */
 .smtcmp-thinking-loader {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-/* 内联思考指示器 - 在编辑器中显示 */
+/* Inline thinking indicator - shown in the editor */
 .smtcmp-thinking-indicator-inline {
   display: inline-flex;
   align-items: center;
@@ -26,7 +26,7 @@
   line-height: 1;
 }
 
-/* 旋转的 Sparkles 图标 */
+/* Spinning Sparkles icon */
 .smtcmp-thinking-icon {
   position: relative;
   width: 18px;
@@ -55,7 +55,7 @@
   }
 }
 
-/* 高光流动的文字 */
+/* Highlight-shimmer text */
 .smtcmp-thinking-text {
   font-size: var(--font-ui-medium);
   font-weight: var(--font-normal);
@@ -137,7 +137,7 @@
   }
 }
 
-/* 保留旧的 dot-loader 作为后备 */
+/* Keep the legacy dot-loader as fallback */
 .smtcmp-dot-loader {
   display: inline-block;
   text-align: left;
@@ -1131,7 +1131,7 @@
   background: var(--background-modifier-hover);
 }
 
-/* 视图切换标签页样式 - 手风琴展开效果 */
+/* View toggle tab styles - accordion expand effect */
 .smtcmp-view-toggle {
   display: inline-flex;
   position: relative;
@@ -1414,10 +1414,10 @@
   user-select: none;
 }
 
-/* 鼠标 hover 任意项都给视觉反馈；键盘 highlight 仅对非选中项给 bg。
-   原因：弹窗打开时 Radix 会把当前选中项自动设为 [data-highlighted]，若在
-   [data-state='checked'] 上叠加 bg 会让"被动选中"出现一块灰底，与 ✓ 图标重复
-   且视觉上像 hover 状态，违和。 */
+/* Mouse hover gives visual feedback on all items; keyboard highlight only applies bg to non-checked items.
+   Reason: when the popover opens, Radix auto-sets [data-highlighted] on the current checked item; if we
+   also apply bg on [data-state='checked'], the "passively checked" item gets a gray background that
+   duplicates the checkmark icon and looks like a hover state, which feels inconsistent. */
 .smtcmp-roller-select-list-item:hover,
 .smtcmp-roller-select-list-item:not([data-state='checked'])[data-highlighted] {
   background: color-mix(
@@ -1440,7 +1440,7 @@
   flex-direction: column;
   gap: 1px;
   flex: 1;
-  /* 让 flex 子元素允许收缩到 0，配合下面 label/desc 的 ellipsis 才会生效 */
+  /* Allow flex children to shrink to 0, required for label/desc ellipsis below to take effect */
   min-width: 0;
 }
 

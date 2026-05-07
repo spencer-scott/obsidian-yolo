@@ -1,6 +1,6 @@
-/* 外部 Agent 工具卡：终端样式
- * 布局：状态条 → Progress（始终展开+自动滚底） → Output → metadata chips
- * 同步派遣与异步派遣完成卡片共用此样式（异步走 ExternalAgentToolCard 适配层）。
+/* External Agent tool card: terminal style
+ * Layout: status bar -> Progress (always expanded + auto-scroll to bottom) -> Output -> metadata chips
+ * Both synchronous and asynchronous dispatch completion cards share these styles (async uses the ExternalAgentToolCard adapter).
  */
 
 .yolo-external-agent-card {
@@ -10,7 +10,7 @@
   font-size: var(--font-ui-small);
 }
 
-/* ── 状态条 ── */
+/* -- Status bar -- */
 .yolo-external-agent-card__status-row {
   display: flex;
   align-items: center;
@@ -92,7 +92,7 @@
   color: var(--color-red);
 }
 
-/* ── 输出块（Progress / Output 共用） ── */
+/* -- Output blocks (shared by Progress / Output) -- */
 .yolo-external-agent-card__stream-section {
   display: flex;
   flex-direction: column;
@@ -125,7 +125,7 @@
   color: var(--text-muted);
 }
 
-/* progress 中按行渲染的容器（用于 claude 标签着色） */
+/* Per-line rendering container in progress (used for claude tag coloring) */
 .yolo-external-agent-card__line {
   display: block;
 }
@@ -162,7 +162,7 @@
   opacity: 0.7;
 }
 
-/* ── metadata chips（底部） ── */
+/* -- metadata chips (bottom) -- */
 .yolo-external-agent-card__meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -184,7 +184,7 @@
   flex-shrink: 0;
 }
 
-/* ── 截断/无输出提示 ── */
+/* -- Truncation / no output notice -- */
 .yolo-external-agent-card__truncation-notice {
   font-size: var(--font-ui-smaller);
   color: var(--text-warning);

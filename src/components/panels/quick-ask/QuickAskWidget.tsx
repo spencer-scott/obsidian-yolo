@@ -484,9 +484,10 @@ export class QuickAskOverlay {
     this.hasUserDragged = true
     this.isDockedTopRight = false
     this.dragPosition = { x, y }
-    // 通过 rAF 节流;mousemove 在高刷屏可达 120Hz+,直接同步 updateDragPosition
-    // 会让每次都做 4 次 getBoundingClientRect + getComputedStyle + querySelector,
-    // 拖拽明显发卡。schedulePositionUpdate 会自动路由回 updateDragPosition。
+    // Throttle via rAF; mousemove can reach 120Hz+ on high-refresh screens. Synchronously
+    // calling updateDragPosition each time would perform 4x getBoundingClientRect +
+    // getComputedStyle + querySelector, causing noticeable drag stutter.
+    // schedulePositionUpdate automatically routes back to updateDragPosition.
     this.schedulePositionUpdate()
   }
 
@@ -503,7 +504,7 @@ export class QuickAskOverlay {
       this.overlayHost?.getBoundingClientRect() ??
       document.body.getBoundingClientRect()
 
-    // Panel rect 一次读两个维度,避免对同一元素两次 getBoundingClientRect。
+    // Read both dimensions from panel rect at once to avoid calling getBoundingClientRect twice on the same element.
     const panelRect = this.containerRef.current?.getBoundingClientRect() ?? null
     const measuredWidth =
       panelRect && Number.isFinite(panelRect.width) && panelRect.width > 0

@@ -78,10 +78,11 @@ const RollerSelect: React.FC<RollerSelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [contextBg, setContextBg] = useState<string | null>(null)
 
-  /** popover 通过 Radix Portal 挂到 body 上，CSS 级联无法从 trigger 所在容器
-   * 透传 background；这里在打开瞬间从 trigger 上溯找到第一个有实底色的祖先，
-   * 把它的 background-color 作为 inline style 注入到 popover，让弹窗自动跟随
-   * 所在容器（侧栏面板 / 独立窗口编辑区 / etc.）的底色。 */
+  /** The popover is mounted on the body via Radix Portal, so CSS cascade cannot pass
+   * the background from the trigger's container. On open, we walk up from the trigger
+   * to find the first ancestor with a solid background color, then inject it as an
+   * inline style on the popover so it automatically matches the container's background
+   * (sidebar panel / standalone editor window / etc.). */
   useEffect(() => {
     if (!isOpen) return
     const node = triggerRef.current

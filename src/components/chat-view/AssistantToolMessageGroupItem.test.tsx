@@ -108,7 +108,7 @@ describe('AssistantToolMessageGroupItem', () => {
       />,
     )
 
-    expect(html).toContain('本次回复生成失败')
+    expect(html).toContain('Response generation failed')
     expect(html).toContain('400 Reasoning is mandatory for this endpoint.')
   })
 

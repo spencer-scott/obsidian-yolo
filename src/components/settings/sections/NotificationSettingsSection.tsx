@@ -103,10 +103,10 @@ export function NotificationSettingsSection() {
   return (
     <div className="smtcmp-models-block-content">
       <ObsidianSetting
-        name={t('settings.etc.notificationsEnabled', '启用通知')}
+        name={t('settings.etc.notificationsEnabled', 'Enable notifications')}
         desc={t(
           'settings.etc.notificationsEnabledDesc',
-          '为 Agent 任务开启或关闭提醒。',
+          'Enable or disable reminders for Agent tasks.',
         )}
         className="smtcmp-models-select-card"
       >
@@ -118,44 +118,44 @@ export function NotificationSettingsSection() {
       {settings.notificationOptions.enabled && (
         <>
           <ObsidianSetting
-            name={t('settings.etc.notificationChannel', '通知方式')}
+            name={t('settings.etc.notificationChannel', 'Notification channel')}
             desc={t(
               'settings.etc.notificationChannelDesc',
-              '选择使用音效、系统通知，或同时使用两者。',
+              'Choose to use sound, system notifications, or both.',
             )}
             className="smtcmp-models-select-card"
           >
             <ObsidianDropdown
               value={settings.notificationOptions.channel ?? 'sound'}
               options={{
-                sound: t('settings.etc.notificationChannelSound', '仅音效'),
+                sound: t('settings.etc.notificationChannelSound', 'Sound only'),
                 system: t(
                   'settings.etc.notificationChannelSystem',
-                  '仅系统通知',
+                  'System notification only',
                 ),
                 both: t(
                   'settings.etc.notificationChannelBoth',
-                  '音效 + 系统通知',
+                  'Sound + system notification',
                 ),
               }}
               onChange={handleNotificationChannelChange}
             />
           </ObsidianSetting>
           <ObsidianSetting
-            name={t('settings.etc.notificationTiming', '提醒时机')}
+            name={t('settings.etc.notificationTiming', 'Notification timing')}
             desc={t(
               'settings.etc.notificationTimingDesc',
-              '选择始终提醒，或仅在 Obsidian 失焦时提醒。',
+              'Choose to always notify, or only when Obsidian is unfocused.',
             )}
             className="smtcmp-models-select-card"
           >
             <ObsidianDropdown
               value={settings.notificationOptions.timing ?? 'when-unfocused'}
               options={{
-                always: t('settings.etc.notificationTimingAlways', '始终提醒'),
+                always: t('settings.etc.notificationTimingAlways', 'Always notify'),
                 'when-unfocused': t(
                   'settings.etc.notificationTimingWhenUnfocused',
-                  '仅失焦时提醒',
+                  'Only when unfocused',
                 ),
               }}
               onChange={handleNotificationTimingChange}
@@ -164,11 +164,11 @@ export function NotificationSettingsSection() {
           <ObsidianSetting
             name={t(
               'settings.etc.notificationApprovalRequired',
-              '需要审批时提醒',
+              'Notify when approval required',
             )}
             desc={t(
               'settings.etc.notificationApprovalRequiredDesc',
-              '当 YOLO 暂停并等待你审批工具调用时发出提醒。',
+              'Notify when YOLO pauses and waits for your approval on tool calls.',
             )}
             className="smtcmp-models-select-card"
           >
@@ -180,10 +180,10 @@ export function NotificationSettingsSection() {
             />
           </ObsidianSetting>
           <ObsidianSetting
-            name={t('settings.etc.notificationTaskCompleted', '任务结束时提醒')}
+            name={t('settings.etc.notificationTaskCompleted', 'Notify when task completed')}
             desc={t(
               'settings.etc.notificationTaskCompletedDesc',
-              '当当前 Agent 任务结束且不再等待审批时发出提醒。',
+              'Notify when the current Agent task ends and is no longer waiting for approval.',
             )}
             className="smtcmp-models-select-card"
           >

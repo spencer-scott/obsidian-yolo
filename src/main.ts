@@ -799,7 +799,7 @@ export default class SmartComposerPlugin extends Plugin {
     const panelHeader = document.createElement('div')
     panelHeader.className = 'smtcmp-background-activity-status-panel-header'
     panelHeader.setText(
-      this.t('statusBar.backgroundStatusPanelTitle', '后台任务'),
+      this.t('statusBar.backgroundStatusPanelTitle', 'Background Tasks'),
     )
 
     const panelList = document.createElement('div')
@@ -810,7 +810,7 @@ export default class SmartComposerPlugin extends Plugin {
     panelEmpty.setText(
       this.t(
         'statusBar.backgroundStatusPanelEmpty',
-        '当前没有正在运行的后台任务',
+        'No background tasks currently running',
       ),
     )
 
@@ -863,7 +863,7 @@ export default class SmartComposerPlugin extends Plugin {
       this.getAgentService().subscribeToRunSummaries((summaries) => {
         this.syncAgentBackgroundActivities(summaries)
       })
-    // 异步派遣的子进程是 desktop-only，懒加载注册表后再订阅。
+    // Async dispatch child processes are desktop-only; lazy-load the registry before subscribing.
     let unsubscribeAsyncTasks: (() => void) | null = null
     if (Platform.isDesktopApp) {
       void import('./core/agent/external-cli/async-task-registry').then(
@@ -946,11 +946,11 @@ export default class SmartComposerPlugin extends Plugin {
         kind: 'agent',
         title: this.t(
           'statusBar.agentStatusFallbackConversationTitle',
-          '运行中的对话',
+          'Running Conversation',
         ),
         detail: summary.isWaitingApproval
-          ? this.t('statusBar.agentStatusWaitingApproval', '待审批')
-          : this.t('statusBar.agentStatusRunning', '运行中'),
+          ? this.t('statusBar.agentStatusWaitingApproval', 'Awaiting Approval')
+          : this.t('statusBar.agentStatusRunning', 'Running'),
         status: summary.isWaitingApproval ? 'waiting' : 'running',
         updatedAt: Date.now(),
         action: {
@@ -1017,7 +1017,7 @@ export default class SmartComposerPlugin extends Plugin {
       'aria-label',
       this.t(
         'statusBar.backgroundStatusAriaLabel',
-        '后台任务状态，点击查看详情',
+        'Background task status, click for details',
       ),
     )
     this.backgroundStatusBarRing.classList.remove(
@@ -1057,33 +1057,33 @@ export default class SmartComposerPlugin extends Plugin {
       return waitingApprovalCount > 0
         ? this.t(
             'statusBar.agentRunningWithApproval',
-            '当前有 {count} 个 agent 正在运行（{approvalCount} 个待审批）',
+            '{count} agent(s) running ({approvalCount} awaiting approval)',
           )
             .replace('{count}', String(agentActivities.length))
             .replace('{approvalCount}', String(waitingApprovalCount))
         : this.t(
             'statusBar.agentRunning',
-            '当前有 {count} 个 agent 正在运行',
+            '{count} agent(s) running',
           ).replace('{count}', String(agentActivities.length))
     }
 
     if (runningActivities.length === 1 && failedActivities.length === 0) {
       const [activity] = runningActivities
       if (activity.kind === 'rag-index') {
-        return this.t('statusBar.ragAutoUpdateRunning', '知识库正在后台更新')
+        return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base updating in background')
       }
     }
 
     if (runningActivities.length > 0) {
       return this.t(
         'statusBar.backgroundTasksRunning',
-        '当前有 {count} 个后台任务正在运行',
+        '{count} background task(s) running',
       ).replace('{count}', String(runningActivities.length))
     }
 
     return this.t(
       'statusBar.backgroundTasksNeedAttention',
-      '有后台任务需要关注',
+      'Background tasks need attention',
     )
   }
 
@@ -1342,7 +1342,7 @@ export default class SmartComposerPlugin extends Plugin {
 
     return this.t(
       'statusBar.agentStatusFallbackConversationTitle',
-      '运行中的对话',
+      'Running Conversation',
     )
   }
 
@@ -1485,7 +1485,7 @@ export default class SmartComposerPlugin extends Plugin {
     const openedAfterFocus = this.getDiffReviewController().openReview(state)
     if (openedAfterFocus) return true
 
-    new Notice('请先打开目标文件后再应用修改。')
+    new Notice('Please open the target file before applying changes.')
     return false
   }
 
@@ -1819,7 +1819,7 @@ export default class SmartComposerPlugin extends Plugin {
         } catch (error) {
           if (error instanceof RagIndexBusyError) {
             notice.setMessage(
-              this.t('statusBar.ragAutoUpdateRunning', '知识库索引正在运行'),
+              this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base indexing is running'),
             )
           } else {
             console.error(error)
@@ -1858,7 +1858,7 @@ export default class SmartComposerPlugin extends Plugin {
         } catch (error) {
           if (error instanceof RagIndexBusyError) {
             notice.setMessage(
-              this.t('statusBar.ragAutoUpdateRunning', '知识库索引正在运行'),
+              this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base indexing is running'),
             )
           } else {
             console.error(error)
@@ -1958,11 +1958,11 @@ export default class SmartComposerPlugin extends Plugin {
     this.agentService?.stopExternalAgentResultListener()
     this.agentService?.abortAll()
     this.agentService = null
-    // 终止所有活跃的外部 CLI 子进程（desktop-only，mobile 为空操作）
+    // Terminate all active external CLI child processes (desktop-only, no-op on mobile)
     void import('./core/agent/external-cli/index').then(
       ({ killAllActiveExternalCli }) => killAllActiveExternalCli(),
     )
-    // 终止所有异步派遣任务，标记为 killed_by_shutdown
+    // Terminate all async dispatch tasks, marking them as killed_by_shutdown
     void import('./core/agent/external-cli/async-task-registry').then(
       ({ asyncTaskRegistry }) => asyncTaskRegistry.abortAll(),
     )

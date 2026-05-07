@@ -60,7 +60,7 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
   const assistants = settings.assistants || []
   const assistantsCountLabel = t(
     'settings.assistants.assistantsCount',
-    '已配置 {count} 个助手',
+    '{count} assistants configured',
   ).replace('{count}', String(assistants.length))
 
   return (
@@ -161,7 +161,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
 
     try {
       await handleSaveAssistants(newAssistants)
-      // 同时更新编辑中的助手状态
+      // Also update the editing assistant state
       if (editingAssistant && editingAssistant.id === assistantId) {
         setEditingAssistant({ ...editingAssistant, icon: newIcon })
       }
@@ -226,7 +226,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
     const newAssistant: Assistant = {
       ...assistant,
       id: crypto.randomUUID(),
-      name: `${assistant.name}${t('settings.assistants.copySuffix', ' (副本)')}`,
+      name: `${assistant.name}${t('settings.assistants.copySuffix', ' (copy)')}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
@@ -331,11 +331,11 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.assistants.icon', '图标')}
-            desc={t('settings.assistants.iconDesc', '选择助手图标')}
+            name={t('settings.assistants.icon', 'Icon')}
+            desc={t('settings.assistants.iconDesc', 'Choose assistant icon')}
           >
             <ObsidianButton
-              text={t('settings.assistants.chooseIcon', '选择图标')}
+              text={t('settings.assistants.chooseIcon', 'Choose icon')}
               onClick={() => {
                 openIconPicker(app, editingAssistant.icon, (newIcon) => {
                   setEditingAssistant({ ...editingAssistant, icon: newIcon })
@@ -573,14 +573,14 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.assistants.icon', '图标')}
-            desc={t('settings.assistants.iconDesc', '选择助手图标')}
+            name={t('settings.assistants.icon', 'Icon')}
+            desc={t('settings.assistants.iconDesc', 'Choose assistant icon')}
           >
             <ObsidianButton
-              text={t('settings.assistants.chooseIcon', '选择图标')}
+              text={t('settings.assistants.chooseIcon', 'Choose icon')}
               onClick={() => {
                 openIconPicker(app, currentEditing.icon, (newIcon) => {
-                  // 立即保存图标到数据库
+                  // Save icon to database immediately
                   void handleUpdateIcon(assistant.id, newIcon)
                 })
               }}

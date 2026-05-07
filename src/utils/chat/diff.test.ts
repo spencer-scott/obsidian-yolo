@@ -59,7 +59,7 @@ describe('createDiffBlocks', () => {
       ['## Goals', '1. Finalise sprint backlog'].join('\n'),
       [
         '## Goals',
-        '1. 次のスプリントのためにスプリントバックログを確定する。',
+        '1. Finalize the sprint backlog for the next sprint.',
       ].join('\n'),
     )
 
@@ -71,20 +71,20 @@ describe('createDiffBlocks', () => {
       blockType: 'list',
       originalValue: '1. Finalise sprint backlog',
       modifiedValue:
-        '1. 次のスプリントのためにスプリントバックログを確定する。',
+        '1. Finalize the sprint backlog for the next sprint.',
     })
   })
 
   it('keeps unchanged intro lines outside translated paragraph diffs', () => {
     const blocks = createDiffBlocks(
       [
-        '### 03 解决方案/功能范围',
-        '**本PRD范围：第一阶段MVP**',
-        '采用 **Agent模拟操作** 方案，通过自动化脚本模拟人工浏览器操作。',
+        '### 03 Solution / Feature Scope',
+        '**This PRD scope: Phase 1 MVP**',
+        'Use the **Agent simulation** approach, leveraging automated scripts to simulate manual browser operations.',
       ].join('\n'),
       [
-        '### 03 解决方案/功能范围',
-        '**本PRD范围：第一阶段MVP**',
+        '### 03 Solution / Feature Scope',
+        '**This PRD scope: Phase 1 MVP**',
         'Adopt the **Agent simulation** approach, using automated scripts to simulate human browser operations.',
       ].join('\n'),
     )
@@ -92,7 +92,7 @@ describe('createDiffBlocks', () => {
     expect(blocks).toHaveLength(2)
     expect(blocks[0]).toEqual({
       type: 'unchanged',
-      value: ['### 03 解决方案/功能范围', '**本PRD范围：第一阶段MVP**'].join(
+      value: ['### 03 Solution / Feature Scope', '**This PRD scope: Phase 1 MVP**'].join(
         '\n',
       ),
     })
@@ -101,7 +101,7 @@ describe('createDiffBlocks', () => {
       presentation: 'inline',
       blockType: 'paragraph',
       originalValue:
-        '采用 **Agent模拟操作** 方案，通过自动化脚本模拟人工浏览器操作。',
+        'Use the **Agent simulation** approach, leveraging automated scripts to simulate manual browser operations.',
       modifiedValue:
         'Adopt the **Agent simulation** approach, using automated scripts to simulate human browser operations.',
     })
@@ -190,7 +190,7 @@ describe('createInlineDiffLines', () => {
       [
         'Mode Variety: Covering single-player campaign, multiplayer PvP, and large-scale battle royale (Warzone).',
       ],
-      ['模式多样性：包括单人剧情、多人对战以及大型大逃杀（Warzone）。'],
+      ['Mode Diversity: Including single-player story, multiplayer battles, and large-scale battle royale (Warzone).'],
     )
 
     expect(line).toEqual({
@@ -202,7 +202,7 @@ describe('createInlineDiffLines', () => {
         },
         {
           type: 'add',
-          text: '模式多样性：包括单人剧情、多人对战以及大型大逃杀（Warzone）。',
+          text: 'Mode Diversity: Including single-player story, multiplayer battles, and large-scale battle royale (Warzone).',
         },
       ],
     })
@@ -225,54 +225,52 @@ describe('createInlineDiffLines', () => {
     })
   })
 
-  it('shows fine-grained inline replacements for chinese wording edits', () => {
+  it('shows fine-grained inline replacements for minor wording edits', () => {
     const [line] = createInlineDiffLines(
-      ['今天去公园散步，然后买咖啡。'],
-      ['今天去公园慢跑，然后买热咖啡。'],
+      ['Today I walked in the park, then bought coffee.'],
+      ['Today I jogged in the park, then bought hot coffee.'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: '今天去公园' },
-        { type: 'del', text: '散步' },
-        { type: 'add', text: '慢跑' },
-        { type: 'same', text: '，然后买' },
-        { type: 'add', text: '热' },
-        { type: 'same', text: '咖啡。' },
+        { type: 'same', text: 'Today I ' },
+        { type: 'del', text: 'walked' },
+        { type: 'add', text: 'jogged' },
+        { type: 'same', text: ' in the park, then bought ' },
+        { type: 'add', text: 'hot ' },
+        { type: 'same', text: 'coffee.' },
       ],
     })
   })
 
-  it('uses segmenter-aware word diff for cjk lines with clear token boundaries', () => {
+  it('uses segmenter-aware word diff for lines with clear token boundaries', () => {
     const [line] = createInlineDiffLines(
-      ['请先打开设置面板，然后保存当前草稿。'],
-      ['请先打开偏好设置面板，然后保存当前草稿。'],
+      ['Please open the settings panel, then save the current draft.'],
+      ['Please open the preference settings panel, then save the current draft.'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: '请先打开' },
-        { type: 'add', text: '偏好' },
-        { type: 'same', text: '设置面板，然后保存当前草稿。' },
+        { type: 'same', text: 'Please open the ' },
+        { type: 'add', text: 'preference ' },
+        { type: 'same', text: 'settings panel, then save the current draft.' },
       ],
     })
   })
 
-  it('splits long chinese additions into smaller punctuation-based change tokens', () => {
+  it('splits long additions into smaller punctuation-based change tokens', () => {
     const [line] = createInlineDiffLines(
-      ['原神获得成功。'],
-      ['原神获得成功。世界观让提瓦特大陆更加丰满。提瓦特大陆值得长期探索。'],
+      ['Genshin achieved success.'],
+      ['Genshin achieved success. The world-building enriches Teyvat. Teyvat is worth long-term exploration.'],
     )
 
     expect(line).toEqual({
       type: 'modified',
       tokens: [
-        { type: 'same', text: '原神获得成功' },
-        { type: 'add', text: '。世界观让提瓦特大陆更加丰满。' },
-        { type: 'add', text: '提瓦特大陆值得长期探索' },
-        { type: 'same', text: '。' },
+        { type: 'same', text: 'Genshin achieved success.' },
+        { type: 'add', text: ' The world-building enriches Teyvat. Teyvat is worth long-term exploration.' },
       ],
     })
   })

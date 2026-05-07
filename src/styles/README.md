@@ -1,30 +1,32 @@
-# `src/styles/` 组织约定
+# `src/styles/` Organization Conventions
 
-## 1. 按职责分目录，不按"哪里先用"
+## 1. Organize by responsibility, not by "who used it first"
 
-历史上 `panels/smart-space.css` 长期堆放了和 SmartSpace 面板无关的 popover、
-dropdown、滚动条共享样式（因为 SmartSpace 是这些样式最早的消费者），
-是典型的"以首个调用者命名"反模式，导致后续所有人都要绕开或踩坑。
+Historically, `panels/smart-space.css` accumulated popover, dropdown, and scrollbar
+shared styles that had nothing to do with the SmartSpace panel (simply because SmartSpace
+was the first consumer of those styles). This is the classic "named after the first caller"
+anti-pattern that forces everyone who comes later to work around it or get tripped up.
 
-**新增样式时的判断顺序：**
-1. 它属于某个跨组件的**视觉系统**（popover、按钮、表单等）→ 找/建独立目录
-   （现有：`popover/`）。
-2. 它属于某个**功能模块**（chat、settings、panels 下的具体面板）→ 放进对应子目录。
-3. **不要**因为「我现在的功能是 SmartSpace」就把通用样式塞进 `smart-space.css`。
+**Decision order when adding new styles:**
+1. Does it belong to a cross-component **visual system** (popover, button, form, etc.)? ->
+   Find or create a dedicated directory (existing: `popover/`).
+2. Does it belong to a specific **feature module** (chat, settings, a specific panel under panels/)? ->
+   Place it in the corresponding subdirectory.
+3. **Do not** put generic styles into `smart-space.css` just because "the feature I am working on right now is SmartSpace."
 
-## 2. 命名前缀
+## 2. Naming Prefixes
 
-- 新增 CSS class → 一律 `yolo-` 前缀。
-- 存量 `smtcmp-*` → 不做大规模重命名（外部主题 / CSS snippet 可能 target）。
-- 旧组件被新抽象**完全替代**时，顺手删掉相关 `smtcmp-*` 死代码（删除而非改名）。
+- New CSS classes -> always use the `yolo-` prefix.
+- Existing `smtcmp-*` -> do not mass-rename (external themes / CSS snippets may target them).
+- When an old component is **fully replaced** by a new abstraction, delete the related `smtcmp-*` dead code (delete, not rename).
 
-## 3. Popover / Dropdown 专项约定
+## 3. Popover / Dropdown Specific Conventions
 
-详见 [`popover/surface.css`](./popover/surface.css) 文件头注释 ——
-包含视觉/尺寸分离、变体文件归属、新增弹窗 checklist 等。
-改弹窗或新增弹窗前请先读那段注释。
+See the header comment in [`popover/surface.css`](./popover/surface.css) -
+it covers visual/sizing separation, variant file ownership, the new-popover checklist, etc.
+Read that comment before modifying or adding any popover.
 
-## 4. 编译
+## 4. Build
 
-`styles.css` 是 PostCSS 从 `index.css` 编译产物，**不要直接编辑**。
-改完源文件运行 `npm run styles:build`（或 `npm run styles:watch`）。
+`styles.css` is the PostCSS output compiled from `index.css` - **do not edit it directly**.
+After modifying source files, run `npm run styles:build` (or `npm run styles:watch`).

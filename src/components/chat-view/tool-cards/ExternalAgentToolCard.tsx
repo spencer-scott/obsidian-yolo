@@ -1,10 +1,10 @@
-// 外部 Agent 工具卡：终端样式
-// 布局：状态条 → Progress（始终展开+自动滚底） → Output → metadata chips
+// External Agent tool card: terminal style
+// Layout: status bar -> Progress (always expanded + auto-scroll to bottom) -> Output -> metadata chips
 //
-// 设计要点：
-// - Progress 用 <pre> 容器配合每行 <span class> 渲染，给 claude 标签着色
-// - 自动滚底：用户手动上滚后停止跟随（接近底部 16px 视为"在底部"）
-// - metadata 从 stderr 现场正则解析，失败整块隐藏
+// Design notes:
+// - Progress uses <pre> container with per-line <span class> rendering, coloring claude labels
+// - Auto-scroll to bottom: stops following when user manually scrolls up (within 16px of bottom is considered "at bottom")
+// - metadata is parsed from stderr via regex on the fly; hidden entirely on failure
 
 import cx from 'clsx'
 import {
@@ -35,9 +35,9 @@ type ExternalAgentArgs = {
 type ExternalAgentCardProps = {
   toolCallId: string
   response: ToolCallResponse
-  /** 用于在状态条显示 provider · model · cwd 摘要 */
+  /** Used to display provider/model/cwd summary in the status bar */
   args?: ExternalAgentArgs
-  /** 用于在 running 状态显示终止按钮 */
+  /** Used to show the abort button in running state */
   onAbort?: () => void
 }
 
@@ -63,7 +63,7 @@ export function ExternalAgentToolCard({
 
   const isRunning = response.status === ToolCallResponseStatus.Running
 
-  // ── 决定文本来源 ──
+  // ── Determine text source ──
   let stderrText: string | undefined
   let stdoutText: string | undefined
   let fallbackText: string | undefined
@@ -71,8 +71,8 @@ export function ExternalAgentToolCard({
   if (stream !== null && stream.source === 'live') {
     stderrText = stream.stderr || undefined
     stdoutText = stream.stdout || undefined
-    // 边角：spawn 失败这类场景，runner 已 push 了 starting/running 但 stdout/stderr 都为空，
-    // 这时 stream !== null 会吃掉 response.error 的显示。回退到 fallbackText 让真实错误浮上来。
+    // Edge case: scenarios like spawn failure where runner has pushed starting/running but stdout/stderr are both empty.
+    // In this case stream !== null would swallow response.error display. Fall back to fallbackText to surface the real error.
     if (
       response.status === ToolCallResponseStatus.Error &&
       !stderrText &&
@@ -91,7 +91,7 @@ export function ExternalAgentToolCard({
     ) {
       stdoutText = response.data.text || undefined
     } else if (response.status === ToolCallResponseStatus.Error) {
-      // Error 状态下保留错误文本，否则进度缓存会把原本的错误信息盖掉
+      // Keep error text in Error state, otherwise the progress cache would overwrite the original error message
       fallbackText = response.error
     }
   } else if (response.status === ToolCallResponseStatus.Success) {
@@ -105,7 +105,7 @@ export function ExternalAgentToolCard({
     fallbackText = response.error
   }
 
-  // ── 从 stderr 解析 metadata（失败则不显示）──
+  // ── Parse metadata from stderr (hidden on failure) ──
   const meta = useMemo<ProgressMeta>(() => {
     if (!stderrText) return {}
     const out: ProgressMeta = {}
@@ -120,7 +120,7 @@ export function ExternalAgentToolCard({
       out.turns = parseInt(claudeDone[3], 10)
     }
 
-    // codex: tokens used\n10,465  (新行格式) 或 tokens used 10,465  (单行)
+    // codex: tokens used\n10,465  (newline format) or tokens used 10,465  (single line)
     const codexTokens = stderrText.match(/tokens used\s*\n?\s*([\d,]+)/)
     if (codexTokens) {
       out.tokens = parseInt(codexTokens[1].replace(/,/g, ''), 10)
@@ -137,7 +137,7 @@ export function ExternalAgentToolCard({
 
   return (
     <div className="yolo-external-agent-card">
-      {/* 状态条 */}
+      {/* Status bar */}
       <div className="yolo-external-agent-card__status-row">
         <StatusBadge status={response.status} t={t} />
         <ArgsInline args={args} />
@@ -154,7 +154,7 @@ export function ExternalAgentToolCard({
         )}
       </div>
 
-      {/* Progress 块 */}
+      {/* Progress block */}
       {stderrText !== undefined && (
         <div className="yolo-external-agent-card__stream-section">
           <div className="yolo-external-agent-card__stream-label">
@@ -172,7 +172,7 @@ export function ExternalAgentToolCard({
         </div>
       )}
 
-      {/* Output 块 */}
+      {/* Output block */}
       {stdoutText !== undefined && (
         <div className="yolo-external-agent-card__stream-section">
           <div className="yolo-external-agent-card__stream-label">
@@ -182,10 +182,10 @@ export function ExternalAgentToolCard({
         </div>
       )}
 
-      {/* 历史/错误路径单块输出 */}
+      {/* Historical/error path single block output */}
       {fallbackText !== undefined && <ConsoleBlock text={fallbackText} />}
 
-      {/* Aborted 无输出文案 */}
+      {/* Aborted with no output message */}
       {response.status === ToolCallResponseStatus.Aborted &&
         !response.data &&
         stream === null && (
@@ -200,13 +200,13 @@ export function ExternalAgentToolCard({
       {/* metadata chips */}
       {hasMeta && <MetaRow meta={meta} />}
 
-      {/* output 截断提示 */}
+      {/* output truncation notice */}
       <TruncationNotice response={response} t={t} />
     </div>
   )
 }
 
-// ──────── 子组件 ────────
+// ──────── Sub-components ────────
 
 function ArgsInline({ args }: { args?: ExternalAgentArgs }) {
   if (!args) return null
@@ -247,7 +247,7 @@ function ArgsInline({ args }: { args?: ExternalAgentArgs }) {
 }
 
 /**
- * 终端日志块。展示全部高度，超长由外层聊天视图滚动。
+ * Terminal log block. Displays at full height; overflow is handled by the outer chat view scroll.
  */
 function ConsoleBlock({
   text,
@@ -256,7 +256,7 @@ function ConsoleBlock({
   text: string
   variant?: 'progress'
 }) {
-  // progress 模式按行渲染（给 claude 标签着色）
+  // Progress mode renders line by line (coloring claude labels)
   if (variant === 'progress') {
     const lines = text.split('\n')
     return (
@@ -285,7 +285,7 @@ function ConsoleBlock({
 }
 
 function progressLineClass(line: string): string | undefined {
-  // ── claude 标签前缀 ──
+  // ── claude label prefixes ──
   if (line.startsWith('[system]'))
     return 'yolo-external-agent-card__line--system'
   if (line.startsWith('[thinking]'))
@@ -297,7 +297,7 @@ function progressLineClass(line: string): string | undefined {
   if (line.startsWith('[parse error]') || line.startsWith('[event]'))
     return 'yolo-external-agent-card__line--parse-error'
 
-  // ── codex 原生格式 ──
+  // ── codex native format ──
   const trimmed = line.trim()
   if (trimmed === '') return undefined
   if (/^-{3,}$/.test(trimmed)) return 'yolo-external-agent-card__line--system'
@@ -312,7 +312,7 @@ function progressLineClass(line: string): string | undefined {
     return 'yolo-external-agent-card__line--tool-result'
   if (/\b(ERROR|WARN|WARNING)\b/.test(line))
     return 'yolo-external-agent-card__line--parse-error'
-  // codex 横幅元数据 key: value 行
+  // codex banner metadata key: value lines
   if (
     /^(workdir|model|provider|approval|sandbox|reasoning effort|reasoning summaries|session id):/.test(
       trimmed,

@@ -13,16 +13,16 @@ export const DEFAULT_ASSISTANT_TOOL_APPROVAL_MODE: AssistantToolApprovalMode =
   'require_approval'
 
 /**
- * 这些工具永远不允许"始终允许"（always-allow）模式。
- * UI 侧应隐藏这些工具的 allowForThisChat 按钮。
+ * These tools are never allowed in "always-allow" mode.
+ * The UI should hide the allowForThisChat button for these tools.
  */
 export const ALWAYS_ALLOW_DISABLED_TOOL_NAMES: readonly string[] = [
   'delegate_external_agent',
 ]
 
 /**
- * local tool 中需要 require_approval 的工具名集合。
- * delegate_external_agent 是高风险工具（执行外部 CLI），必须在此列表中。
+ * Set of local tool names that require approval.
+ * delegate_external_agent is a high-risk tool (executes external CLI) and must be in this list.
  */
 const REQUIRE_APPROVAL_LOCAL_TOOLS: ReadonlySet<string> = new Set([
   'fs_file_ops',

@@ -1,10 +1,10 @@
-// 解析 claude -p --output-format stream-json 的 NDJSON 输出
-// 实测 schema（2026-05）：
-//   stream_event: event.type === "content_block_delta" && event.delta.type === "text_delta" → 增量文本
-//   assistant: message.content[] 含 text / tool_use / thinking
-//   user: message.content[] 含 tool_result（content 是 string 或 {type:'text',text}[]）
-//   result: 顶层 result 字段（非 message.result）
-//   system: subtype 字段
+// Parse NDJSON output from claude -p --output-format stream-json
+// Observed schema (2026-05):
+//   stream_event: event.type === "content_block_delta" && event.delta.type === "text_delta" -> incremental text
+//   assistant: message.content[] contains text / tool_use / thinking
+//   user: message.content[] contains tool_result (content is string or {type:'text',text}[])
+//   result: top-level result field (not message.result)
+//   system: subtype field
 
 export class ClaudeStreamParser {
   private lineBuffer = ''
@@ -20,7 +20,7 @@ export class ClaudeStreamParser {
   feed(chunk: string): void {
     this.lineBuffer += chunk
     const lines = this.lineBuffer.split('\n')
-    // 最后一段可能是未完成的行，留在 buffer
+    // The last segment may be an incomplete line; keep it in the buffer
     this.lineBuffer = lines.pop() ?? ''
     for (const line of lines) {
       if (line.trim()) this.processLine(line)
@@ -54,10 +54,10 @@ export class ClaudeStreamParser {
           this.opts.onText(text)
           this.gotAnyDelta = true
         }
-        // text_delta 不发 onProgress，避免每个 token 都发
+        // Do not emit onProgress for text_delta to avoid firing on every token
         return
       }
-      // 其他 stream_event 子类型静默忽略（message_start/content_block_start/stop 等噪音太多）
+      // Silently ignore other stream_event subtypes (message_start/content_block_start/stop are too noisy)
       return
     }
 
@@ -69,7 +69,7 @@ export class ClaudeStreamParser {
           `[system] init session_id=${sessionId ?? '(unknown)'}`,
         )
       }
-      // 其他 system 子类型（status、post_turn_summary）静默忽略
+      // Silently ignore other system subtypes (status, post_turn_summary)
       return
     }
 
@@ -82,14 +82,14 @@ export class ClaudeStreamParser {
           if (block.type === 'tool_use') {
             const name = block.name as string | undefined
             const input = block.input
-            // input 缺失时 JSON.stringify(undefined) 返回 undefined，slice 会抛
+            // When input is missing, JSON.stringify(undefined) returns undefined and slice would throw
             const inputStr = JSON.stringify(input ?? null).slice(0, 100)
             this.opts.onProgress(`[tool] ${name ?? '?'}(${inputStr})`)
           } else if (block.type === 'thinking') {
             const text = (block.thinking as string | undefined) ?? ''
             this.opts.onProgress(`[thinking] ${text.slice(0, 200)}`)
           }
-          // text block 忽略（delta 已累加，重复累加会导致输出翻倍）
+          // Ignore text blocks (delta has already accumulated; double-counting would duplicate output)
         }
       }
       return
@@ -126,7 +126,7 @@ export class ClaudeStreamParser {
       this.opts.onProgress(
         `[done] duration=${durationMs ?? '?'}ms cost=$${costUsd?.toFixed(4) ?? '?'} turns=${numTurns ?? '?'}`,
       )
-      // fallback：没有收到任何 delta 时用 result 字段
+      // fallback: use the result field when no deltas were received
       if (!this.gotAnyDelta) {
         const resultText = event.result as string | undefined
         if (resultText) {
@@ -137,11 +137,11 @@ export class ClaudeStreamParser {
     }
 
     if (type === 'rate_limit_event') {
-      // 静默忽略
+      // Silently ignore
       return
     }
 
-    // 未知类型
+    // Unknown type
     this.opts.onProgress(`[event] ${type ?? '(unknown)'}`)
   }
 }

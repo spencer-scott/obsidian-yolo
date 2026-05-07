@@ -343,17 +343,17 @@ export class DatabaseManager {
       return
     }
     try {
-      // 让步给主线程，避免在繁忙时刻开始保存
+      // Yield to the main thread to avoid starting a save during busy moments
       await yieldToMain()
 
       const blob: Blob = await this.pgClient.dumpDataDir('gzip')
 
-      // 让步给主线程，大型数据库的 dump 可能很耗时
+      // Yield to the main thread; dumping large databases can be time-consuming
       await yieldToMain()
 
       const arrayBuffer = await blob.arrayBuffer()
 
-      // 让步给主线程，准备写入文件
+      // Yield to the main thread before writing to file
       await yieldToMain()
 
       await this.app.vault.adapter.writeBinary(this.dbPath, arrayBuffer)

@@ -7,8 +7,9 @@ import { RequestMessage } from '../../types/llm/request'
 
 import { AnthropicProvider } from './anthropic'
 
-// Kimi 的 Anthropic 兼容端点不校验 thinking block 的 signature 真实性，
-// 只要求 thinking block 存在；这里复用社区代理 (abcpro1/kimi-proxy) 的占位符。
+// Kimi's Anthropic-compatible endpoint does not validate the authenticity of
+// thinking block signatures; it only requires that a thinking block exists.
+// Here we reuse the placeholder from the community proxy (abcpro1/kimi-proxy).
 const PLACEHOLDER_SIGNATURE = 'c2lnbmF0dXJlX3BsYWNlaG9sZGVy'
 
 export class MoonshotAnthropicProvider extends AnthropicProvider {

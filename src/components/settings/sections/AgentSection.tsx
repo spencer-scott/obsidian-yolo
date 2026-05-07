@@ -604,7 +604,7 @@ export function AgentSection({ app }: AgentSectionProps) {
       <section className="smtcmp-agent-block">
         <div className="smtcmp-agent-block-head">
           <div className="smtcmp-settings-sub-header">
-            {t('settings.etc.notifications', '通知提醒')}
+            {t('settings.etc.notifications', 'Notifications')}
           </div>
         </div>
 

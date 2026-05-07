@@ -349,7 +349,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   const ringPercent = useMemo(() => {
     // After a sync that only deleted rows (e.g. user removed an include
     // folder), the run reports totalChunks=0 with status='completed'. Treat
-    // that as 100% so the UI shows "索引已完成" instead of a stale 0%.
+    // that as 100% so the UI shows "Index complete" instead of a stale 0%.
     if (
       !isIndexing &&
       indexRunSnapshot.status === 'completed' &&
@@ -386,7 +386,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
       return `${ringPercent}% ${t('settings.rag.indexing', 'Indexing...')}`
     }
     if (indexRunSnapshot.status === 'retry_scheduled') {
-      const base = t('settings.rag.waitingRetry', '等待重试中...')
+      const base = t('settings.rag.waitingRetry', 'Waiting to retry...')
       return indexRunSnapshot.failureMessage
         ? `${base} · ${indexRunSnapshot.failureMessage}`
         : base
@@ -633,12 +633,12 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
         }
       } catch (error) {
         if (error instanceof RagIndexBusyError) {
-          new Notice(t('statusBar.ragAutoUpdateRunning', '知识库索引正在运行'))
+          new Notice(t('statusBar.ragAutoUpdateRunning', 'Knowledge base index is running'))
         } else if (
           error instanceof DOMException &&
           error.name === 'AbortError'
         ) {
-          new Notice(t('notices.indexCancelled', '索引已取消'))
+          new Notice(t('notices.indexCancelled', 'Indexing cancelled'))
         } else {
           console.error('Failed to update knowledge base index:', error)
           new Notice(failureNotice)
@@ -799,20 +799,20 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   return (
     <div className="smtcmp-settings-section">
       <div className="smtcmp-settings-header">
-        {t('settings.rag.title', '知识库')}
+        {t('settings.rag.title', 'Knowledge Base')}
       </div>
       <div className="smtcmp-settings-desc">
         {t(
           'settings.rag.desc',
-          '管理知识库索引，当 Agent 使用「搜索」工具并选择混合 & RAG 模式时，会自动调用 RAG 能力。',
+          'Manage the knowledge base index. RAG capabilities are automatically invoked when the Agent uses the Search tool in hybrid & RAG mode.',
         )}
       </div>
       <div className="smtcmp-rag-layout">
         <RAGCard
-          title={t('settings.rag.resourceCardTitle', 'PGlite 资源')}
+          title={t('settings.rag.resourceCardTitle', 'PGlite Resources')}
           description={t(
             'settings.rag.resourceCardDesc',
-            '管理知识库运行所需的数据库运行时资源。',
+            'Manage database runtime resources required for the knowledge base.',
           )}
           actions={
             <>
@@ -866,7 +866,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           {pgliteFailureReason ? (
             <div className="smtcmp-rag-inline-status smtcmp-rag-inline-status--error">
               <div className="smtcmp-rag-inline-status-title">
-                {t('settings.rag.pgliteInlineErrorTitle', '下载失败')}
+                {t('settings.rag.pgliteInlineErrorTitle', 'Download failed')}
               </div>
               <div className="smtcmp-rag-inline-status-text">
                 {pgliteFailureReason}
@@ -878,10 +878,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
         </RAGCard>
 
         <RAGCard
-          title={t('settings.rag.basicCardTitle', '知识库')}
+          title={t('settings.rag.basicCardTitle', 'Knowledge Base')}
           description={t(
             'settings.rag.basicCardDesc',
-            '控制知识库索引的启用状态、嵌入模型与相关维护操作。',
+            'Control the knowledge base index enable state, embedding model, and related maintenance operations.',
           )}
         >
           <ObsidianSetting
@@ -896,7 +896,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   new Notice(
                     t(
                       'settings.rag.selectEmbeddingModelFirst',
-                      '请先选择嵌入模型，再启用知识库索引。',
+                      'Please select an embedding model before enabling the knowledge base index.',
                     ),
                   )
                   return
@@ -913,10 +913,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.rag.autoUpdate', '自动更新索引')}
+            name={t('settings.rag.autoUpdate', 'Auto-update index')}
             desc={t(
               'settings.rag.autoUpdateDesc',
-              '开启后会在文档发生变化时于后台自动增量更新索引。',
+              'When enabled, the index will be incrementally updated in the background when documents change.',
             )}
             className="smtcmp-settings-card"
           >
@@ -935,10 +935,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.rag.indexPdf', '索引 PDF')}
+            name={t('settings.rag.indexPdf', 'Index PDF')}
             desc={t(
               'settings.rag.indexPdfDesc',
-              '为知识库提取并索引 PDF 文本；首次全库重建可能较慢。大型仓库若不需要可关闭。',
+              'Extract and index PDF text for the knowledge base; the first full rebuild may be slow. Can be disabled for large vaults if not needed.',
             )}
             className="smtcmp-settings-card"
           >
@@ -977,7 +977,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
             <div className="smtcmp-muted-note">
               {t(
                 'settings.rag.maintenanceUnavailableHint',
-                '请先在上方准备好 PGlite 资源，再执行索引维护或嵌入数据库管理。',
+                'Please prepare PGlite resources above before performing index maintenance or embedding database management.',
               )}
             </div>
           )}
@@ -985,7 +985,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           {isRagEnabled && (
             <>
               <ObsidianSetting
-                name={t('settings.rag.maintenanceActions', '维护操作')}
+                name={t('settings.rag.maintenanceActions', 'Maintenance actions')}
                 nameExtra={
                   <div className="smtcmp-index-inline-status">
                     <IndexProgressRing percent={ringPercent} />
@@ -1036,11 +1036,11 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     const status = indexRunSnapshot.status
                     let label: string
                     if (status === 'retry_scheduled') {
-                      label = t('settings.rag.retryNow', '立即重试')
+                      label = t('settings.rag.retryNow', 'Retry now')
                     } else if (status === 'failed') {
-                      label = t('common.retry', '重试')
+                      label = t('common.retry', 'Retry')
                     } else {
-                      label = t('settings.rag.rebuildIndex', '重建索引')
+                      label = t('settings.rag.rebuildIndex', 'Rebuild index')
                     }
                     return (
                       <ObsidianButton
@@ -1058,12 +1058,12 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   })()}
                   {isIndexing && (
                     <ObsidianButton
-                      text={t('settings.rag.cancelIndex', '取消')}
+                      text={t('settings.rag.cancelIndex', 'Cancel')}
                       onClick={() => {
                         console.debug('[YOLO] Cancel button clicked')
                         plugin.cancelRagIndex()
                         new Notice(
-                          t('notices.indexCancelling', '正在取消索引...'),
+                          t('notices.indexCancelling', 'Cancelling indexing...'),
                         )
                       }}
                     />
@@ -1077,10 +1077,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
         {isRagEnabled && (
           <>
             <RAGCard
-              title={t('settings.rag.scopeCardTitle', '索引范围')}
+              title={t('settings.rag.scopeCardTitle', 'Index Scope')}
               description={t(
                 'settings.rag.scopeCardDesc',
-                '选择哪些文件夹应参与知识库索引，哪些应被排除。',
+                'Select which folders to include in the knowledge base index and which to exclude.',
               )}
             >
               <div className="smtcmp-rag-scope-group">
@@ -1114,7 +1114,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
-                    title={t('settings.rag.selectedFolders', '已选择的文件夹')}
+                    title={t('settings.rag.selectedFolders', 'Selected folders')}
                     value={includeFolders}
                     onChange={(folders: string[]) => {
                       const patterns = folderPathsToIncludePatterns(folders)
@@ -1157,10 +1157,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
-                    title={t('settings.rag.excludedFolders', '已排除的文件夹')}
+                    title={t('settings.rag.excludedFolders', 'Excluded folders')}
                     placeholder={t(
                       'settings.rag.selectExcludeFoldersPlaceholder',
-                      '点击此处选择要排除的文件夹（留空则不排除）',
+                      'Click here to select folders to exclude (leave empty to exclude none)',
                     )}
                     value={excludeFolders}
                     onChange={(folders: string[]) => {
@@ -1186,7 +1186,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     <div>
                       {t(
                         'settings.rag.conflictNoteDefaultInclude',
-                        '提示：当前未选择包含文件夹，默认包含全部。若设置了排除文件夹，则排除将优先生效。',
+                        'Note: No include folders are selected, so all folders are included by default. If exclude folders are set, they will take priority.',
                       )}
                     </div>
                   )}
@@ -1194,7 +1194,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     <div>
                       {t(
                         'settings.rag.conflictExact',
-                        '以下文件夹同时被包含与排除，最终将被排除：',
+                        'The following folders are both included and excluded, and will ultimately be excluded:',
                       )}{' '}
                       {conflictInfo.exactConflicts
                         .map((f) => (f === '' ? '/' : f))
@@ -1205,7 +1205,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     <div>
                       {t(
                         'settings.rag.conflictParentExclude',
-                        '以下包含的文件夹位于已排除的上级之下，最终将被排除：',
+                        'The following included folders are under an excluded parent and will ultimately be excluded:',
                       )}{' '}
                       {conflictInfo.includeUnderExcluded
                         .map((f) => (f === '' ? '/' : f))
@@ -1216,7 +1216,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     <div>
                       {t(
                         'settings.rag.conflictChildExclude',
-                        '以下排除的子文件夹位于包含文件夹之下（局部排除将生效）：',
+                        'The following excluded subfolders are under an included folder (partial exclusion will apply):',
                       )}{' '}
                       {conflictInfo.excludeWithinIncluded
                         .map((f) => (f === '' ? '/' : f))
@@ -1226,14 +1226,14 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <div>
                     {t(
                       'settings.rag.conflictRule',
-                      '当包含与排除重叠时，以排除为准。',
+                      'When include and exclude overlap, exclude takes precedence.',
                     )}
                   </div>
                 </div>
               )}
             </RAGCard>
 
-            <RAGCard title={t('settings.rag.advanced', '高级设置')}>
+            <RAGCard title={t('settings.rag.advanced', 'Advanced settings')}>
               <div
                 className={`smtcmp-settings-advanced-toggle smtcmp-clickable${
                   showAdvancedRagSettings ? ' is-expanded' : ''
@@ -1249,7 +1249,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                 }}
               >
                 <span className="smtcmp-settings-advanced-toggle-icon">▶</span>
-                {t('settings.rag.advanced', '高级设置')}
+                {t('settings.rag.advanced', 'Advanced settings')}
               </div>
 
               {showAdvancedRagSettings && (

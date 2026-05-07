@@ -1,10 +1,10 @@
-// runner.test.ts — 外部 CLI runner 单元测试
-// 使用 Jest 模拟 node:child_process 和相关依赖
-/* eslint-disable import/no-nodejs-modules -- 测试文件允许直接引入 node 内置模块进行 mock */
+// runner.test.ts - External CLI runner unit tests
+// Uses Jest to mock node:child_process and related dependencies
+/* eslint-disable import/no-nodejs-modules -- test files may directly import node built-in modules for mocking */
 
 import { EventEmitter } from 'node:events'
 
-// ── 模拟 shell-env ──
+// ── Mock shell-env ──
 jest.mock('shell-env', () => ({
   shellEnvSync: () => ({
     PATH: '/usr/local/bin:/usr/bin:/bin',
@@ -12,12 +12,12 @@ jest.mock('shell-env', () => ({
   }),
 }))
 
-// ── 模拟 which.ts（让其总是找到 CLI） ──
+// ── Mock which.ts (always finds the CLI) ──
 jest.mock('./which', () => ({
   which: jest.fn().mockResolvedValue('/usr/local/bin/codex'),
 }))
 
-// ── 模拟 streamBus ──
+// ── Mock streamBus ──
 const pushMock = jest.fn()
 jest.mock('./streamBus', () => ({
   externalCliStreamBus: {
@@ -28,7 +28,7 @@ jest.mock('./streamBus', () => ({
   },
 }))
 
-// ── 模拟 async-task-registry ──
+// ── Mock async-task-registry ──
 const registerMock = jest.fn()
 const updateMock = jest.fn()
 const getMock = jest.fn()
@@ -44,7 +44,7 @@ jest.mock('./async-task-registry', () => ({
   },
 }))
 
-// ── 模拟 child_process ──
+// ── Mock child_process ──
 let mockChild: MockChild
 const allMockChildren: MockChild[] = []
 const taskkillCalls: Array<{ args: readonly string[] }> = []
@@ -69,12 +69,12 @@ class MockChild extends EventEmitter {
   }
 }
 
-// taskkill 的 mock 返回值：仅需 EventEmitter 接口（监听 error 事件）
+// Mock return value for taskkill: only needs EventEmitter interface (listens for error event)
 function makeTaskkillMock(): EventEmitter {
   return new EventEmitter()
 }
 
-// 主子进程 spawn：taskkill 返回独立 EE，其他返回 MockChild
+// Main child process spawn: taskkill returns a standalone EE, others return MockChild
 function defaultSpawnImpl(
   command: string,
   args?: readonly string[],
@@ -100,23 +100,23 @@ jest.mock('cross-spawn', () => ({
   spawn: crossSpawnMock,
 }))
 
-// 模拟 node:fs/promises
-// - access/constants：供 which 使用（which 自身已被 mock，但保留兼容）
-// - stat：供 runner 校验 workingDirectory 使用，默认返回 isDirectory=true
+// Mock node:fs/promises
+// - access/constants: used by which (which itself is mocked, but kept for compatibility)
+// - stat: used by runner to validate workingDirectory, defaults to isDirectory=true
 jest.mock('node:fs/promises', () => ({
   access: jest.fn().mockResolvedValue(undefined),
   constants: { X_OK: 1 },
   stat: jest.fn().mockResolvedValue({ isDirectory: () => true }),
 }))
 
-// 模拟 node:path
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factory 需要 require 语法
+// Mock node:path
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factory requires require syntax
 jest.mock('node:path', () => require('path'))
 
 import type { RunExternalAgentResult } from './runner'
 import { killAllActiveExternalCli, runExternalAgent } from './runner'
 
-// 阻止真实 process.kill 调用（进程树 kill 需要负 PID，在测试中不可用）
+// Prevent real process.kill calls (process tree kill needs negative PID, not available in tests)
 const originalKill = process.kill.bind(process)
 beforeAll(() => {
   jest.spyOn(process, 'kill').mockImplementation(() => true)
@@ -129,16 +129,16 @@ beforeEach(() => {
   jest.clearAllMocks()
   allMockChildren.length = 0
   taskkillCalls.length = 0
-  // clearAllMocks 会清空 mockImplementation，需要在每个测试前重新设置
+  // clearAllMocks clears mockImplementation, so we need to re-set it before each test
   spawnMock.mockImplementation(defaultSpawnImpl)
   crossSpawnMock.mockImplementation(defaultSpawnImpl)
-  // which mock 也需要重新设置（clearAllMocks 会清空 mockResolvedValue）
+  // which mock also needs to be re-set (clearAllMocks clears mockResolvedValue)
   jest.requireMock('./which').which.mockResolvedValue('/usr/local/bin/codex')
-  // 重置活跃进程集合（通过连续调用 killAll）
+  // Reset active process set (by calling killAll)
   killAllActiveExternalCli()
 })
 
-// ── 工具函数：模拟进程正常退出 ──
+// ── Helper: simulate a successful process exit ──
 function simulateSuccess(stdout: string, exitCode = 0) {
   setImmediate(() => {
     mockChild.stdout.emit('data', Buffer.from(stdout))
@@ -147,7 +147,7 @@ function simulateSuccess(stdout: string, exitCode = 0) {
 }
 
 describe('runExternalAgent', () => {
-  it('spawn 成功 — 返回 stdout', async () => {
+  it('successful spawn returns stdout', async () => {
     const promise = runExternalAgent({
       toolCallId: 'tc-1',
       provider: 'codex',
@@ -162,7 +162,7 @@ describe('runExternalAgent', () => {
     expect(result.truncated).toBeUndefined()
   })
 
-  it('非 0 退出码仍返回 result', async () => {
+  it('non-zero exit code still returns result', async () => {
     const promise = runExternalAgent({
       toolCallId: 'tc-2',
       provider: 'codex',
@@ -179,7 +179,7 @@ describe('runExternalAgent', () => {
     expect(result.exitCode).toBe(1)
   })
 
-  it('abort signal — 触发 kill 并 resolve（保留已采集输出）', async () => {
+  it('abort signal triggers kill and resolves (preserving collected output)', async () => {
     const controller = new AbortController()
     const promise = runExternalAgent({
       toolCallId: 'tc-3',
@@ -193,7 +193,7 @@ describe('runExternalAgent', () => {
     setImmediate(() => {
       mockChild.stdout.emit('data', Buffer.from('some output'))
       controller.abort()
-      // 模拟被 SIGTERM 杀死后进程退出
+      // Simulate process exiting after being killed by SIGTERM
       setImmediate(() => {
         mockChild.emit('close', null)
       })
@@ -201,13 +201,13 @@ describe('runExternalAgent', () => {
 
     const result = (await promise) as RunExternalAgentResult
     expect(result.stdout).toBe('some output')
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy 断言必须引用原始方法
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion must reference the original method
     expect(process.kill).toHaveBeenCalledWith(-mockChild.pid, 'SIGTERM')
   })
 
-  it('超时 — reject 并调用 kill', async () => {
-    // 测试超时逻辑：用 AbortSignal 模拟超时路径（超时内部也是 killProcess + reject）
-    // 避免使用 jest.useFakeTimers()，因其会干扰 await import() 的微任务队列
+  it('timeout triggers kill', async () => {
+    // Test timeout logic: use AbortSignal to simulate the timeout path (timeout internally also calls killProcess + reject)
+    // Avoid jest.useFakeTimers() as it interferes with await import() microtask queue
 
     const controller = new AbortController()
     const promise = runExternalAgent({
@@ -220,7 +220,7 @@ describe('runExternalAgent', () => {
       signal: controller.signal,
     })
 
-    // abort 触发与超时相同的 killProcess 逻辑
+    // abort triggers the same killProcess logic as timeout
     setImmediate(() => {
       controller.abort()
       setImmediate(() => {
@@ -229,12 +229,12 @@ describe('runExternalAgent', () => {
     })
 
     await promise
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy 断言
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion
     expect(process.kill).toHaveBeenCalledWith(-mockChild.pid, 'SIGTERM')
   }, 10000)
 
-  it('输出超过 1MB — 双端截断并设置 truncated metadata', async () => {
-    // 构造超过 1MB 的数据
+  it('output exceeding 1MB is head+tail truncated with truncated metadata', async () => {
+    // Build data exceeding 1MB
     const MB = 1024 * 1024
     const bigData = Buffer.alloc(MB + 100, 'x')
 
@@ -255,12 +255,12 @@ describe('runExternalAgent', () => {
     expect(result.truncated).toBeDefined()
     expect(result.truncated?.totalBytes).toBe(MB + 100)
     expect(result.truncated?.omittedBytes).toBeGreaterThan(0)
-    // 截断后文本应包含提示信息
-    expect(result.stdout).toContain('输出过长')
+    // Truncated text should contain the truncation marker
+    expect(result.stdout).toContain('output too long')
   })
 
-  it('输出超过 1.5MB — collector 内存占用 ≤ 600KB（head+tail 上限）', async () => {
-    // 构造 1.5MB 数据，验证进程内部收集到的字节远少于原始数据大小
+  it('output exceeding 1.5MB has collector memory usage <= 600KB (head+tail cap)', async () => {
+    // Build 1.5MB data, verify that internally collected bytes are far less than original data size
     const MB = 1024 * 1024
     const bigData = Buffer.alloc(1.5 * MB, 0x61) // 1.5MB 'a'
 
@@ -279,18 +279,18 @@ describe('runExternalAgent', () => {
 
     const result = (await promise) as RunExternalAgentResult
 
-    // truncated 应存在，且 totalBytes 等于实际输入
+    // truncated should exist, and totalBytes should equal the actual input
     expect(result.truncated).toBeDefined()
     expect(result.truncated?.totalBytes).toBe(Math.floor(1.5 * MB))
-    // omittedBytes 应 > 0（确实有数据被省略）
+    // omittedBytes should be > 0 (data was actually omitted)
     expect(result.truncated?.omittedBytes).toBeGreaterThan(0)
-    // 最终文本应包含截断提示标记
-    expect(result.stdout).toContain('输出过长')
-    // 最终文本长度应远小于原始 1.5MB（head 256KB + marker + tail 256KB ≈ 512KB+）
+    // Final text should contain the truncation marker
+    expect(result.stdout).toContain('output too long')
+    // Final text length should be far less than the original 1.5MB (head 256KB + marker + tail 256KB ~ 512KB+)
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThan(600 * 1024)
   })
 
-  it('Windows 平台 — 主子进程走 cross-spawn，options 含 windowsHide 不含 detached', async () => {
+  it('Windows platform uses cross-spawn for main child process, options include windowsHide but not detached', async () => {
     const origPlatform = process.platform
     Object.defineProperty(process, 'platform', {
       value: 'win32',
@@ -307,7 +307,7 @@ describe('runExternalAgent', () => {
       simulateSuccess('output')
       await promise
 
-      // Windows 下应只通过 cross-spawn 启动主子进程；node:child_process.spawn 不应被调用
+      // On Windows, main child process should only be started via cross-spawn; node:child_process.spawn should not be called
       expect(crossSpawnMock).toHaveBeenCalledTimes(1)
       expect(spawnMock).not.toHaveBeenCalled()
       const opts = crossSpawnMock.mock.calls[0][2] as Record<string, unknown>
@@ -321,7 +321,7 @@ describe('runExternalAgent', () => {
     }
   })
 
-  it('Windows 平台 + abort — 调 taskkill /T /F /PID 而非 process.kill(-pid)', async () => {
+  it('Windows platform + abort calls taskkill /T /F /PID instead of process.kill(-pid)', async () => {
     const origPlatform = process.platform
     Object.defineProperty(process, 'platform', {
       value: 'win32',
@@ -345,7 +345,7 @@ describe('runExternalAgent', () => {
       })
       await promise
 
-      // 应通过 spawnMock 调用 taskkill（cross-spawn 不参与 kill 路径）
+      // Should call taskkill via spawnMock (cross-spawn is not involved in the kill path)
       expect(taskkillCalls).toHaveLength(1)
       expect(taskkillCalls[0].args).toEqual([
         '/T',
@@ -353,8 +353,8 @@ describe('runExternalAgent', () => {
         '/PID',
         String(mockChild.pid),
       ])
-      // 不应使用 POSIX 进程组 kill
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy 断言
+      // Should not use POSIX process group kill
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion
       expect(process.kill).not.toHaveBeenCalled()
     } finally {
       Object.defineProperty(process, 'platform', {
@@ -364,10 +364,11 @@ describe('runExternalAgent', () => {
     }
   })
 
-  it('Windows 平台 — killProcess 幂等：abort 后 killAll 不再 spawn 第二次 taskkill', async () => {
-    // 真正覆盖 createKillProcess 的 killed 标志。abort 触发后，runner 内部
-    // 会清掉 timeoutId，所以 timer 不会再调 killProcess；但 killAllActiveExternalCli
-    // 仍会调用同一个 closure 的 killProcess，此时 killed=true 必须把它拦下。
+  it('Windows platform - killProcess is idempotent: killAll after abort does not spawn a second taskkill', async () => {
+    // Actually covers the killed flag in createKillProcess. After abort triggers,
+    // the runner clears timeoutId so the timer won't call killProcess again; but
+    // killAllActiveExternalCli will still call the same closure's killProcess,
+    // and killed=true must block it.
     const origPlatform = process.platform
     Object.defineProperty(process, 'platform', {
       value: 'win32',
@@ -384,11 +385,12 @@ describe('runExternalAgent', () => {
         signal: controller.signal,
       })
 
-      // 等子进程注册到 activeProcesses
+      // Wait for child process to be registered in activeProcesses
       await new Promise((r) => setImmediate(r))
       controller.abort()
-      // 同 tick 内再触发 killAll —— 此时 abort handler 已调用过 killProcess 一次，
-      // killAll 是第二次调用：幂等保证 taskkill 只 spawn 1 次。
+      // Trigger killAll in the same tick - at this point the abort handler has already
+      // called killProcess once; killAll is the second call: idempotency ensures
+      // taskkill is only spawned once.
       killAllActiveExternalCli()
       setImmediate(() => mockChild.emit('close', null))
       await promise
@@ -402,20 +404,20 @@ describe('runExternalAgent', () => {
     }
   }, 5000)
 
-  it('Windows 平台 — taskkill close 非 0 时 fallback 到 child.kill()', async () => {
+  it('Windows platform - taskkill close non-zero falls back to child.kill()', async () => {
     const origPlatform = process.platform
     Object.defineProperty(process, 'platform', {
       value: 'win32',
       configurable: true,
     })
-    // 让 taskkill mock 返回的 EE 立刻 emit close(1)
+    // Make the taskkill mock's returned EE immediately emit close(1)
     const taskkillEEs: EventEmitter[] = []
     spawnMock.mockImplementation((command, args) => {
       if (command === 'taskkill') {
         taskkillCalls.push({ args: args ?? [] })
         const ee = makeTaskkillMock()
         taskkillEEs.push(ee)
-        // 异步 emit close(1) 模拟 taskkill 启动成功但执行失败
+        // Async emit close(1) to simulate taskkill starting successfully but failing to execute
         setImmediate(() => ee.emit('close', 1))
         return ee as never
       }
@@ -436,14 +438,14 @@ describe('runExternalAgent', () => {
 
       await new Promise((r) => setImmediate(r))
       controller.abort()
-      // 等 taskkill close 事件传播 + fallback
+      // Wait for taskkill close event propagation + fallback
       await new Promise((r) => setImmediate(r))
       await new Promise((r) => setImmediate(r))
       setImmediate(() => mockChild.emit('close', null))
       await promise
 
       expect(taskkillCalls).toHaveLength(1)
-      // close 非 0 应触发 child.kill() 兜底
+      // close non-zero should trigger child.kill() fallback
       expect(mockChild.kill).toHaveBeenCalled()
     } finally {
       Object.defineProperty(process, 'platform', {
@@ -453,7 +455,7 @@ describe('runExternalAgent', () => {
     }
   })
 
-  it('Windows 平台 — killAllActiveExternalCli 也走 taskkill', async () => {
+  it('Windows platform - killAllActiveExternalCli also uses taskkill', async () => {
     const origPlatform = process.platform
     Object.defineProperty(process, 'platform', {
       value: 'win32',
@@ -468,10 +470,10 @@ describe('runExternalAgent', () => {
         prompt: 'long',
         timeoutSeconds: 3600,
       })
-      // 等子进程注册到 activeProcesses
+      // Wait for child process to be registered in activeProcesses
       await new Promise((r) => setImmediate(r))
       killAllActiveExternalCli()
-      // 触发 close 让 promise 收尾
+      // Trigger close to let the promise settle
       setImmediate(() => mockChild.emit('close', null))
       await promise
 
@@ -490,7 +492,7 @@ describe('runExternalAgent', () => {
     }
   })
 
-  it('sandboxMode 不合法 — reject', async () => {
+  it('invalid sandboxMode rejects', async () => {
     await expect(
       runExternalAgent({
         toolCallId: 'tc-7',
@@ -502,7 +504,7 @@ describe('runExternalAgent', () => {
     ).rejects.toThrow('sandboxMode')
   })
 
-  it('model 字段含非法字符 — reject', async () => {
+  it('model field with invalid characters rejects', async () => {
     await expect(
       runExternalAgent({
         toolCallId: 'tc-8',
@@ -515,8 +517,8 @@ describe('runExternalAgent', () => {
     ).rejects.toThrow('model')
   })
 
-  it('并发超过 3 个 — reject', async () => {
-    // 启动 3 个不会退出的进程
+  it('more than 3 concurrent processes rejects', async () => {
+    // Start 3 processes that will not exit
     const makeSlowRun = (id: string) =>
       runExternalAgent({
         toolCallId: id,
@@ -531,10 +533,10 @@ describe('runExternalAgent', () => {
     const p2 = makeSlowRun('conc-2')
     const p3 = makeSlowRun('conc-3')
 
-    // 第 4 个应该立即 reject（此时活跃进程已满 3 个）
+    // The 4th should immediately reject (active processes are at capacity: 3)
     await expect(makeSlowRun('conc-4')).rejects.toThrow('too many concurrent')
 
-    // 关闭所有已创建的子进程让 p1/p2/p3 完成
+    // Close all created child processes so p1/p2/p3 can complete
     setImmediate(() => {
       for (const child of allMockChildren) {
         child.emit('close', 0)
@@ -544,16 +546,16 @@ describe('runExternalAgent', () => {
     await Promise.allSettled([p1, p2, p3])
   })
 
-  it('UTF-8 边界 — 截断不破坏多字节字符', async () => {
-    // 创建一个总大小 > 1MB 且在 256KB 边界恰好有中文字符的 buffer
+  it('UTF-8 boundary - truncation does not break multibyte characters', async () => {
+    // Create a buffer > 1MB with CJK characters right at the 256KB boundary
     const MB = 1024 * 1024
     const TRUNCATE_HEAD = 256 * 1024
     const head = Buffer.alloc(TRUNCATE_HEAD - 1, 0x41) // 'A' * (256KB - 1)
-    const chinese = Buffer.from('中文', 'utf8') // 6 bytes（UTF-8 多字节）
-    // tail 足够长，让总大小超过 1MB
+    const multibyte = Buffer.from('☃☂', 'utf8') // 6 bytes (UTF-8 multibyte, 3 bytes each)
+    // tail is long enough to make total size exceed 1MB
     const tail = Buffer.alloc(MB - TRUNCATE_HEAD + 100, 0x42)
-    const bigBuf = Buffer.concat([head, chinese, tail])
-    // 确认总大小确实超过 1MB
+    const bigBuf = Buffer.concat([head, multibyte, tail])
+    // Confirm total size actually exceeds 1MB
     expect(bigBuf.length).toBeGreaterThan(MB)
 
     const promise = runExternalAgent({
@@ -570,16 +572,16 @@ describe('runExternalAgent', () => {
     })
 
     const result = (await promise) as RunExternalAgentResult
-    // 应该被截断（总大小 > 1MB）
+    // Should be truncated (total size > 1MB)
     expect(result.truncated).toBeDefined()
-    // 截断结果应为合法 UTF-8（能正常解码而不出现 replacement char 问题）
+    // Truncated result should be valid UTF-8 (decodes without replacement char issues)
     expect(() =>
       Buffer.from(result.stdout, 'utf8').toString('utf8'),
     ).not.toThrow()
   })
 
-  // ── 必修 1：512KB < 输出 < 1MB 时全量保留，不静默丢数据 ──
-  it('800KB 输出（512KB < x < 1MB）— 全量保留，truncated 为 undefined', async () => {
+  // ── Output between 512KB and 1MB is fully preserved, no silent data loss ──
+  it('800KB output (512KB < x < 1MB) is fully preserved, truncated is undefined', async () => {
     const KB = 1024
     const size = 800 * KB
     const data = Buffer.alloc(size, 0x41) // 800KB 'A'
@@ -598,17 +600,17 @@ describe('runExternalAgent', () => {
     })
 
     const result = (await promise) as RunExternalAgentResult
-    // 800KB < 1MB，应该全量保留，不截断
+    // 800KB < 1MB, should be fully preserved, no truncation
     expect(result.truncated).toBeUndefined()
-    // 输出长度应等于原始大小（ASCII 字符，字节 == 字符数）
+    // Output length should equal original size (ASCII characters, bytes == char count)
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBe(size)
   })
 
-  // ── 必修 2：含中文的 >1MB 输出不产生 replacement char ──
-  it('含中文的 1.2MB 输出截断后不含 replacement char', async () => {
+  // ── CJK content >1MB does not produce replacement chars after truncation ──
+  it('1.2MB output containing CJK characters does not contain replacement chars after truncation', async () => {
     const MB = 1024 * 1024
-    // "你好世界" 每个字符 3 字节，4 字符 = 12 字节，重复填充到 ~1.2MB
-    const unit = Buffer.from('你好世界', 'utf8') // 12 bytes
+    // Each CJK character is 3 bytes in UTF-8, 4 chars = 12 bytes, repeated to fill ~1.2MB
+    const unit = Buffer.from('☃☂☄★', 'utf8') // 12 bytes (UTF-8 multibyte, 3 bytes each)
     const repeat = Math.ceil((1.2 * MB) / unit.length)
     const chunks: Buffer[] = []
     for (let i = 0; i < repeat; i++) {
@@ -632,30 +634,30 @@ describe('runExternalAgent', () => {
 
     const result = (await promise) as RunExternalAgentResult
     expect(result.truncated).toBeDefined()
-    // 不含 UTF-8 replacement char（U+FFFD）
+    // Should not contain UTF-8 replacement char (U+FFFD)
     expect(result.stdout).not.toContain('�')
   })
 
-  // ── 必修 4：超时后 result 包含 timedOut: true 且 stdout 非空 ──
-  it('超时 — result.timedOut 为 true 且保留已采集 stdout', async () => {
-    // 先推数据，再启动 runner（timeoutSeconds 极小），确保超时发生在 close 之前
-    // 不使用 fake timers，避免与 await import() 的微任务队列冲突
+  // ── After timeout, result contains timedOut: true and stdout is non-empty ──
+  it('timeout sets result.timedOut to true and preserves collected stdout', async () => {
+    // Push data first, then start the runner (very small timeoutSeconds) to ensure timeout occurs before close
+    // Do not use fake timers to avoid conflicts with await import() microtask queue
     const promise = runExternalAgent({
       toolCallId: 'tc-timeout-result',
       provider: 'codex',
       workingDirectory: '/tmp',
       sandboxMode: 'read-only',
       prompt: 'slow',
-      timeoutSeconds: 0.05, // 50ms 后超时
+      timeoutSeconds: 0.05, // timeout after 50ms
     })
 
     setImmediate(() => {
-      // 在超时触发前推送数据
+      // Push data before timeout triggers
       mockChild.stdout.emit(
         'data',
         Buffer.from('partial output before timeout'),
       )
-      // 200ms 后模拟进程退出（晚于超时）
+      // Simulate process exit after 200ms (later than the timeout)
       setTimeout(() => {
         mockChild.emit('close', null)
       }, 200)
@@ -674,7 +676,7 @@ describe('runExternalAgent — async mode', () => {
     getMock.mockClear()
   })
 
-  it('mode=async — 立刻返回占位结果，不等待进程', async () => {
+  it('mode=async returns placeholder result immediately without waiting for the process', async () => {
     const abortController = new AbortController()
     getMock.mockReturnValue({
       taskId: 'ext_test001',
@@ -711,7 +713,7 @@ describe('runExternalAgent — async mode', () => {
       },
     })
 
-    // mode=async 应立刻 resolve，无需等待 close 事件
+    // mode=async should resolve immediately, no need to wait for close event
     const result = await promise
     expect('accepted' in result).toBe(true)
     if ('accepted' in result) {
@@ -720,16 +722,16 @@ describe('runExternalAgent — async mode', () => {
       expect(result.status).toBe('running')
     }
 
-    // registry.register 应该被调用
+    // registry.register should have been called
     expect(registerMock).toHaveBeenCalledWith(
       expect.objectContaining({ taskId: 'ext_test001' }),
     )
 
-    // 模拟进程完成（后台）
+    // Simulate process completion (background)
     simulateSuccess('output text')
   })
 
-  it('mode=async — 进程完成后 emit task-completed 事件', async () => {
+  it('mode=async emits task-completed event after process completes', async () => {
     const abortController = new AbortController()
     const completedRecord = {
       taskId: 'ext_test002',
@@ -768,19 +770,19 @@ describe('runExternalAgent — async mode', () => {
     })
     await promise
 
-    // 模拟进程完成
+    // Simulate process completion
     await new Promise<void>((resolve) => {
       simulateSuccess('done output')
       setImmediate(resolve)
     })
 
-    // registry.update 应该被调用
+    // registry.update should have been called
     expect(updateMock).toHaveBeenCalledWith(
       'ext_test002',
       expect.objectContaining({ status: 'completed', exitCode: 0 }),
     )
 
-    // streamBus.push 应该有 task-completed 事件
+    // streamBus.push should have a task-completed event
     expect(pushMock).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'task-completed',

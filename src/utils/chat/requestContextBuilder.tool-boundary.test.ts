@@ -88,7 +88,7 @@ describe('filterRequestMessagesByToolBoundary', () => {
     const input: RequestMessage[] = [
       assistantWithTools(['call-1', 'call-2']),
       toolMessage('call-1'),
-      { role: 'assistant', content: '继续处理' },
+      { role: 'assistant', content: 'Continue processing' },
       toolMessage('call-2'),
     ]
 
@@ -107,7 +107,7 @@ describe('filterRequestMessagesByToolBoundary', () => {
         ],
       },
       toolMessage('call-1'),
-      { role: 'assistant', content: '继续处理', tool_calls: undefined },
+      { role: 'assistant', content: 'Continue processing', tool_calls: undefined },
     ])
   })
 

@@ -1,9 +1,9 @@
-// 外部 CLI 流式事件总线
-// runner 往里 push，前端 hook 订阅后续事件并通过 getSnapshot 补齐历史
+// External CLI streaming event bus
+// The runner pushes events; frontend hooks subscribe to new events and use getSnapshot to catch up on history
 
 import type { AsyncTaskRecord } from './async-task-registry'
 
-/** snapshot 中 stdout/stderr 字段的最大字符数（超出时从前端截断） */
+/** Maximum character count for stdout/stderr in the snapshot (truncated from the front when exceeded) */
 const SNAPSHOT_MAX_CHARS = 1 * 1024 * 1024 // 1MB chars
 const SNAPSHOT_TRUNCATION_MARKER = '... [front truncated] ...\n'
 
@@ -29,9 +29,10 @@ export type ExternalCliSnapshot = {
 type Subscriber = (event: ExternalCliEvent) => void
 
 /**
- * 将 snapshot 字符串限制在 SNAPSHOT_MAX_CHARS 以内。
- * 超出时从前端截断并插入 marker，防止 snapshot 无限增长。
- * JS string 已是有效 UTF-16，无需 UTF-8 边界处理。
+ * Cap a snapshot string to SNAPSHOT_MAX_CHARS.
+ * When exceeded, truncate from the front and insert a marker to prevent
+ * unbounded snapshot growth. JS strings are valid UTF-16, so no UTF-8
+ * boundary handling is needed.
  */
 function cappedSnapshotString(s: string): string {
   if (s.length <= SNAPSHOT_MAX_CHARS) return s
@@ -47,7 +48,7 @@ export class ExternalCliStreamBus {
   private readonly subscribers = new Map<string, Set<Subscriber>>()
   private readonly taskCompletedSubscribers = new Set<TaskCompletedSubscriber>()
 
-  /** 订阅指定 toolCallId 的后续事件，返回取消订阅函数 */
+  /** Subscribe to subsequent events for a given toolCallId; returns an unsubscribe function */
   subscribe(toolCallId: string, fn: Subscriber): () => void {
     let subs = this.subscribers.get(toolCallId)
     if (!subs) {
@@ -63,7 +64,7 @@ export class ExternalCliStreamBus {
     }
   }
 
-  /** 订阅所有 task-completed 事件（供 ChatStore 使用） */
+  /** Subscribe to all task-completed events (for ChatStore) */
   subscribeTaskCompleted(fn: TaskCompletedSubscriber): () => void {
     this.taskCompletedSubscribers.add(fn)
     return () => {
@@ -71,7 +72,7 @@ export class ExternalCliStreamBus {
     }
   }
 
-  /** runner 推送事件；同时更新内存快照 */
+  /** Runner pushes events; also updates the in-memory snapshot */
   push(event: ExternalCliEvent): void {
     if (event.type === 'task-completed') {
       for (const fn of this.taskCompletedSubscribers) {
@@ -112,19 +113,20 @@ export class ExternalCliStreamBus {
   }
 
   /**
-   * 获取当前快照（供 late subscriber 补齐历史）。
-   * 返回 null 表示该 toolCallId 从未注册过（即历史会话，走静态渲染路径）。
+   * Get the current snapshot (for late subscribers to catch up on history).
+   * Returns null if the toolCallId was never registered (i.e., a historical
+   * session using the static rendering path).
    */
   getSnapshot(toolCallId: string): ExternalCliSnapshot | null {
     return this.snapshots.get(toolCallId) ?? null
   }
 
-  /** 进程结束后清理内存快照（可选调用，避免长期占用） */
+  /** Clean up the in-memory snapshot after the process ends (optional, to avoid long-term memory usage) */
   clearSnapshot(toolCallId: string): void {
     this.snapshots.delete(toolCallId)
     this.subscribers.delete(toolCallId)
   }
 }
 
-// 单例：整个 plugin 生命周期内唯一
+// Singleton: unique for the entire plugin lifecycle
 export const externalCliStreamBus = new ExternalCliStreamBus()

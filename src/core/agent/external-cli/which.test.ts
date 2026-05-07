@@ -1,10 +1,13 @@
-// which.test.ts — 跨平台 PATH/PATHEXT 解析测试
+// which.test.ts - Cross-platform PATH/PATHEXT resolution tests
 //
-// 注意：测试在主机平台（如 darwin/linux）跑，`path.delimiter` 与 `path.join`
-// 的语义保持主机平台行为，与我们用 Object.defineProperty 改的 process.platform
-// 无关。因此构造路径时不要包含主机 path.delimiter（POSIX 是 ':'），
-// 否则 split(env.PATH) 时会被错切。下面用不含分隔符的占位路径绕开。
-/* eslint-disable import/no-nodejs-modules -- 测试文件允许直接引入 node 内置模块进行 mock */
+// Note: tests run on the host platform (e.g., darwin/linux), so
+// `path.delimiter` and `path.join` semantics follow the host platform
+// behavior, regardless of our Object.defineProperty override of
+// process.platform. Therefore, do not include the host path.delimiter
+// (POSIX ':') in constructed paths, otherwise split(env.PATH) will
+// incorrectly split them. Placeholder paths without delimiters are used
+// below to work around this.
+/* eslint-disable import/no-nodejs-modules -- test files may directly import node built-in modules for mocking */
 
 import * as path from 'node:path'
 
@@ -39,7 +42,7 @@ describe('which — POSIX', () => {
     })
   })
 
-  it('PATH 大写命中', async () => {
+  it('uppercase PATH matches', async () => {
     mockExisting.add(path.join('/usr/local/bin', 'codex'))
     const result = await which('codex', {
       PATH: ['/opt/x', '/usr/local/bin'].join(path.delimiter),
@@ -47,7 +50,7 @@ describe('which — POSIX', () => {
     expect(result).toBe(path.join('/usr/local/bin', 'codex'))
   })
 
-  it('PATH 缺失返回 null', async () => {
+  it('missing PATH returns null', async () => {
     const result = await which('codex', {})
     expect(result).toBeNull()
   })
@@ -68,31 +71,31 @@ describe('which — Windows', () => {
     })
   })
 
-  it('小写 Path 也能命中（Windows 大小写不敏感兜底）', async () => {
-    // 注意 ext 用大写 .CMD 与 which.ts 内部遍历顺序一致（PATHEXT 默认全大写）。
-    // 文件系统在 Windows 大小写不敏感，但这里我们 mock access，需字符串一致。
+  it('lowercase Path also matches (Windows case-insensitive fallback)', async () => {
+    // Note: ext uses uppercase .CMD matching the iteration order in which.ts (PATHEXT defaults to all uppercase).
+    // The file system on Windows is case-insensitive, but here we mock access, requiring exact string match.
     const dir = '/fake/npm'
     const candidate = path.join(dir, 'claude.CMD')
     mockExisting.add(candidate)
     const result = await which('claude', {
-      Path: dir, // 小写 Path 而非 PATH
+      Path: dir, // lowercase Path instead of PATH
       PATHEXT: '.COM;.EXE;.BAT;.CMD',
     })
     expect(result).toBe(candidate)
   })
 
-  it('全小写 path / pathext 也能命中', async () => {
+  it('all-lowercase path / pathext also matches', async () => {
     const dir = '/fake/npm2'
     const candidate = path.join(dir, 'codex.cmd')
     mockExisting.add(candidate)
     const result = await which('codex', {
       path: dir,
-      pathext: '.com;.exe;.bat;.cmd', // 小写 pathext，which 不会做大小写规范化，按字面遍历
+      pathext: '.com;.exe;.bat;.cmd', // lowercase pathext; which does not normalize case, iterates literally
     })
     expect(result).toBe(candidate)
   })
 
-  it('PATHEXT 缺失时使用默认扩展名集 .COM;.EXE;.BAT;.CMD', async () => {
+  it('missing PATHEXT uses default extension set .COM;.EXE;.BAT;.CMD', async () => {
     const dir = '/fake/bin'
     const candidate = path.join(dir, 'claude.EXE')
     mockExisting.add(candidate)
@@ -102,17 +105,17 @@ describe('which — Windows', () => {
     expect(result).toBe(candidate)
   })
 
-  it('无任何变体的 PATH — 返回 null', async () => {
+  it('no PATH variant at all returns null', async () => {
     const result = await which('codex', { PATHEXT: '.EXE' })
     expect(result).toBeNull()
   })
 
-  it('PATH 为空字符串但 Path 有值 — 跳过空串使用 Path', async () => {
+  it('PATH is empty string but Path has value - skips empty string and uses Path', async () => {
     const dir = '/fake/binx'
     const candidate = path.join(dir, 'codex.CMD')
     mockExisting.add(candidate)
     const result = await which('codex', {
-      PATH: '', // 空串需被跳过
+      PATH: '', // empty string should be skipped
       Path: dir,
       PATHEXT: '.CMD',
     })

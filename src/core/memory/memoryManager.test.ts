@@ -71,13 +71,13 @@ describe('memoryManager', () => {
     const result = await memoryAdd({
       app,
       settings,
-      content: '用户不喜欢结尾反问',
+      content: 'User dislikes rhetorical questions at the end',
     })
 
     expect(result.scope).toBe('global')
     expect(result.filePath).toBe('YOLO/memory/global.md')
     expect(readByPath(result.filePath)).toContain(
-      '- Memory_1: 用户不喜欢结尾反问',
+      '- Memory_1: User dislikes rhetorical questions at the end',
     )
     expect(readByPath(result.filePath)).not.toContain(
       'Long-term characteristics',
@@ -103,13 +103,13 @@ describe('memoryManager', () => {
     const first = await memoryAdd({
       app,
       settings,
-      content: '用户叫 Alice',
+      content: 'User is named Alice',
       category: 'profile',
     })
     const second = await memoryAdd({
       app,
       settings,
-      content: '用户在做 YOLO 插件',
+      content: 'User is working on the YOLO plugin',
       category: 'profile',
     })
     await memoryDelete({
@@ -121,7 +121,7 @@ describe('memoryManager', () => {
     const third = await memoryAdd({
       app,
       settings,
-      content: '用户习惯深夜开发',
+      content: 'User habitually codes late at night',
       category: 'profile',
     })
 
@@ -133,8 +133,8 @@ describe('memoryManager', () => {
 
     const fileContent = readByPath(first.filePath)
     expect(fileContent).not.toContain('Profile_1')
-    expect(fileContent).toContain('- Profile_2: 用户在做 YOLO 插件')
-    expect(fileContent).toContain('- Profile_3: 用户习惯深夜开发')
+    expect(fileContent).toContain('- Profile_2: User is working on the YOLO plugin')
+    expect(fileContent).toContain('- Profile_3: User habitually codes late at night')
   })
 
   it('reads global and assistant prompt context', async () => {
@@ -145,7 +145,7 @@ describe('memoryManager', () => {
       assistants: [
         {
           id: 'helper',
-          name: '助手A',
+          name: 'Assistant A',
           systemPrompt: 'You are helper.',
         },
       ],
@@ -154,14 +154,14 @@ describe('memoryManager', () => {
     await memoryAdd({
       app,
       settings,
-      content: '用户希望回答简洁',
+      content: 'User prefers concise answers',
       category: 'preferences',
       scope: 'global',
     })
     const assistantMemory = await memoryAdd({
       app,
       settings,
-      content: '当前在实现记忆工具',
+      content: 'Currently implementing the memory tool',
       category: 'other',
       scope: 'assistant',
     })
@@ -169,7 +169,7 @@ describe('memoryManager', () => {
       app,
       settings,
       id: assistantMemory.id,
-      newContent: '当前在实现 YOLO 记忆机制',
+      newContent: 'Currently implementing the YOLO memory mechanism',
       scope: 'assistant',
     })
 
@@ -180,7 +180,7 @@ describe('memoryManager', () => {
     })
 
     expect(context.global).toContain('Preference_1')
-    expect(context.assistant).toContain('Memory_1: 当前在实现 YOLO 记忆机制')
+    expect(context.assistant).toContain('Memory_1: Currently implementing the YOLO memory mechanism')
   })
 
   it('parses section heading aliases and preserves custom text', async () => {
@@ -193,7 +193,7 @@ describe('memoryManager', () => {
       '## user profile',
       '> keep this note',
       '',
-      '* Profile_4：已有记录',
+      '* Profile_4: Existing record',
       '',
       '## Preferences',
       '- Preference_1: existing pref',
@@ -224,7 +224,7 @@ describe('memoryManager', () => {
     const result = await memoryAdd({
       app,
       settings,
-      content: '新增档案',
+      content: 'New profile entry',
       category: 'profile',
       scope: 'global',
     })
@@ -233,7 +233,7 @@ describe('memoryManager', () => {
     const content = readByPath('YOLO/memory/global.md')
     expect(content).toContain('> keep this note')
     expect(content).toContain('Some custom footer text.')
-    expect(content).toContain('- Profile_5: 新增档案')
+    expect(content).toContain('- Profile_5: New profile entry')
   })
 
   it('throws when duplicated id is found in memory file', async () => {
@@ -288,12 +288,12 @@ describe('memoryManager', () => {
       assistants: [
         {
           id: 'helper-1',
-          name: '测试 Agent',
+          name: 'Test Agent',
           systemPrompt: 'A1',
         },
         {
           id: 'helper-2',
-          name: '测试 Agent',
+          name: 'Test Agent',
           systemPrompt: 'A2',
         },
       ],
@@ -305,7 +305,7 @@ describe('memoryManager', () => {
       content: 'test memory',
       scope: 'assistant',
     })
-    expect(addResult.filePath).toBe('YOLO/memory/测试 Agent (2).md')
+    expect(addResult.filePath).toBe('YOLO/memory/Test Agent (2).md')
 
     const context = await getMemoryPromptContext({
       app,

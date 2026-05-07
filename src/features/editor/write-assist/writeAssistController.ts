@@ -91,14 +91,14 @@ export class WriteAssistController {
   ) {
     const selected = preSelectedText ?? editor.getSelection()
     if (!selected || selected.trim().length === 0) {
-      new Notice('请先选择要改写的文本。')
+      new Notice('Please select text to rewrite first.')
       return
     }
 
     const from = preSelectionFrom ?? editor.getCursor('from')
     const to = getSelectionEndPosition(from, selected)
 
-    const notice = new Notice('正在生成改写...', 0)
+    const notice = new Notice('Generating rewrite...', 0)
     const controller = new AbortController()
     this.deps.addAbortController(controller)
 
@@ -175,14 +175,14 @@ export class WriteAssistController {
       })
       const rewritten = stripFences(rewriteResult.content).trim()
       if (!rewritten) {
-        notice.setMessage('未生成改写内容。')
+        notice.setMessage('No rewrite content generated.')
         this.deps.registerTimeout(() => notice.hide(), 1200)
         return
       }
 
       const activeFile = this.deps.app.workspace.getActiveFile()
       if (!activeFile) {
-        notice.setMessage('未找到当前文件。')
+        notice.setMessage('Current file not found.')
         this.deps.registerTimeout(() => notice.hide(), 1200)
         return
       }
@@ -206,15 +206,15 @@ export class WriteAssistController {
         },
       } satisfies ApplyViewState)
 
-      notice.setMessage('改写结果已生成。')
+      notice.setMessage('Rewrite result generated.')
       this.deps.registerTimeout(() => notice.hide(), 1200)
     } catch (error) {
       if ((error as Error)?.name === 'AbortError') {
-        notice.setMessage('已取消生成。')
+        notice.setMessage('Generation cancelled.')
         this.deps.registerTimeout(() => notice.hide(), 1000)
       } else {
         console.error(error)
-        notice.setMessage('改写失败。')
+        notice.setMessage('Rewrite failed.')
         this.deps.registerTimeout(() => notice.hide(), 1200)
       }
     } finally {
@@ -581,7 +581,7 @@ export class WriteAssistController {
     } catch (error) {
       this.deps.clearInlineSuggestion()
       if ((error as Error)?.name === 'AbortError') {
-        const n = new Notice('已取消生成。')
+        const n = new Notice('Generation cancelled.')
         this.deps.registerTimeout(() => n.hide(), 1000)
       } else {
         console.error(error)

@@ -295,7 +295,7 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
         [
           explicitFile.path,
           {
-            title: '工具上下文管理详解',
+            title: 'Tool Context Management Explained',
             exported_at: '2026-04-09T12:10:14.480Z',
             draft: false,
             position: {
@@ -315,7 +315,7 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
 
     const textContent = getTextContent(result.promptContent)
 
-    expect(textContent).toContain('    - `title`: `工具上下文管理详解`')
+    expect(textContent).toContain('    - `title`: `Tool Context Management Explained`')
     expect(textContent).toContain(
       '    - `exported_at`: `2026-04-09T12:10:14.480Z`',
     )
@@ -887,7 +887,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
         {
           role: 'assistant',
           id: 'assistant-tools',
-          content: '好的，我来帮您压缩上下文。',
+          content: 'OK, let me help you compact the context.',
           toolCallRequests: [
             {
               id: 'compact-1',
@@ -923,13 +923,13 @@ describe('RequestContextBuilder generateRequestMessages', () => {
         {
           role: 'assistant',
           id: 'assistant-after-compact',
-          content: '上下文压缩已完成。现在我们可以继续工作了。',
+          content: 'Context compaction is complete. Now we can continue working.',
         },
         {
           role: 'user',
           id: 'user-2',
           content: null,
-          promptContent: '在吗',
+          promptContent: 'Are you there',
           mentionables: [],
         },
       ],
@@ -964,7 +964,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
       }),
       {
         role: 'user',
-        content: '在吗',
+        content: 'Are you there',
       },
     ])
   })
@@ -1274,7 +1274,7 @@ describe('stripUnsupportedImages', () => {
     expect(content).toHaveLength(2)
     expect(content[0]).toEqual({
       type: 'text',
-      text: '[图片已省略：模型不支持视觉]',
+      text: '[Image omitted: model does not support vision]',
     })
     expect(content[1]).toEqual(textPart)
   })
@@ -1326,7 +1326,7 @@ describe('stripUnsupportedImages', () => {
     const userContent = result[1]?.content as ContentPart[]
     expect(userContent[1]).toEqual({
       type: 'text',
-      text: '[图片已省略：模型不支持视觉]',
+      text: '[Image omitted: model does not support vision]',
     })
   })
 
@@ -1339,7 +1339,7 @@ describe('stripUnsupportedImages', () => {
     const content = result[0]?.content as ContentPart[]
     expect(content[0]).toEqual({
       type: 'text',
-      text: '[图片已省略：模型不支持视觉]',
+      text: '[Image omitted: model does not support vision]',
     })
   })
 })

@@ -25,11 +25,11 @@ export class AssistantIconPickerModal extends Modal {
   onOpen() {
     const { contentEl } = this
 
-    // 创建 React 根容器
+    // Create React root container
     const root = contentEl.createDiv()
     root.addClass('smtcmp-icon-picker-modal')
 
-    // 使用 React 渲染内容
+    // Render content using React
     const IconPickerContent: React.FC = () => {
       const [activeTab, setActiveTab] = useState<'lucide' | 'emoji'>('lucide')
       const [customEmoji, setCustomEmoji] = useState('')
@@ -41,15 +41,15 @@ export class AssistantIconPickerModal extends Modal {
 
       return (
         <div className="smtcmp-icon-picker-content">
-          <h2>选择助手图标</h2>
+          <h2>Select assistant icon</h2>
 
-          {/* Tab 切换 */}
+          {/* Tab switch */}
           <div className="smtcmp-icon-picker-tabs">
             <button
               className={`smtcmp-icon-picker-tab ${activeTab === 'lucide' ? 'active' : ''}`}
               onClick={() => setActiveTab('lucide')}
             >
-              图标库
+              Icon library
             </button>
             <button
               className={`smtcmp-icon-picker-tab ${activeTab === 'emoji' ? 'active' : ''}`}
@@ -59,7 +59,7 @@ export class AssistantIconPickerModal extends Modal {
             </button>
           </div>
 
-          {/* Lucide 图标网格 */}
+          {/* Lucide icon grid */}
           {activeTab === 'lucide' && (
             <div className="smtcmp-icon-picker-grid">
               {PRESET_LUCIDE_ICONS.map((iconName) => {
@@ -87,14 +87,14 @@ export class AssistantIconPickerModal extends Modal {
             </div>
           )}
 
-          {/* Emoji 网格 */}
+          {/* Emoji grid */}
           {activeTab === 'emoji' && (
             <div>
-              {/* 自定义 Emoji 输入 */}
+              {/* Custom emoji input */}
               <div className="smtcmp-icon-picker-custom-emoji">
                 <input
                   type="text"
-                  placeholder="或输入自定义 emoji..."
+                  placeholder="Or enter a custom emoji..."
                   value={customEmoji}
                   onChange={(e) => setCustomEmoji(e.target.value)}
                   maxLength={4}
@@ -107,12 +107,12 @@ export class AssistantIconPickerModal extends Modal {
                       handleSelect({ type: 'emoji', value: customEmoji })
                     }
                   >
-                    确认
+                    Confirm
                   </button>
                 )}
               </div>
 
-              {/* 预设 Emoji 网格 */}
+              {/* Preset emoji grid */}
               <div className="smtcmp-icon-picker-grid">
                 {PRESET_EMOJIS.map((emoji) => {
                   const isSelected =
@@ -143,13 +143,13 @@ export class AssistantIconPickerModal extends Modal {
       )
     }
 
-    // 渲染 React 组件
+    // Render React component
     void import('react-dom/client')
       .then(({ createRoot }) => {
         const reactRoot = createRoot(root)
         reactRoot.render(<IconPickerContent />)
 
-        // 在关闭时清理
+        // Clean up on close
         this.onClose = () => {
           reactRoot.unmount()
         }
@@ -166,7 +166,7 @@ export class AssistantIconPickerModal extends Modal {
 }
 
 /**
- * 打开图标选择器
+ * Open icon picker
  */
 export const openIconPicker = (
   app: App,

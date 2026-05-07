@@ -31,7 +31,7 @@ export class FolderPickerModal extends ReactModal<FolderPickerModalProps> {
       app,
       Component: FolderPickerModalComponent,
       props: { vault, existing, onPick, allowFiles },
-      options: { title: allowFiles ? '选择文件或文件夹' : '选择文件夹' },
+      options: { title: allowFiles ? 'Select files or folders' : 'Select folder' },
     })
   }
 }
@@ -264,9 +264,9 @@ function FolderPickerModalComponent({
                 className="smtcmp-folder-name"
                 title={
                   isSelected
-                    ? '已选择'
+                    ? 'Already selected'
                     : isCoveredByAncestor
-                      ? '已被父级覆盖'
+                      ? 'Covered by parent'
                       : node.path || '/'
                 }
               >
@@ -288,7 +288,7 @@ function FolderPickerModalComponent({
     <div className="smtcmp-folder-picker">
       <input
         type="text"
-        placeholder="搜索文件夹..."
+        placeholder="Search folders..."
         value={q}
         onChange={(e) => setQ(e.target.value)}
         className="svelte-obsidian-text-input"
@@ -296,7 +296,7 @@ function FolderPickerModalComponent({
 
       <div className="smtcmp-scroll-panel">
         {filteredRoots.length === 0 ? (
-          <div className="smtcmp-folder-empty">未找到匹配的文件夹</div>
+          <div className="smtcmp-folder-empty">No matching folders found</div>
         ) : (
           <ul className="smtcmp-list-reset smtcmp-tree-root">
             {renderNodes(filteredRoots, 0, [])}
@@ -306,7 +306,7 @@ function FolderPickerModalComponent({
 
       <div className="smtcmp-actions-right-gap-8">
         <button onClick={onClose} className="mod-cancel">
-          关闭
+          Close
         </button>
       </div>
     </div>

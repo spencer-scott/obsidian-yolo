@@ -416,7 +416,7 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
             ],
             usage: resp.usage,
           }
-          await Promise.resolve() // 保持异步迭代语义，避免同步调用时阻塞
+          await Promise.resolve() // Preserve async iteration semantics to avoid blocking on synchronous calls
           yield chunk
         }
         return singleChunk(nonStream)

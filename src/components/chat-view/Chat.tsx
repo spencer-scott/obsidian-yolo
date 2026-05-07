@@ -1121,11 +1121,11 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const compactionDividerTitle = t(
     'chat.compaction.dividerTitle',
-    '从这里继续当前任务',
+    'Continue the current task from here',
   )
   const compactionPendingTitle = t(
     'chat.compaction.pendingTitle',
-    '正在压缩上下文',
+    'Compacting context',
   )
   const compactionDividerDescription = (() => {
     const compactedMessageCount = latestCompactionState?.compactedMessageCount
@@ -1138,7 +1138,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     ) {
       return t(
         'chat.compaction.dividerDescriptionWithSavings',
-        '{messageCount} 条消息已压缩，节省约 {tokens} tokens',
+        '{messageCount} messages compacted, saving approximately {tokens} tokens',
       )
         .replace('{messageCount}', String(compactedMessageCount))
         .replace('{tokens}', formatTokenCount(estimatedTokensSaved))
@@ -1146,7 +1146,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     if (typeof latestCompactionState?.estimatedNextContextTokens === 'number') {
       return t(
         'chat.compaction.dividerDescriptionWithEstimate',
-        '以上对话已压缩为摘要，下一轮总上下文约为 {count} tokens',
+        'The conversation above has been compacted into a summary. Next round total context is approximately {count} tokens',
       ).replace(
         '{count}',
         formatTokenCount(latestCompactionState.estimatedNextContextTokens),
@@ -1154,12 +1154,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
     return t(
       'chat.compaction.dividerDescription',
-      '以上对话已压缩为摘要，以下回复基于摘要继续',
+      'The conversation above has been compacted into a summary. Subsequent replies continue from the summary',
     )
   })()
   const compactionPendingDescription = t(
     'chat.compaction.pendingStatus',
-    '正在整理上下文，稍后将从新的上下文继续。',
+    'Organizing context, will continue with the new context shortly.',
   )
 
   const displayMentionablesForInput = inputMessage.mentionables
@@ -1710,7 +1710,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const handleManualContextCompaction = useCallback(async () => {
     if (currentConversationRunSummary.isRunning) {
       new Notice(
-        t('chat.compaction.runActive', '请等待当前回复完成后再压缩上下文。'),
+        t('chat.compaction.runActive', 'Please wait for the current response to complete before compacting context.'),
       )
       return
     }
@@ -1719,14 +1719,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.waitingApproval',
-          '请先处理当前待确认的工具调用，再压缩上下文。',
+          'Please handle the pending tool call approvals before compacting context.',
         ),
       )
       return
     }
 
     if (chatMessages.length === 0) {
-      new Notice(t('chat.compaction.empty', '当前还没有可压缩的对话内容。'))
+      new Notice(t('chat.compaction.empty', 'There is no conversation content to compact yet.'))
       return
     }
 
@@ -1736,7 +1736,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       setPendingCompactionAnchorMessageId(null)
 
       if (!nextCompactionState) {
-        new Notice(t('chat.compaction.empty', '当前还没有可压缩的对话内容。'))
+        new Notice(t('chat.compaction.empty', 'There is no conversation content to compact yet.'))
         return
       }
 
@@ -1778,12 +1778,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.success',
-          '已压缩较早上下文，后续回复将基于摘要继续。',
+          'Earlier context has been compacted. Subsequent replies will continue from the summary.',
         ),
       )
     } catch (error) {
       setPendingCompactionAnchorMessageId(null)
-      new Notice(t('chat.compaction.failed', '上下文压缩失败，请稍后重试。'))
+      new Notice(t('chat.compaction.failed', 'Context compaction failed. Please try again later.'))
       console.error('Failed to compact conversation context', error)
     }
   }, [
@@ -2869,7 +2869,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
 
       if (!plan) {
-        throw new Error('当前内容不包含可应用的编辑计划。')
+        throw new Error('The current content does not contain an applicable edit plan.')
       }
 
       const materialized = materializeTextEditPlan({
@@ -2890,7 +2890,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           operationCount: materialized.totalOperations,
           errors: materialized.errors,
         })
-        throw new Error('当前编辑计划未匹配到可修改内容，请重新生成。')
+        throw new Error('The edit plan did not match any modifiable content. Please regenerate.')
       }
 
       const selectionRange = getInlineSelectionRange(
@@ -2904,7 +2904,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         if (materialized.errors.length > 0) {
           const partialMessage = t(
             'quickAsk.editPartialSuccess',
-            '已应用 {appliedCount}/{totalEdits} 个编辑，详情请查看控制台',
+            'Applied {appliedCount}/{totalEdits} edits. Check the console for details',
           )
             .replace('{appliedCount}', String(materialized.appliedCount))
             .replace('{totalEdits}', String(materialized.totalOperations))
@@ -3127,26 +3127,26 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.undoSuccess',
-              '已撤销本轮 assistant 的文件修改。',
+              'Undone this round of assistant file changes.',
             ),
           )
         } else if (appliedCount > 0) {
           new Notice(
             t(
               'chat.editSummary.undoPartial',
-              '部分文件已撤销，另一些文件因后续变更未覆盖。',
+              'Some files have been reverted. Others could not be reverted due to subsequent changes.',
             ),
           )
         } else {
           new Notice(
             t(
               'chat.editSummary.undoUnavailable',
-              '文件内容已变化，无法安全撤销本轮修改。',
+              'File content has changed. Cannot safely undo this round of modifications.',
             ),
           )
         }
       } catch (error) {
-        new Notice(t('chat.editSummary.undoFailed', '撤销失败，请稍后重试。'))
+        new Notice(t('chat.editSummary.undoFailed', 'Undo failed. Please try again later.'))
         console.error('Failed to undo assistant edit summary', error)
       } finally {
         setUndoingEditSummaryTarget(null)
@@ -3175,7 +3175,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       if (!currentConversationId) {
         if (!targetFile) {
           new Notice(
-            t('chat.editSummary.fileMissing', '文件不存在或已被移动。'),
+            t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'),
           )
           return
         }
@@ -3206,7 +3206,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.fileDeleted',
-              '文件已被删除，可使用撤销进行恢复。',
+              'File has been deleted. You can use undo to restore it.',
             ),
           )
           return
@@ -3214,7 +3214,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
         if (!targetFile) {
           new Notice(
-            t('chat.editSummary.fileMissing', '文件不存在或已被移动。'),
+            t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'),
           )
           return
         }
@@ -3226,7 +3226,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.undoUnavailable',
-              '文件内容已变化，无法安全撤销本轮修改。',
+              'File content has changed. Cannot safely undo this round of modifications.',
             ),
           )
           return
@@ -3243,7 +3243,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       }
 
       if (!targetFile) {
-        new Notice(t('chat.editSummary.fileMissing', '文件不存在或已被移动。'))
+        new Notice(t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'))
         return
       }
 
@@ -3562,14 +3562,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     updateHistoricalUserMessage,
   ])
 
-  // 从所有消息中删除指定的 mentionable，并清空 promptContent 以便重新编译
+  // Delete the specified mentionable from all messages and clear promptContent for recompilation
   const handleMentionableDeleteFromAll = useCallback(
     (mentionable: ChatUserMessage['mentionables'][number]) => {
       const mentionableKey = getMentionableKey(
         serializeMentionable(mentionable),
       )
 
-      // 从所有历史消息中删除
+      // Delete from all historical messages
       const sourceMessages = chatMessagesStateRef.current
       let didChangeHistory = false
       const nextMessages = sourceMessages.flatMap((message): ChatMessage[] => {
@@ -3646,7 +3646,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       activeBranchByUserMessageIdRef.current = nextActiveBranchByUserMessageId
       setActiveBranchByUserMessageId(nextActiveBranchByUserMessageId)
 
-      // 从当前输入消息中删除
+      // Delete from the current input message
       setInputMessage((prev) => ({
         ...prev,
         mentionables: prev.mentionables.filter(
@@ -4109,7 +4109,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             <ContextUsageRing
               promptTokens={headerContextUsage.promptTokens}
               maxContextTokens={headerContextUsage.maxContextTokens}
-              label={t('chat.contextUsage', '上下文窗口占用')}
+              label={t('chat.contextUsage', 'Context window usage')}
             />
           )}
           <AssistantSelector
@@ -4226,10 +4226,11 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return null
   }, [chatTimelineItems])
 
-  // 异步派遣结果作为独立 timeline 项追加到对话流；在派遣消息和结果之间
-  // 显示 footer 信息栏会切断「派遣 → 等结果 → 结果到达」这条逻辑流。
-  // 因此凡是后面紧跟一个 external_agent_result group 的 assistant-group，
-  // 都把它的 footer 抑制掉。
+  // Async dispatch results are appended as independent timeline items to the conversation flow.
+  // Showing a footer info bar between dispatch messages and results would interrupt the
+  // "dispatch -> wait for result -> result arrives" logical flow.
+  // Therefore, any assistant-group immediately followed by an external_agent_result group
+  // has its footer suppressed.
   const renderKeysWithSuppressedAsyncFollowUpFooter = useMemo(() => {
     const set = new Set<string>()
     for (let i = 0; i < chatTimelineItems.length - 1; i++) {
@@ -4670,23 +4671,23 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           }
           onForceScrollToBottom={forceScrollToBottom}
           hasStreamingMessages={hasStreamingMessages}
-          scrollToBottomLabel={t('chat.scrollToBottom', '回到底部')}
+          scrollToBottomLabel={t('chat.scrollToBottom', 'Scroll to bottom')}
           scrollToBottomWhileStreamingLabel={t(
             'chat.scrollToBottomWhileStreaming',
-            '回到底部继续跟随',
+            'Scroll to bottom and follow',
           )}
           emptyStateChatTitle={t(
             'chat.emptyState.chatTitle',
-            '先想清楚，再落笔',
+            'Think first, then write',
           )}
-          emptyStateAgentTitle={t('chat.emptyState.agentTitle', '让 AI 去执行')}
+          emptyStateAgentTitle={t('chat.emptyState.agentTitle', 'Let AI take action')}
           emptyStateChatDescription={t(
             'chat.emptyState.chatDescription',
-            '适合提问、润色与改写，专注表达本身',
+            'Ideal for questions, polishing, and rewriting - focused on expression',
           )}
           emptyStateAgentDescription={t(
             'chat.emptyState.agentDescription',
-            '启用工具链，处理搜索、读写与多步骤任务',
+            'Enable tool chain for search, read/write, and multi-step tasks',
           )}
           onTimelineVirtualizationChange={setTimelineIsVirtualized}
           footerContent={

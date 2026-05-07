@@ -974,7 +974,7 @@
   border-top: none;
 }
 
-/* 特殊样式：模型选择区域 */
+/* Special styles: model selection area */
 .smtcmp-composer-section--primary {
   background: transparent !important;
   border: 2px solid var(--interactive-accent);
@@ -991,7 +991,7 @@
   height: 20px;
 }
 
-/* 功能开关区域 */
+/* Feature toggle area */
 .smtcmp-composer-section--toggles .smtcmp-composer-option {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border-hover);
@@ -1004,21 +1004,21 @@
   border-color: var(--background-modifier-border-hover);
 }
 
-/* 高级设置区域 */
+/* Advanced settings area */
 .smtcmp-composer-section--advanced {
   background: transparent !important;
   border-style: dashed;
   opacity: 0.9;
 }
 
-/* 让高级设置标题样式与默认卡片标题完全一致 */
+/* Make advanced settings title style identical to default card title */
 .smtcmp-composer-section--advanced .smtcmp-composer-heading-title::before {
   background: var(--h1-color, var(--text-accent));
   width: 4px;
   height: 18px;
 }
 
-/* 改进开关控件样式 */
+/* Improved toggle control styles */
 .smtcmp-checkbox-container {
   position: relative;
   display: inline-flex;
@@ -1060,7 +1060,7 @@
   transform: translateX(20px);
 }
 
-/* 优先参考目录样式优化 */
+/* Priority reference directory style improvements */
 .smtcmp-composer-hint {
   margin-top: var(--size-4-3);
   padding: var(--size-4-3);

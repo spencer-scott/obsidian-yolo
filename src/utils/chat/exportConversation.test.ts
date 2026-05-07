@@ -65,7 +65,7 @@ describe('conversationToMarkdown', () => {
 
 This section provides only paths and outlines. Use file tools only if you need the full contents or a specific line range.
 
-@Folder/Test.md 看一下`,
+@Folder/Test.md take a look`,
             mentionables: [],
           },
         ],
@@ -78,7 +78,7 @@ This section provides only paths and outlines. Use file tools only if you need t
 
     expect(markdown).toContain('> [!info]- Mentioned vault files')
     expect(markdown).toContain('> - `Folder/Test.md`')
-    expect(markdown).toContain('@Folder/Test.md 看一下')
+    expect(markdown).toContain('@Folder/Test.md take a look')
     expect(markdown).not.toContain('## Mentioned Vault Files (outline only)')
   })
 

@@ -120,7 +120,7 @@ export type ToolCallResponse =
     }
   | {
       status: ToolCallResponseStatus.Aborted
-      /** 中断时已采集的输出（可选）。存在时表示已有部分输出；不存在时表示启动前就被取消。 */
+      /** Output collected before abort (optional). Present means partial output was captured; absent means cancelled before starting. */
       data?: {
         type: 'text'
         text: string

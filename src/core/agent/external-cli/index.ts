@@ -1,5 +1,5 @@
-// 外部 CLI 公开入口
-// Platform.isDesktop 守卫 + 懒加载 runner（保持 mobile 安全）
+// External CLI public entry point
+// Platform.isDesktop guard + lazy-loaded runner (keeps mobile safe)
 import { Platform } from 'obsidian'
 
 import type {
@@ -22,8 +22,8 @@ export type {
 } from './streamBus'
 
 /**
- * 在本机运行外部 CLI Agent。
- * 仅桌面端可用；在移动端调用时直接抛出错误。
+ * Run an external CLI Agent on the local machine.
+ * Only available on desktop; throws an error when called on mobile.
  */
 export async function runExternalAgent(
   params: RunExternalAgentParams,
@@ -31,14 +31,14 @@ export async function runExternalAgent(
   if (!Platform.isDesktop) {
     throw new Error('External agent delegation is only available on desktop.')
   }
-  // 懒加载，避免 node:child_process 等在 mobile/web 环境被求值
+  // Lazy-load to avoid node:child_process etc. being evaluated in mobile/web environments
   const { runExternalAgent: _run } = await import('./runner')
   return _run(params)
 }
 
 /**
- * plugin unload 时调用，终止所有活跃子进程。
- * 仅桌面端执行，mobile 为空操作。
+ * Called on plugin unload to terminate all active child processes.
+ * Only executes on desktop; no-op on mobile.
  */
 export async function killAllActiveExternalCli(): Promise<void> {
   if (!Platform.isDesktop) return

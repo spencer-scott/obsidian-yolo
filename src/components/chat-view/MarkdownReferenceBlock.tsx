@@ -64,7 +64,7 @@ export default function MarkdownReferenceBlock({
         setBlockContent(
           initial.length > 0
             ? initial
-            : t('chat.pdfReferenceNoPreview', '（PDF：点击标题打开对应页）'),
+            : t('chat.pdfReferenceNoPreview', '(PDF: click the title to open the corresponding page)'),
         )
         setCollapsed(initial.split('\n').length > 2)
         return

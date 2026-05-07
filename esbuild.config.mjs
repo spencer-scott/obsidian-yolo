@@ -23,7 +23,7 @@ const nodeBuiltins = [...builtins, ...builtins.map((mod) => `node:${mod}`)]
 const pgliteShimPlugin = {
   name: 'pglite-shim-plugin',
   setup(build) {
-    // 兼容 Windows 反斜杠路径，确保 pglite shim 始终生效
+    // Handle Windows backslash paths to ensure the pglite shim always takes effect
     build.onLoad({ filter: /@electric-sql[\\/]+pglite/ }, async (args) => {
       const source = await fs.promises.readFile(args.path, 'utf8')
       const shimSource = `const process = {};\n${source}`

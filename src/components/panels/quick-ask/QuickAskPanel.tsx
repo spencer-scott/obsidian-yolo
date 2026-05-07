@@ -368,7 +368,7 @@ export function QuickAskPanel({
     (executionMode === 'edit' || executionMode === 'edit-direct') &&
     hasScopedSelectionForEdit
   const modeTriggerLabel = isTemporaryRewriteMode
-    ? t('chatMode.rewrite', '改写')
+    ? t('chatMode.rewrite', 'Rewrite')
     : undefined
   const modeTriggerIcon = isTemporaryRewriteMode ? (
     <PencilLine size={14} />
@@ -485,7 +485,7 @@ export function QuickAskPanel({
     ({ path }: { path: string }) => {
       const targetFile = app.vault.getAbstractFileByPath(path)
       if (!(targetFile instanceof TFile)) {
-        new Notice(t('chat.editSummary.fileMissing', '文件不存在或已被移动。'))
+        new Notice(t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'))
         return
       }
 
@@ -705,7 +705,7 @@ export function QuickAskPanel({
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [isAssistantMenuOpen, isModelMenuOpen, isModeMenuOpen])
 
-  // When focus在助手按钮但菜单未展开时，ArrowUp 将焦点送回输入框（兜底）
+  // When focus is on the assistant button but menu is not open, ArrowUp sends focus back to input (fallback)
   useEffect(() => {
     const handleArrowUpBack = (event: KeyboardEvent) => {
       if (event.key !== 'ArrowUp') return
@@ -720,7 +720,7 @@ export function QuickAskPanel({
     return () => window.removeEventListener('keydown', handleArrowUpBack, true)
   }, [isAssistantMenuOpen])
 
-  // When assistant menu已打开时按 Esc：只关闭菜单并回焦输入
+  // When assistant menu is open and Esc is pressed: only close menu and refocus input
   useEffect(() => {
     const handleMenuEscape = (event: KeyboardEvent) => {
       if (!isAssistantMenuOpen) return
@@ -1276,7 +1276,7 @@ export function QuickAskPanel({
         })
 
         if (!plan) {
-          throw new Error('当前内容不包含可应用的编辑计划。')
+          throw new Error('The current content does not contain an applicable edit plan.')
         }
 
         const materialized = materializeTextEditPlan({
@@ -1292,7 +1292,7 @@ export function QuickAskPanel({
         }
 
         if (materialized.appliedCount === 0) {
-          throw new Error('当前编辑计划未匹配到可修改内容，请重新生成。')
+          throw new Error('The edit plan did not match any modifiable content. Please regenerate.')
         }
 
         await plugin.openApplyReview({
@@ -1351,7 +1351,7 @@ export function QuickAskPanel({
         mentionableUnitLabel,
       })
       editor.setEditorState(editor.parseEditorState(editorState))
-      // setEditorState 会重置选区并让 contentEditable 失焦，这里把焦点/光标拿回来
+      // setEditorState resets the selection and blurs contentEditable; restore focus/cursor here
       editor.focus(undefined, { defaultSelection: 'rootEnd' })
     }
 
@@ -1793,7 +1793,7 @@ export function QuickAskPanel({
         return
       }
       if (isModelMenuOpen || isModeMenuOpen) {
-        // 交给下拉自身处理关闭，避免误关闭面板
+        // Let the dropdown handle closing itself to avoid accidentally closing the panel
         return
       }
       if (isStreaming) {

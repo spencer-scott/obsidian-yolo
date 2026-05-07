@@ -137,7 +137,7 @@ const StorageBadge = ({ value }: { value: number | null }) => {
 
   return (
     <span className="smtcmp-setting-size-badge">
-      {value === null ? t('common.loading', '加载中...') : formatBytes(value)}
+      {value === null ? t('common.loading', 'Loading...') : formatBytes(value)}
     </span>
   )
 }
@@ -336,10 +336,10 @@ export function EtcSection({ app, className }: EtcSectionProps) {
 
         <div className="smtcmp-settings-block-content">
           <ObsidianSetting
-            name={t('settings.etc.yoloBaseDir', 'YOLO 根目录')}
+            name={t('settings.etc.yoloBaseDir', 'YOLO base directory')}
             desc={t(
               'settings.etc.yoloBaseDirDesc',
-              '用于存放 YOLO 管理文件的库内相对目录（例如：Config/YOLO）。技能将从 {path} 加载。',
+              'Relative directory within the vault for storing YOLO managed files (e.g., Config/YOLO). Skills will be loaded from {path}.',
             ).replace('{path}', `${yoloBaseDir}/skills`)}
             className="smtcmp-settings-card"
           >

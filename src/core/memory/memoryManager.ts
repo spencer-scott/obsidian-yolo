@@ -55,19 +55,19 @@ const MEMORY_SECTIONS: MemorySectionDefinition[] = [
     key: 'profile',
     title: 'User Profile',
     idPrefix: 'Profile',
-    headingAliases: ['user profile', 'profile', '用户画像', '用户信息'],
+    headingAliases: ['user profile', 'profile'],
   },
   {
     key: 'preferences',
     title: 'Preferences',
     idPrefix: 'Preference',
-    headingAliases: ['preferences', 'preference', '偏好'],
+    headingAliases: ['preferences', 'preference'],
   },
   {
     key: 'other',
     title: 'Other Memory',
     idPrefix: 'Memory',
-    headingAliases: ['other memory', 'memory', 'other', '其他记忆'],
+    headingAliases: ['other memory', 'memory', 'other'],
   },
 ]
 

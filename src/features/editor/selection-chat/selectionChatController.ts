@@ -438,19 +438,19 @@ export class SelectionChatController {
   private async openCustomAsk(editor: Editor) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!editor || !view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const mentionable = this.createSelectionMentionable(editor, view)
     if (!mentionable) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 
     const editorView = this.getEditorView(editor)
     if (!editorView) {
-      new Notice('无法获取编辑器视图')
+      new Notice('Unable to get editor view')
       return
     }
 
@@ -832,32 +832,32 @@ export class SelectionChatController {
   ) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const selectedText = editor.getSelection()
     if (!selectedText || selectedText.trim().length === 0) {
-      new Notice('请先选择要改写的文本。')
+      new Notice('Please select text to rewrite first.')
       return
     }
 
     const mentionable = this.createSelectionMentionable(editor, view)
     if (!mentionable) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 
     const editorView = this.getEditorView(editor)
     if (!editorView) {
-      new Notice('无法获取编辑器视图')
+      new Notice('Unable to get editor view')
       return
     }
 
     const behavior = rewriteBehavior ?? 'custom'
     const prompt = instruction.trim()
     if (behavior === 'preset' && !prompt) {
-      new Notice('未设置改写指令。')
+      new Notice('No rewrite instruction set.')
       return
     }
 
@@ -876,24 +876,24 @@ export class SelectionChatController {
   private async explainSelection(editor: Editor, prompt?: string) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!editor || !view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const mentionable = this.createSelectionMentionable(editor, view)
     if (!mentionable) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 
     const editorView = this.getEditorView(editor)
     if (!editorView) {
-      new Notice('无法获取编辑器视图')
+      new Notice('Unable to get editor view')
       return
     }
 
     const basePrompt =
-      prompt?.trim() || this.t('selection.actions.explain', '请深入解释')
+      prompt?.trim() || this.t('selection.actions.explain', 'Please explain in depth')
     this.showQuickAskWithAutoSend(editor, editorView, {
       prompt: basePrompt,
       mentionables: [mentionable],
@@ -904,13 +904,13 @@ export class SelectionChatController {
   private async addToChatInput(editor: Editor, prompt?: string) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!editor || !view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const data = getMentionableBlockData(editor, view)
     if (!data) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 
@@ -940,13 +940,13 @@ export class SelectionChatController {
   private async addToSidebar(editor: Editor) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!editor || !view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const data = getMentionableBlockData(editor, view)
     if (!data) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 
@@ -976,13 +976,13 @@ export class SelectionChatController {
   private async addToChatAndSend(editor: Editor, prompt?: string) {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!editor || !view) {
-      new Notice('无法获取当前编辑器')
+      new Notice('Unable to get current editor')
       return
     }
 
     const data = getMentionableBlockData(editor, view)
     if (!data) {
-      new Notice('无法创建选区数据')
+      new Notice('Unable to create selection data')
       return
     }
 

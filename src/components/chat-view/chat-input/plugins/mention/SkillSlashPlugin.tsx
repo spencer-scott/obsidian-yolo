@@ -146,10 +146,10 @@ export default function SkillSlashPlugin({
   const compactCommand = useMemo<SlashCommand>(
     () => ({
       id: COMPACT_COMMAND_ID,
-      name: t('chat.slashCommands.compact.label', '压缩上下文'),
+      name: t('chat.slashCommands.compact.label', 'Compact context'),
       description: t(
         'chat.slashCommands.compact.description',
-        '手动压缩较早对话历史，并在新的上下文窗口中继续当前任务。',
+        'Manually compact earlier conversation history and continue the current task in a new context window.',
       ),
     }),
     [t],
@@ -294,7 +294,7 @@ export default function SkillSlashPlugin({
                   <div
                     className="smtcmp-smart-space-mention-list"
                     role="listbox"
-                    aria-label={t('chat.mentionMenu.entrySkill', '技能')}
+                    aria-label={t('chat.mentionMenu.entrySkill', 'Skills')}
                   >
                     {options.map((option, index) => (
                       <SkillTypeaheadMenuItem

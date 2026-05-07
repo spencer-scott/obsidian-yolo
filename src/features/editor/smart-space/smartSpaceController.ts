@@ -90,17 +90,17 @@ export class SmartSpaceController {
     const state = this.smartSpaceWidgetState
     if (!state) return
 
-    // 先清除状态，避免重复关闭
+    // Clear state first to avoid duplicate close
     this.smartSpaceWidgetState = null
 
     // Clear pending selection rewrite if user closes without submitting
     this.deps.clearPendingSelectionRewrite()
 
-    // 尝试触发关闭动画
+    // Attempt to trigger close animation
     const hasAnimation = SmartSpaceWidget.closeCurrentWithAnimation()
 
     if (!hasAnimation) {
-      // 如果没有动画实例，直接分发关闭效果
+      // If no animation instance exists, dispatch close effect directly
       state.view.dispatch({ effects: smartSpaceWidgetEffect.of(null) })
     }
 
@@ -116,7 +116,7 @@ export class SmartSpaceController {
     this.close()
 
     const close = () => {
-      // 检查是否是当前的 widget（允许状态为 null，因为可能在动画期间被清除）
+      // Check if this is the current widget (state may be null since it can be cleared during animation)
       if (
         this.smartSpaceWidgetState &&
         this.smartSpaceWidgetState.view !== view
@@ -307,8 +307,8 @@ export class SmartSpaceController {
         if (update.docChanged) {
           state.pos = update.changes.mapPos(state.pos)
         }
-        // 移除 selectionSet 关闭逻辑，与 inline suggestion 行为一致
-        // 外部点击关闭由 handlePointerDown 处理
+        // Removed selectionSet close logic, consistent with inline suggestion behavior
+        // External click-to-close is handled by handlePointerDown
       }),
     ]
   }

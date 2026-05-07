@@ -596,30 +596,30 @@ export default function NewMentionsPlugin({
       }> = [
         {
           entryType: 'current-file',
-          label: t('chat.mentionMenu.entryCurrentFile', '当前文件'),
+          label: t('chat.mentionMenu.entryCurrentFile', 'Current file'),
         },
         {
           entryType: 'assistant',
-          label: t('chat.mentionMenu.entryAssistant', '助手'),
+          label: t('chat.mentionMenu.entryAssistant', 'Assistants'),
         },
         {
           entryType: 'file',
-          label: t('chat.mentionMenu.entryFile', '文件'),
+          label: t('chat.mentionMenu.entryFile', 'Files'),
         },
         {
           entryType: 'folder',
-          label: t('chat.mentionMenu.entryFolder', '文件夹'),
+          label: t('chat.mentionMenu.entryFolder', 'Folders'),
         },
       ]
       if (onSelectChatMode) {
         entryOptions.splice(1, 0, {
           entryType: 'mode',
-          label: t('chat.mentionMenu.entryMode', '模式'),
+          label: t('chat.mentionMenu.entryMode', 'Mode'),
         })
       }
       entryOptions.push({
         entryType: 'model',
-        label: t('chat.mentionMenu.entryModel', '模型'),
+        label: t('chat.mentionMenu.entryModel', 'Models'),
       })
       return entryOptions
         .map(
@@ -674,7 +674,7 @@ export default function NewMentionsPlugin({
       return [
         new MentionTypeaheadOption({
           kind: 'back',
-          label: t('chat.mentionMenu.back', '返回上一级'),
+          label: t('chat.mentionMenu.back', 'Back'),
         }),
         ...modeTypeaheadOptions,
       ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT)
@@ -701,7 +701,7 @@ export default function NewMentionsPlugin({
       return [
         new MentionTypeaheadOption({
           kind: 'back',
-          label: t('chat.mentionMenu.back', '返回上一级'),
+          label: t('chat.mentionMenu.back', 'Back'),
         }),
         ...assistantOptions,
       ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT)
@@ -724,7 +724,7 @@ export default function NewMentionsPlugin({
       return [
         new MentionTypeaheadOption({
           kind: 'back',
-          label: t('chat.mentionMenu.back', '返回上一级'),
+          label: t('chat.mentionMenu.back', 'Back'),
         }),
         ...modelOptions,
       ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT)
@@ -747,7 +747,7 @@ export default function NewMentionsPlugin({
       return [
         new MentionTypeaheadOption({
           kind: 'back',
-          label: t('chat.mentionMenu.back', '返回上一级'),
+          label: t('chat.mentionMenu.back', 'Back'),
         }),
         ...mentionableOptions,
       ]
@@ -769,7 +769,7 @@ export default function NewMentionsPlugin({
     return [
       new MentionTypeaheadOption({
         kind: 'back',
-        label: t('chat.mentionMenu.back', '返回上一级'),
+        label: t('chat.mentionMenu.back', 'Back'),
       }),
       ...mentionableOptions,
     ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT)
@@ -836,7 +836,7 @@ export default function NewMentionsPlugin({
               unitLabel: mentionableUnitLabel,
               currentFileLabel: t(
                 'chat.mentionMenu.entryCurrentFile',
-                '当前文件',
+                'Current file',
               ),
             }),
             serializeMentionable(currentFileMentionable),

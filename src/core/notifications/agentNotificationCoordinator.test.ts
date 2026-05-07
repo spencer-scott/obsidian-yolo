@@ -118,8 +118,8 @@ describe('AgentNotificationCoordinator', () => {
     expect(notify).toHaveBeenCalledWith({
       type: 'approval_required',
       dedupeKey: 'tool-2',
-      title: 'YOLO 需要你的确认',
-      body: '当前任务暂停中，正在等待你审批一个工具调用。',
+      title: 'YOLO needs your confirmation',
+      body: 'The current task is paused, waiting for you to approve a tool call.',
     })
   })
 
@@ -156,8 +156,8 @@ describe('AgentNotificationCoordinator', () => {
     expect(notify).toHaveBeenCalledWith({
       type: 'task_completed',
       dedupeKey: 'conversation-1:3',
-      title: 'YOLO 任务已结束',
-      body: '当前 Agent 任务已完成，可以回来看结果了。',
+      title: 'YOLO task has ended',
+      body: 'The current agent task has completed. You can come back to see the results.',
     })
   })
 
@@ -194,8 +194,8 @@ describe('AgentNotificationCoordinator', () => {
     expect(notify).toHaveBeenCalledWith({
       type: 'task_completed',
       dedupeKey: 'conversation-1:4',
-      title: 'YOLO 任务已结束',
-      body: '当前 Agent 任务已结束，请回到窗口查看结果。',
+      title: 'YOLO task has ended',
+      body: 'The current agent task has ended. Please return to the window to see the results.',
     })
   })
 
@@ -250,8 +250,8 @@ describe('AgentNotificationCoordinator', () => {
     expect(notify).toHaveBeenCalledWith({
       type: 'approval_required',
       dedupeKey: 'tool-6',
-      title: 'YOLO 需要你的确认',
-      body: '当前任务暂停中，正在等待你审批一个工具调用。',
+      title: 'YOLO needs your confirmation',
+      body: 'The current task is paused, waiting for you to approve a tool call.',
     })
   })
 

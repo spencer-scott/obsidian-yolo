@@ -96,11 +96,11 @@ export class AgentNotificationCoordinator {
         dedupeKey: toolCallId,
         title: this.options.translate(
           'chat.notification.approvalTitle',
-          'YOLO 需要你的确认',
+          'YOLO needs your confirmation',
         ),
         body: this.options.translate(
           'chat.notification.approvalBody',
-          '当前任务暂停中，正在等待你审批一个工具调用。',
+          'The current task is paused, waiting for you to approve a tool call.',
         ),
       })
     }
@@ -119,17 +119,17 @@ export class AgentNotificationCoordinator {
         dedupeKey: `${state.conversationId}:${state.runId}`,
         title: this.options.translate(
           'chat.notification.completedTitle',
-          'YOLO 任务已结束',
+          'YOLO task has ended',
         ),
         body:
           state.status === 'error'
             ? this.options.translate(
                 'chat.notification.completedErrorBody',
-                '当前 Agent 任务已结束，请回到窗口查看结果。',
+                'The current agent task has ended. Please return to the window to see the results.',
               )
             : this.options.translate(
                 'chat.notification.completedBody',
-                '当前 Agent 任务已完成，可以回来看结果了。',
+                'The current agent task has completed. You can come back to see the results.',
               ),
       })
     }

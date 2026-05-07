@@ -1,4 +1,4 @@
-// LLM 序列化层快照测试：external_agent_result → user-role text
+// LLM serialization layer snapshot test: external_agent_result -> user-role text
 
 import type { ChatExternalAgentResultMessage } from '../../types/chat'
 

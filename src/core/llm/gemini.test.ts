@@ -10,7 +10,7 @@ describe('GeminiProvider response parsing', () => {
     const contents = GeminiProvider.buildRequestContents([
       {
         role: 'assistant',
-        content: '这段内容应被忽略',
+        content: 'This content should be ignored',
         providerMetadata: {
           gemini: {
             parts: [
@@ -108,7 +108,7 @@ describe('GeminiProvider response parsing', () => {
 
   it('replays assistant tool calls and tool responses as Gemini turns', () => {
     const contents = GeminiProvider.buildRequestContents([
-      { role: 'user', content: '帮我读一下 README' },
+      { role: 'user', content: 'Please read the README for me' },
       {
         role: 'assistant',
         content: '',
@@ -137,7 +137,7 @@ describe('GeminiProvider response parsing', () => {
     expect(contents).toEqual([
       {
         role: 'user',
-        parts: [{ text: '帮我读一下 README' }],
+        parts: [{ text: 'Please read the README for me' }],
       },
       {
         role: 'model',
@@ -171,7 +171,7 @@ describe('GeminiProvider response parsing', () => {
     const contents = GeminiProvider.buildRequestContents([
       {
         role: 'assistant',
-        content: '我先检查两个文件',
+        content: 'Let me check two files first',
         tool_calls: [
           {
             id: 'call-1',
@@ -215,7 +215,7 @@ describe('GeminiProvider response parsing', () => {
       {
         role: 'model',
         parts: [
-          { text: '我先检查两个文件' },
+          { text: 'Let me check two files first' },
           {
             thoughtSignature: 'sig-a',
             functionCall: {

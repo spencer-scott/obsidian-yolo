@@ -134,7 +134,7 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     icon: 'sparkles',
     category: 'suggestions',
     labelKey: 'chat.customContinueSections.suggestions.items.continue.label',
-    labelFallback: '继续编写',
+    labelFallback: 'Continue writing',
     instructionKey:
       'chat.customContinueSections.suggestions.items.continue.instruction',
     instructionFallback:
@@ -145,80 +145,80 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     icon: 'filetext',
     category: 'writing',
     labelKey: 'chat.customContinueSections.writing.items.summarize.label',
-    labelFallback: '添加摘要',
+    labelFallback: 'Add summary',
     instructionKey:
       'chat.customContinueSections.writing.items.summarize.instruction',
-    instructionFallback: '请为当前内容写一个简洁摘要。',
+    instructionFallback: 'Please write a concise summary of the current content.',
   },
   {
     id: 'todo',
     icon: 'listtodo',
     category: 'writing',
     labelKey: 'chat.customContinueSections.writing.items.todo.label',
-    labelFallback: '添加待办事项',
+    labelFallback: 'Add to-do list',
     instructionKey:
       'chat.customContinueSections.writing.items.todo.instruction',
-    instructionFallback: '请基于当前内容整理一个可执行的待办清单。',
+    instructionFallback: 'Please organize an actionable to-do list based on the current content.',
   },
   {
     id: 'flowchart',
     icon: 'workflow',
     category: 'writing',
     labelKey: 'chat.customContinueSections.writing.items.flowchart.label',
-    labelFallback: '制作流程图',
+    labelFallback: 'Create flowchart',
     instructionKey:
       'chat.customContinueSections.writing.items.flowchart.instruction',
-    instructionFallback: '请将当前要点整理成流程图或分步骤说明。',
+    instructionFallback: 'Please organize the current key points into a flowchart or step-by-step explanation.',
   },
   {
     id: 'table',
     icon: 'table',
     category: 'writing',
     labelKey: 'chat.customContinueSections.writing.items.table.label',
-    labelFallback: '制作表格',
+    labelFallback: 'Create table',
     instructionKey:
       'chat.customContinueSections.writing.items.table.instruction',
-    instructionFallback: '请把当前信息整理成表格，并给出合适的列标题。',
+    instructionFallback: 'Please organize the current information into a table with appropriate column headers.',
   },
   {
     id: 'freewrite',
     icon: 'penline',
     category: 'writing',
     labelKey: 'chat.customContinueSections.writing.items.freewrite.label',
-    labelFallback: '随心写作',
+    labelFallback: 'Free writing',
     instructionKey:
       'chat.customContinueSections.writing.items.freewrite.instruction',
-    instructionFallback: '请结合上下文自由发挥，继续创作新的段落。',
+    instructionFallback: 'Please freely continue writing new paragraphs based on the context.',
   },
   {
     id: 'brainstorm',
     icon: 'lightbulb',
     category: 'thinking',
     labelKey: 'chat.customContinueSections.thinking.items.brainstorm.label',
-    labelFallback: '头脑风暴',
+    labelFallback: 'Brainstorm',
     instructionKey:
       'chat.customContinueSections.thinking.items.brainstorm.instruction',
-    instructionFallback: '请给出若干新的灵感或切入点。',
+    instructionFallback: 'Please provide some new ideas or angles of approach.',
   },
   {
     id: 'analyze',
     icon: 'brain',
     category: 'thinking',
     labelKey: 'chat.customContinueSections.thinking.items.analyze.label',
-    labelFallback: '分析重点',
+    labelFallback: 'Analyze key points',
     instructionKey:
       'chat.customContinueSections.thinking.items.analyze.instruction',
-    instructionFallback: '请简要分析当前内容的要点、风险或机会。',
+    instructionFallback: 'Please briefly analyze the key points, risks, or opportunities in the current content.',
   },
   {
     id: 'dialogue',
     icon: 'messagecircle',
     category: 'thinking',
     labelKey: 'chat.customContinueSections.thinking.items.dialogue.label',
-    labelFallback: '提出追问',
+    labelFallback: 'Follow-up questions',
     instructionKey:
       'chat.customContinueSections.thinking.items.dialogue.instruction',
-    instructionFallback: '请给出一些深入讨论的追问。',
+    instructionFallback: 'Please provide some follow-up questions for deeper discussion.',
   },
 ]
 
@@ -266,7 +266,7 @@ export function SmartSpaceQuickActionsSettings({
     getDefaultQuickActions(t)
   const actionsCountLabel = t(
     'settings.smartSpace.actionsCount',
-    '已配置 {count} 个快捷选项',
+    '{count} quick actions configured',
   ).replace('{count}', String(quickActions.length))
 
   const handleOpenModal = () => {
@@ -280,7 +280,7 @@ export function SmartSpaceQuickActionsSettings({
         <div className="smtcmp-smart-space-settings-row">
           <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
           <ObsidianButton
-            text={t('settings.smartSpace.configureActions', '配置快捷选项')}
+            text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
             onClick={handleOpenModal}
           />
         </div>
@@ -293,17 +293,17 @@ export function SmartSpaceQuickActionsSettings({
       <ObsidianSetting
         name={t(
           'settings.smartSpace.quickActionsTitle',
-          'Smart Space 快捷选项',
+          'Smart Space Quick Actions',
         )}
         desc={t(
           'settings.smartSpace.quickActionsDesc',
-          '自定义 Smart Space 中显示的快捷选项和提示词',
+          'Customize quick actions and prompts shown in Smart Space',
         )}
         className="smtcmp-settings-card"
       >
         <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
         <ObsidianButton
-          text={t('settings.smartSpace.configureActions', '配置快捷选项')}
+          text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
           onClick={handleOpenModal}
         />
       </ObsidianSetting>
@@ -317,13 +317,13 @@ export function SmartSpaceQuickActionsSettingsContent() {
   const { t } = useLanguage()
   const categoryOptions = useMemo(
     () => ({
-      suggestions: t('settings.smartSpace.categories.suggestions', '建议'),
-      writing: t('settings.smartSpace.categories.writing', '撰写'),
+      suggestions: t('settings.smartSpace.categories.suggestions', 'Suggestions'),
+      writing: t('settings.smartSpace.categories.writing', 'Writing'),
       thinking: t(
         'settings.smartSpace.categories.thinking',
-        '思考 · 询问 · 对话',
+        'Thinking / Ask / Dialogue',
       ),
-      custom: t('settings.smartSpace.categories.custom', '自定义'),
+      custom: t('settings.smartSpace.categories.custom', 'Custom'),
     }),
     [t],
   )
@@ -459,7 +459,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
     const newAction = {
       ...action,
       id: generateId(),
-      label: `${action.label}${t('settings.smartSpace.copySuffix', ' (副本)')}`,
+      label: `${action.label}${t('settings.smartSpace.copySuffix', ' (copy)')}`,
       enabled: true,
     }
     const newActions = [...quickActions, newAction]
@@ -525,7 +525,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
       ),
       message: t(
         'settings.smartSpace.confirmReset',
-        '确定要恢复默认的快捷选项吗？这将删除所有自定义设置。',
+        'Are you sure you want to reset to default quick actions? This will delete all custom settings.',
       ),
       ctaText: t('common.confirm'),
       onConfirm: () => {
@@ -556,19 +556,19 @@ export function SmartSpaceQuickActionsSettingsContent() {
       <ObsidianSetting
         name={t(
           'settings.smartSpace.quickActionsTitle',
-          'Smart Space 快捷选项',
+          'Smart Space Quick Actions',
         )}
         desc={t(
           'settings.smartSpace.quickActionsDesc',
-          '自定义 Smart Space 中显示的快捷选项和提示词',
+          'Customize quick actions and prompts shown in Smart Space',
         )}
       >
         <ObsidianButton
-          text={t('settings.smartSpace.addAction', '添加选项')}
+          text={t('settings.smartSpace.addAction', 'Add action')}
           onClick={handleAddAction}
         />
         <ObsidianButton
-          text={t('settings.smartSpace.resetToDefault', '恢复默认')}
+          text={t('settings.smartSpace.resetToDefault', 'Reset to default')}
           onClick={handleResetToDefault}
         />
       </ObsidianSetting>
@@ -577,17 +577,17 @@ export function SmartSpaceQuickActionsSettingsContent() {
       {isAddingAction && editingAction && (
         <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-new">
           <ObsidianSetting
-            name={t('settings.smartSpace.actionLabel', '选项名称')}
+            name={t('settings.smartSpace.actionLabel', 'Action name')}
             desc={t(
               'settings.smartSpace.actionLabelDesc',
-              '显示在快捷选项中的文本',
+              'Text displayed in the quick action',
             )}
           >
             <ObsidianTextInput
               value={editingAction.label}
               placeholder={t(
                 'settings.smartSpace.actionLabelPlaceholder',
-                '例如：继续编写',
+                'e.g., Continue writing',
               )}
               onChange={(value) =>
                 setEditingAction({ ...editingAction, label: value })
@@ -596,10 +596,10 @@ export function SmartSpaceQuickActionsSettingsContent() {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionInstruction', '提示词')}
+            name={t('settings.smartSpace.actionInstruction', 'Prompt')}
             desc={t(
               'settings.smartSpace.actionInstructionDesc',
-              '发送给 AI 的指令',
+              'Instruction sent to the AI',
             )}
             className="smtcmp-settings-textarea-header"
           />
@@ -608,7 +608,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
               value={editingAction.instruction}
               placeholder={t(
                 'settings.smartSpace.actionInstructionPlaceholder',
-                '例如：请继续扩展当前段落，保持原有语气与风格。',
+                'e.g., Please continue expanding the current paragraph while maintaining the original tone and style.',
               )}
               onChange={(value) =>
                 setEditingAction({ ...editingAction, instruction: value })
@@ -617,8 +617,8 @@ export function SmartSpaceQuickActionsSettingsContent() {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionCategory', '分类')}
-            desc={t('settings.smartSpace.actionCategoryDesc', '选项所属的分类')}
+            name={t('settings.smartSpace.actionCategory', 'Category')}
+            desc={t('settings.smartSpace.actionCategoryDesc', 'Category this action belongs to')}
           >
             <ObsidianDropdown
               value={editingAction.category || 'custom'}
@@ -633,8 +633,8 @@ export function SmartSpaceQuickActionsSettingsContent() {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionIcon', '图标')}
-            desc={t('settings.smartSpace.actionIconDesc', '选择一个图标')}
+            name={t('settings.smartSpace.actionIcon', 'Icon')}
+            desc={t('settings.smartSpace.actionIconDesc', 'Choose an icon')}
           >
             <ObsidianDropdown
               value={editingAction.icon || 'sparkles'}
@@ -647,13 +647,13 @@ export function SmartSpaceQuickActionsSettingsContent() {
 
           <div className="smtcmp-quick-action-editor-buttons">
             <ObsidianButton
-              text={t('common.save', '保存')}
+              text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}
               cta
               disabled={!editingAction.label || !editingAction.instruction}
             />
             <ObsidianButton
-              text={t('common.cancel', '取消')}
+              text={t('common.cancel', 'Cancel')}
               onClick={() => {
                 setEditingAction(null)
                 setIsAddingAction(false)
@@ -775,7 +775,7 @@ function QuickActionItem({
         <div className="smtcmp-quick-action-drag-handle">
           <span
             className={`smtcmp-drag-handle ${isDragging ? 'smtcmp-drag-handle--active' : ''}`}
-            aria-label={t('settings.smartSpace.dragHandleAria', '拖拽排序')}
+            aria-label={t('settings.smartSpace.dragHandleAria', 'Drag to reorder')}
             {...listeners}
           >
             <GripVertical size={16} />
@@ -799,18 +799,18 @@ function QuickActionItem({
             }}
             icon={isEditing ? 'x' : 'pencil'}
             tooltip={
-              isEditing ? t('common.cancel', '取消') : t('common.edit', '编辑')
+              isEditing ? t('common.cancel', 'Cancel') : t('common.edit', 'Edit')
             }
           />
           <ObsidianButton
             onClick={() => void handleDuplicateAction(action)}
             icon="copy"
-            tooltip={t('settings.smartSpace.duplicate', '复制')}
+            tooltip={t('settings.smartSpace.duplicate', 'Duplicate')}
           />
           <ObsidianButton
             onClick={() => void handleDeleteAction(action.id)}
             icon="trash-2"
-            tooltip={t('common.delete', '删除')}
+            tooltip={t('common.delete', 'Delete')}
           />
         </div>
       </div>
@@ -818,17 +818,17 @@ function QuickActionItem({
       {isEditing && currentEditing && (
         <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-inline">
           <ObsidianSetting
-            name={t('settings.smartSpace.actionLabel', '选项名称')}
+            name={t('settings.smartSpace.actionLabel', 'Action name')}
             desc={t(
               'settings.smartSpace.actionLabelDesc',
-              '显示在快捷选项中的文本',
+              'Text displayed in the quick action',
             )}
           >
             <ObsidianTextInput
               value={currentEditing.label}
               placeholder={t(
                 'settings.smartSpace.actionLabelPlaceholder',
-                '例如：继续编写',
+                'e.g., Continue writing',
               )}
               onChange={(value) =>
                 setEditingAction({
@@ -840,10 +840,10 @@ function QuickActionItem({
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionInstruction', '提示词')}
+            name={t('settings.smartSpace.actionInstruction', 'Prompt')}
             desc={t(
               'settings.smartSpace.actionInstructionDesc',
-              '发送给 AI 的指令',
+              'Instruction sent to the AI',
             )}
             className="smtcmp-settings-textarea-header"
           />
@@ -852,7 +852,7 @@ function QuickActionItem({
               value={currentEditing.instruction}
               placeholder={t(
                 'settings.smartSpace.actionInstructionPlaceholder',
-                '例如：请继续扩展当前段落，保持原有语气与风格。',
+                'e.g., Please continue expanding the current paragraph while maintaining the original tone and style.',
               )}
               onChange={(value) =>
                 setEditingAction({
@@ -864,8 +864,8 @@ function QuickActionItem({
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionCategory', '分类')}
-            desc={t('settings.smartSpace.actionCategoryDesc', '选项所属的分类')}
+            name={t('settings.smartSpace.actionCategory', 'Category')}
+            desc={t('settings.smartSpace.actionCategoryDesc', 'Category this action belongs to')}
           >
             <ObsidianDropdown
               value={currentEditing.category || 'custom'}
@@ -880,8 +880,8 @@ function QuickActionItem({
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.smartSpace.actionIcon', '图标')}
-            desc={t('settings.smartSpace.actionIconDesc', '选择一个图标')}
+            name={t('settings.smartSpace.actionIcon', 'Icon')}
+            desc={t('settings.smartSpace.actionIconDesc', 'Choose an icon')}
           >
             <ObsidianDropdown
               value={currentEditing.icon || 'sparkles'}
@@ -897,13 +897,13 @@ function QuickActionItem({
 
           <div className="smtcmp-quick-action-editor-buttons">
             <ObsidianButton
-              text={t('common.save', '保存')}
+              text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}
               cta
               disabled={!currentEditing.label || !currentEditing.instruction}
             />
             <ObsidianButton
-              text={t('common.cancel', '取消')}
+              text={t('common.cancel', 'Cancel')}
               onClick={() => {
                 setEditingAction(null)
               }}

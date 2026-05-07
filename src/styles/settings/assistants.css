@@ -809,23 +809,23 @@
 
 /* ==================== Emoji Icon Styles (No Background) ==================== */
 
-/* 助手选择器当前图标 - emoji 无背景 */
+/* Assistant selector current icon - no background for emoji */
 .smtcmp-assistant-selector-current-icon:has(.smtcmp-icon-emoji) {
   background: none;
   box-shadow: none;
 }
 
-/* 助手选择器列表项图标 - emoji 无背景 */
+/* Assistant selector list item icon - no background for emoji */
 .smtcmp-assistant-selector-item-icon:has(.smtcmp-icon-emoji) {
   background: none;
 }
 
-/* 设置面板助手列表图标 - emoji 无背景 */
+/* Settings panel assistant list icon - no background for emoji */
 .smtcmp-assistant-icon:has(.smtcmp-icon-emoji) {
   background: none;
 }
 
-/* Emoji 图标字体大小调整 */
+/* Emoji icon font size adjustments */
 .smtcmp-icon-emoji {
   display: flex;
   align-items: center;

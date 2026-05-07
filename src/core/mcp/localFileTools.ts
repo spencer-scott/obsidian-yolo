@@ -171,7 +171,7 @@ type LocalToolCallResult =
     }
   | {
       status: ToolCallResponseStatus.Aborted
-      /** 中断时已采集的部分输出（可选） */
+      /** Partial output collected before abort (optional) */
       data?: {
         type: 'text'
         text: string
@@ -976,7 +976,7 @@ export function getLocalFileTools(options?: {
         'Desktop-only. ' +
         'The subprocess inherits the current process environment (API keys, tokens, proxy settings). ' +
         'IMPORTANT: only use this tool when the user explicitly asks to delegate ' +
-        'to an external agent (e.g. "让 codex 去做", "派一个 claude-code 跑这个", ' +
+        'to an external agent (e.g. "have codex do it", "send a claude-code to run this", ' +
         '"use codex / claude-code for this"). For normal note edits or single-file ' +
         'code changes inside the vault, use the local fs_* tools instead. ' +
         'When mode="async" is used, the tool returns a placeholder result containing a taskId and title. ' +
@@ -1025,7 +1025,7 @@ export function getLocalFileTools(options?: {
             type: 'string',
             description:
               'Optional model override. Pass this when the user explicitly names ' +
-              'a model (e.g. "用 o3 跑", "use claude-opus-4-5"); otherwise omit ' +
+              'a model (e.g. "run with o3", "use claude-opus-4-5"); otherwise omit ' +
               'and let the CLI use its own default. Only [A-Za-z0-9._-] characters allowed.',
           },
           mode: {
@@ -2653,8 +2653,9 @@ export async function callLocalFileTool({
               continue
             }
 
-            // PDF 场景下 line 语义 = 页号。不做 `${index+1}|` 前缀，避免
-            // 与 returnedRange（页号）语义错位，LLM 可直接依赖 <page N> 标签定位。
+            // In the PDF case, "line" semantically means page number. We skip
+            // the `${index+1}|` prefix to avoid a mismatch with returnedRange
+            // (page numbers); the LLM can locate content via <page N> tags directly.
             const totalLines = totalPageCount
             const outputContent = taggedBody
             const returnedCount = selectedPages.length
@@ -2690,7 +2691,7 @@ export async function callLocalFileTool({
               ...(visionDowngraded
                 ? {
                     effectiveModality: 'text' as const,
-                    warning: '当前模型不支持图像输入，已自动降级为文本读取',
+                    warning: 'The current model does not support image input; automatically downgraded to text reading',
                   }
                 : {}),
             })
@@ -3584,7 +3585,7 @@ export async function callLocalFileTool({
       }
 
       case 'delegate_external_agent': {
-        // 所有 node:child_process 相关代码都在 external-cli/index.ts 里懒加载
+        // All node:child_process related code is lazily loaded in external-cli/index.ts
         const { runExternalAgent } = await import('../agent/external-cli/index')
 
         const provider = getTextArg(args, 'provider').trim()
@@ -3594,9 +3595,11 @@ export async function callLocalFileTool({
           )
         }
 
-        // workingDirectory: 可选；LLM 没传或传空则回退到 vault 根目录。
-        // 路径有效性校验（绝对路径 / 存在 / isDirectory）放在 runner 内部做，
-        // 因为 runner 是 desktop-only 模块，可以安全静态 import node:fs/path。
+        // workingDirectory: optional; falls back to the vault root if the LLM
+        // does not provide it or passes an empty value.
+        // Path validation (absolute path / exists / isDirectory) is done inside
+        // the runner because it is a desktop-only module that can safely
+        // statically import node:fs/path.
         let workingDirectory =
           getOptionalTextArg(args, 'workingDirectory')?.trim() ?? ''
         if (!workingDirectory) {
@@ -3670,14 +3673,14 @@ export async function callLocalFileTool({
             })
           }
         } catch (runError) {
-          // 启动失败或被中止信号在 runner 里作为 reject 抛出
+          // Startup failure or abort signal is thrown as a rejection inside the runner
           if (signal?.aborted) {
             return { status: ToolCallResponseStatus.Aborted }
           }
           throw runError
         }
 
-        // async 模式：立刻返回占位结果
+        // async mode: return placeholder result immediately
         if ('accepted' in result) {
           return {
             status: ToolCallResponseStatus.Success,
@@ -3700,8 +3703,9 @@ export async function callLocalFileTool({
           }
         }
 
-        // 进程被外部 abort 时 runner 通过 close 事件 resolve（而非 reject），
-        // signal.aborted 为 true 时视为 Aborted（携带已采集输出）
+        // When the process is externally aborted, the runner resolves via the
+        // close event (rather than rejecting). When signal.aborted is true,
+        // treat it as Aborted (carrying any collected output).
         if (signal?.aborted) {
           return {
             status: ToolCallResponseStatus.Aborted,
@@ -3715,9 +3719,9 @@ export async function callLocalFileTool({
           }
         }
 
-        // 超时：返回 Error 状态但携带已采集的 stdout（必修 4）
+        // Timeout: return Error status but carry the collected stdout
         if (result.timedOut) {
-          const outputText = result.stdout || result.stderr || '（无输出）'
+          const outputText = result.stdout || result.stderr || '(no output)'
           return {
             status: ToolCallResponseStatus.Error,
             error: `Exit code timeout. Output:\n${outputText}`,
@@ -3725,7 +3729,7 @@ export async function callLocalFileTool({
         }
 
         const exitOk = result.exitCode === 0
-        const outputText = result.stdout || result.stderr || '（无输出）'
+        const outputText = result.stdout || result.stderr || '(no output)'
 
         if (!exitOk) {
           return {

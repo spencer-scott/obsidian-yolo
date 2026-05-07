@@ -81,28 +81,28 @@ print("Hello, world!")
   })
 
   it('should ignore inline literal smtcmp_block mentions and still parse real blocks', () => {
-    const input = `下面演示如何使用 \`<smtcmp_block>\`：
+    const input = `Here is how to use \`<smtcmp_block>\`：
 
 <smtcmp_block filename="example.md">
 <<<<<<< REPLACE
 [old]
-旧内容
+old content
 =======
 [new]
-新内容
+new content
 >>>>>>> END
 </smtcmp_block>`
 
     expect(parseTagContents(input)).toEqual([
-      { type: 'string', content: '下面演示如何使用 `<smtcmp_block>`：\n' },
+      { type: 'string', content: 'Here is how to use `<smtcmp_block>`：\n' },
       {
         type: 'smtcmp_block',
         content: `<<<<<<< REPLACE
 [old]
-旧内容
+old content
 =======
 [new]
-新内容
+new content
 >>>>>>> END`,
         filename: 'example.md',
         language: undefined,
@@ -199,14 +199,14 @@ Some text after without closing tag`,
 
   it('should unwrap nested smtcmp_block references', () => {
     const input = `<smtcmp_block language="markdown">
-<smtcmp_block filename="临床医学知识库/基础医学/病理生理学/休克.md" language="markdown" startline="1782" endline="1784"></smtcmp_block>
+<smtcmp_block filename="Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md" language="markdown" startline="1782" endline="1784"></smtcmp_block>
 </smtcmp_block>`
 
     const expected: ParsedTagContent[] = [
       {
         type: 'smtcmp_block',
         content: '',
-        filename: '临床医学知识库/基础医学/病理生理学/休克.md',
+        filename: 'Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md',
         language: 'markdown',
         startLine: 1782,
         endLine: 1784,
@@ -219,14 +219,14 @@ Some text after without closing tag`,
 
   it('should keep outer block when nested tags are mixed with text', () => {
     const input = `<smtcmp_block language="markdown">
-请参考下面的引用：
+Please refer to the quote below:
 <smtcmp_block filename="example.md" language="markdown" startline="1" endline="2"></smtcmp_block>
 </smtcmp_block>`
 
     const expected: ParsedTagContent[] = [
       {
         type: 'smtcmp_block',
-        content: `请参考下面的引用：
+        content: `Please refer to the quote below:
 <smtcmp_block filename="example.md" language="markdown" startline="1" endline="2"></smtcmp_block>`,
         language: 'markdown',
         filename: undefined,

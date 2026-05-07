@@ -17,7 +17,7 @@ describe('createQuickAskEditorState', () => {
 
     const selectionMentionable: MentionableBlock = {
       type: 'block',
-      content: '主人能指',
+      content: 'selected text',
       file,
       startLine: 1,
       endLine: 1,
@@ -26,9 +26,9 @@ describe('createQuickAskEditorState', () => {
     }
 
     const editorState = createQuickAskEditorState({
-      prompt: '解释',
+      prompt: 'explain',
       mentionables: [selectionMentionable],
-      mentionableUnitLabel: '字符',
+      mentionableUnitLabel: 'chars',
     })
 
     const paragraph = editorState.root.children[0] as unknown as {
@@ -38,8 +38,8 @@ describe('createQuickAskEditorState', () => {
     expect(paragraph?.type).toBe('paragraph')
     expect(paragraph?.children[0]).toMatchObject({
       type: 'mention',
-      mentionName: 'test.md (4 字符)',
+      mentionName: 'test.md (4 chars)',
     })
-    expect(editorStateToPlainText(editorState)).toBe('@test.md (4 字符) 解释')
+    expect(editorStateToPlainText(editorState)).toBe('@test.md (4 chars) explain')
   })
 })

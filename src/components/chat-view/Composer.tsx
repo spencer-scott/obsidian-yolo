@@ -322,13 +322,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 <div className="smtcmp-composer-heading-title">
                   {t(
                     'settings.continuation.smartSpaceToggle',
-                    '启用 Smart Space',
+                    'Enable Smart Space',
                   )}
                 </div>
                 <div className="smtcmp-composer-heading-desc">
                   {t(
                     'settings.continuation.smartSpaceDescription',
-                    'Smart Space 在空行触发，为续写与快速操作提供入口。',
+                    'Smart Space triggers on empty lines, providing an entry point for continuation and quick actions.',
                   )}
                 </div>
               </header>
@@ -338,13 +338,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-option-title">
                     {t(
                       'settings.continuation.smartSpaceToggle',
-                      '启用 Smart Space',
+                      'Enable Smart Space',
                     )}
                   </div>
                   <div className="smtcmp-composer-option-desc">
                     {t(
                       'settings.continuation.smartSpaceToggleDesc',
-                      '关闭后将不会触发 Smart Space 浮动面板。',
+                      'When disabled, the Smart Space floating panel will not appear.',
                     )}
                   </div>
                 </div>
@@ -365,13 +365,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.smartSpaceTriggerMode',
-                          '触发模式',
+                          'Trigger mode',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.smartSpaceTriggerModeDesc',
-                          '定义在空行按下空格时的触发方式。',
+                          'Define how Smart Space is triggered when pressing space on an empty line.',
                         )}
                       </div>
                     </div>
@@ -384,21 +384,21 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                               value: 'single-space',
                               label: t(
                                 'settings.continuation.smartSpaceTriggerModeSingle',
-                                '单空格触发',
+                                'Single space',
                               ),
                             },
                             {
                               value: 'double-space',
                               label: t(
                                 'settings.continuation.smartSpaceTriggerModeDouble',
-                                '双空格触发',
+                                'Double space',
                               ),
                             },
                             {
                               value: 'off',
                               label: t(
                                 'settings.continuation.smartSpaceTriggerModeOff',
-                                '关闭',
+                                'Off',
                               ),
                             },
                           ]}
@@ -426,12 +426,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <section className="smtcmp-composer-section">
                 <header className="smtcmp-composer-heading">
                   <div className="smtcmp-composer-heading-title">
-                    {t('settings.smartSpace.quickActionsTitle', '快捷动作')}
+                    {t('settings.smartSpace.quickActionsTitle', 'Quick actions')}
                   </div>
                   <div className="smtcmp-composer-heading-desc">
                     {t(
                       'settings.smartSpace.quickActionsDesc',
-                      '自定义 Smart Space 中显示的快捷选项和提示词。',
+                      'Customize the quick options and prompts shown in Smart Space.',
                     )}
                   </div>
                 </header>
@@ -442,12 +442,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
             <section className="smtcmp-composer-section">
               <header className="smtcmp-composer-heading">
                 <div className="smtcmp-composer-heading-title">
-                  {t('settings.rag.title', '知识库')}
+                  {t('settings.rag.title', 'Knowledge base')}
                 </div>
                 <div className="smtcmp-composer-heading-desc">
                   {t(
                     'settings.rag.composerEntryDesc',
-                    '知识库索引已经迁移到设置页统一管理，这里提供快捷入口。',
+                    'Knowledge base indexing has been moved to the settings page. This provides a quick entry point.',
                   )}
                 </div>
               </header>
@@ -455,12 +455,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <div className="smtcmp-composer-option">
                 <div className="smtcmp-composer-option-info">
                   <div className="smtcmp-composer-option-title">
-                    {t('settings.rag.openKnowledgeSettings', '打开知识库设置')}
+                    {t('settings.rag.openKnowledgeSettings', 'Open knowledge base settings')}
                   </div>
                   <div className="smtcmp-composer-option-desc">
                     {t(
                       'settings.rag.openKnowledgeSettingsDesc',
-                      '前往设置页配置知识库索引、范围、状态与高级参数。',
+                      'Go to settings to configure knowledge base indexing, scope, status, and advanced parameters.',
                     )}
                   </div>
                 </div>
@@ -468,7 +468,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <ObsidianButton
                     text={t(
                       'settings.rag.openKnowledgeSettings',
-                      '打开知识库设置',
+                      'Open knowledge base settings',
                     )}
                     onClick={() => {
                       // @ts-expect-error: setting property exists in Obsidian's App but is not typed
@@ -496,7 +496,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 <div className="smtcmp-composer-heading-desc">
                   {t(
                     'settings.continuation.quickAskDescription',
-                    '在空行输入触发字符快速呼出浮动聊天面板。',
+                    'Type the trigger character on an empty line to quickly open the floating chat panel.',
                   )}
                 </div>
               </header>
@@ -506,13 +506,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-option-title">
                     {t(
                       'settings.continuation.quickAskToggle',
-                      '启用 Quick Ask',
+                      'Enable Quick Ask',
                     )}
                   </div>
                   <div className="smtcmp-composer-option-desc">
                     {t(
                       'settings.continuation.quickAskToggleDesc',
-                      '关闭后不会再触发 Quick Ask 浮动面板。',
+                      'When disabled, the Quick Ask floating panel will not appear.',
                     )}
                   </div>
                 </div>
@@ -531,12 +531,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-option">
                     <div className="smtcmp-composer-option-info">
                       <div className="smtcmp-composer-option-title">
-                        {t('settings.continuation.quickAskTrigger', '触发字符')}
+                        {t('settings.continuation.quickAskTrigger', 'Trigger character')}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskTriggerDesc',
-                          '支持 1-3 个字符。',
+                          'Supports 1-3 characters.',
                         )}
                       </div>
                     </div>
@@ -559,13 +559,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.quickAskContextBeforeChars',
-                          '上文字符数',
+                          'Characters before cursor',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskContextBeforeCharsDesc',
-                          '传递给模型的光标上方最大字符数。',
+                          'Maximum number of characters above the cursor to pass to the model.',
                         )}
                       </div>
                     </div>
@@ -603,13 +603,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.quickAskContextAfterChars',
-                          '下文字符数',
+                          'Characters after cursor',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskContextAfterCharsDesc',
-                          '传递给模型的光标下方最大字符数。',
+                          'Maximum number of characters below the cursor to pass to the model.',
                         )}
                       </div>
                     </div>
@@ -657,7 +657,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 <div className="smtcmp-composer-heading-desc">
                   {t(
                     'settings.continuation.selectionChatDescription',
-                    '选中文本后显示快捷操作面板，并保持同步到侧边 Chat。',
+                    'Show a quick actions panel after selecting text, synced with the sidebar chat.',
                   )}
                 </div>
               </header>
@@ -672,7 +672,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-option-desc">
                     {t(
                       'settings.continuation.selectionChatToggleDesc',
-                      '选中文本后显示快捷操作面板。',
+                      'Show a quick actions panel after selecting text.',
                     )}
                   </div>
                 </div>
@@ -693,13 +693,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     <div className="smtcmp-composer-option-title">
                       {t(
                         'settings.continuation.selectionChatAutoDock',
-                        '自动停靠到右上角',
+                        'Auto-dock to top right',
                       )}
                     </div>
                     <div className="smtcmp-composer-option-desc">
                       {t(
                         'settings.continuation.selectionChatAutoDockDesc',
-                        '发送问题后自动移动到编辑器右上角（拖动后不再自动跟随）。',
+                        'Automatically move to the top-right corner of the editor after sending a question (stops following after manual drag).',
                       )}
                     </div>
                   </div>
@@ -732,13 +732,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 <div className="smtcmp-composer-heading-title">
                   {t(
                     'settings.continuation.tabCompletionBasicTitle',
-                    '基础设置',
+                    'Basic settings',
                   )}
                 </div>
                 <div className="smtcmp-composer-heading-desc">
                   {t(
                     'settings.continuation.tabCompletionBasicDesc',
-                    '启用 Tab 补全并设置基础参数。',
+                    'Enable Tab completion and configure basic parameters.',
                   )}
                 </div>
               </header>
@@ -746,12 +746,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <div className="smtcmp-composer-option">
                 <div className="smtcmp-composer-option-info">
                   <div className="smtcmp-composer-option-title">
-                    {t('settings.continuation.tabCompletion', '启用 Tab 补全')}
+                    {t('settings.continuation.tabCompletion', 'Enable Tab completion')}
                   </div>
                   <div className="smtcmp-composer-option-desc">
                     {t(
                       'settings.continuation.tabCompletionDesc',
-                      '开启后会在编辑器中自动触发补全建议。',
+                      'When enabled, completion suggestions will be triggered automatically in the editor.',
                     )}
                   </div>
                 </div>
@@ -781,13 +781,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionModel',
-                          '补全模型',
+                          'Completion model',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionModelDesc',
-                          '选择用于 Tab 补全的模型。',
+                          'Select the model used for Tab completion.',
                         )}
                       </div>
                     </div>
@@ -815,13 +815,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionMaxSuggestionLength',
-                          '最大补全长度',
+                          'Max completion length',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionMaxSuggestionLengthDesc',
-                          '控制单次建议的最大长度。',
+                          'Control the maximum length of a single suggestion.',
                         )}
                       </div>
                     </div>
@@ -861,13 +861,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       <div className="smtcmp-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionLengthPreset',
-                          '补全长度',
+                          'Completion length',
                         )}
                       </div>
                       <div className="smtcmp-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionLengthPresetDesc',
-                          '提示模型生成短、中、长三档补全。',
+                          'Prompt the model to generate short, medium, or long completions.',
                         )}
                       </div>
                     </div>
@@ -945,13 +945,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionTriggersSectionTitle',
-                      '触发器设置',
+                      'Trigger settings',
                     )}
                   </div>
                   <div className="smtcmp-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionTriggersSectionDesc',
-                      '配置补全触发条件与规则。',
+                      'Configure completion trigger conditions and rules.',
                     )}
                   </div>
                 </header>
@@ -961,13 +961,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     <div className="smtcmp-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionTriggerDelay',
-                        '触发延迟',
+                        'Trigger delay',
                       )}
                     </div>
                     <div className="smtcmp-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionTriggerDelayDesc',
-                        '输入后延迟触发的毫秒数。',
+                        'Milliseconds to wait after typing before triggering.',
                       )}
                     </div>
                   </div>
@@ -1005,13 +1005,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     <div className="smtcmp-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionTriggersTitle',
-                        '触发器',
+                        'Triggers',
                       )}
                     </div>
                     <div className="smtcmp-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionTriggersDesc',
-                        '配置补全触发规则。',
+                        'Configure completion trigger rules.',
                       )}
                     </div>
                   </div>
@@ -1136,13 +1136,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionAutoSectionTitle',
-                      '自动补全设置',
+                      'Auto-completion settings',
                     )}
                   </div>
                   <div className="smtcmp-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionAutoSectionDesc',
-                      '配置停顿后的自动补全行为。',
+                      'Configure auto-completion behavior after pausing.',
                     )}
                   </div>
                 </header>
@@ -1152,13 +1152,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     <div className="smtcmp-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionAutoTrigger',
-                        '自动补全（停顿后）',
+                        'Auto-complete (after pause)',
                       )}
                     </div>
                     <div className="smtcmp-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionAutoTriggerDesc',
-                        '启用后，停止输入一段时间也会触发补全。',
+                        'When enabled, completion will also trigger after a pause in typing.',
                       )}
                     </div>
                   </div>
@@ -1181,13 +1181,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerDelay',
-                            '自动补全停顿时间（毫秒）',
+                            'Auto-complete pause time (ms)',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerDelayDesc',
-                            '停止输入后等待多久再触发自动补全。',
+                            'How long to wait after typing stops before triggering auto-completion.',
                           )}
                         </div>
                       </div>
@@ -1227,13 +1227,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerCooldown',
-                            '自动补全冷却时间（毫秒）',
+                            'Auto-complete cooldown (ms)',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerCooldownDesc',
-                            '自动补全触发后冷却一段时间，避免频繁请求。',
+                            'Cooldown period after auto-completion triggers to avoid frequent requests.',
                           )}
                         </div>
                       </div>
@@ -1278,13 +1278,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="smtcmp-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionAdvanced',
-                      '高级设置',
+                      'Advanced settings',
                     )}
                   </div>
                   <div className="smtcmp-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionAdvancedSectionDesc',
-                      '配置 Tab 补全的高级参数。',
+                      'Configure advanced parameters for Tab completion.',
                     )}
                   </div>
                 </header>
@@ -1306,7 +1306,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <span className="smtcmp-settings-advanced-toggle-icon">
                     ▶
                   </span>
-                  {t('settings.continuation.tabCompletionAdvanced', '高级设置')}
+                  {t('settings.continuation.tabCompletionAdvanced', 'Advanced settings')}
                 </div>
 
                 {showTabAdvanced && (
@@ -1316,13 +1316,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionContextRange',
-                            '上下文范围',
+                            'Context range',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionContextRangeDesc',
-                            '控制上下文范围大小。',
+                            'Control the context range size.',
                           )}
                         </div>
                       </div>
@@ -1360,13 +1360,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionMinContextLength',
-                            '最小上下文长度',
+                            'Minimum context length',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionMinContextLengthDesc',
-                            '低于该长度不会触发补全。',
+                            'Completion will not trigger below this length.',
                           )}
                         </div>
                       </div>
@@ -1406,13 +1406,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionTemperature',
-                            '温度',
+                            'Temperature',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionTemperatureDesc',
-                            '控制生成的发散程度。',
+                            'Control the randomness of generation.',
                           )}
                         </div>
                       </div>
@@ -1451,13 +1451,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionRequestTimeout',
-                            '请求超时',
+                            'Request timeout',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionRequestTimeoutDesc',
-                            '超过该时间将取消请求。',
+                            'Requests exceeding this time will be cancelled.',
                           )}
                         </div>
                       </div>
@@ -1497,13 +1497,13 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                         <div className="smtcmp-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionConstraints',
-                            '补全约束',
+                            'Completion constraints',
                           )}
                         </div>
                         <div className="smtcmp-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionConstraintsDesc',
-                            '插入到补全提示词中的附加规则。',
+                            'Additional rules inserted into the completion prompt.',
                           )}
                         </div>
                       </div>

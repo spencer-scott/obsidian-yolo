@@ -36,7 +36,7 @@ import {
 import { useChatManager } from './useJsonManagers'
 
 const LEGACY_UNTITLED_CONVERSATION_TITLES = new Set([
-  '新消息',
+  'New Message',
   DEFAULT_UNTITLED_CONVERSATION_TITLE,
 ])
 const AUTO_TITLE_TIMEOUT_MS = 10000
@@ -267,7 +267,7 @@ export function useChatHistory(): UseChatHistory {
             : { touchUpdatedAt: options.touchUpdatedAt },
         )
       } else {
-        // 默认标题统一为"新对话"，待首条用户消息保存后由对话命名模型自动改名
+        // Default title is "New Conversation"; it will be auto-renamed by the conversation naming model after the first user message is saved
         const defaultTitle = DEFAULT_UNTITLED_CONVERSATION_TITLE
 
         await chatManager.createChat({
@@ -510,8 +510,8 @@ export function useChatHistory(): UseChatHistory {
       titleGenerationInFlightRef.current.add(id)
 
       try {
-        // 等待对话存在（最多等待 3 秒，每 200ms 检查一次）
-        // 这是为了处理 debounce 导致的保存延迟
+        // Wait for the conversation to exist (up to 3 seconds, checking every 200ms)
+        // This handles save delays caused by debounce
         let conversation = null
         for (let i = 0; i < AUTO_TITLE_WAIT_CONVERSATION_RETRIES; i++) {
           conversation = await chatManager.findById(id)
@@ -526,7 +526,7 @@ export function useChatHistory(): UseChatHistory {
           return
         }
 
-        // 如果标题已经命名过了，不需要再次命名
+        // If the title has already been named, no need to rename again
         if (!force && !isUntitledConversationTitle(conversation.title)) {
           logTitleEvent('already_titled')
           return
@@ -657,7 +657,7 @@ export function useChatHistory(): UseChatHistory {
         }
         titleGenerationCooldownUntilRef.current.delete(id)
 
-        // 再次检查标题是否仍为默认标题，避免竞态条件
+        // Re-check whether the title is still the default to avoid race conditions
         const currentConversation = await chatManager.findById(id)
         if (
           currentConversation &&

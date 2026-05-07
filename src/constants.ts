@@ -11,7 +11,7 @@ import {
 } from './types/provider.types'
 
 export const CHAT_VIEW_TYPE = 'smtcmp-chat-view'
-export const DEFAULT_UNTITLED_CONVERSATION_TITLE = '新对话'
+export const DEFAULT_UNTITLED_CONVERSATION_TITLE = 'New Conversation'
 export const PLUGIN_ID = 'obsidian-smart-composer'
 
 // Default model ids (with provider prefix)
@@ -30,7 +30,7 @@ export const RECOMMENDED_MODELS_FOR_EMBEDDING = [
 
 export const DEFAULT_CHAT_TITLE_PROMPT = {
   en: 'You are a title generator. Generate a concise conversation title based on the first user message. Output the title only.',
-  zh: '你是一个标题生成器。请基于用户首条消息生成一个简洁的会话标题，直接输出标题本身。',
+  zh: 'You are a title generator. Generate a concise conversation title based on the first user message. Output the title only.',
   it: "Sei un generatore di titoli. Genera un titolo di conversazione conciso in base al primo messaggio dell'utente. Restituisci solo il titolo.",
 } as const
 

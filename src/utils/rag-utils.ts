@@ -58,8 +58,9 @@ export function listAllFolderPaths(vault: Vault): string[] {
 
 /**
  * Convert folder paths => include patterns used by current RAG engine.
- * 模式只限定"目录范围"，不限定扩展名；文件类型由 VectorManager 的扩展名过滤
- * 与「索引 PDF」等独立开关决定，避免在此处把 PDF/未来新格式挡在外面。
+ * Patterns only constrain directory scope, not file extensions. File types are
+ * filtered by VectorManager's extension filter and separate toggles such as
+ * "index PDF", to avoid blocking PDFs or future formats here.
  */
 export function folderPathsToIncludePatterns(paths: string[]): string[] {
   const patterns = new Set<string>()
@@ -76,10 +77,10 @@ export function folderPathsToIncludePatterns(paths: string[]): string[] {
 export function includePatternsToFolderPaths(patterns: string[]): string[] {
   const folders = new Set<string>()
   for (const pat of patterns) {
-    // 新格式优先：folder/** 与 folder/*
+    // New format first: folder/** and folder/*
     let m = pat.match(/^(.*)\/\*\*$/)
     if (!m) m = pat.match(/^(.*)\/\*$/)
-    // 旧 md-only 格式兼容：folder/**/*.md 与 folder/*.md
+    // Legacy md-only format compatibility: folder/**/*.md and folder/*.md
     if (!m) m = pat.match(/^(.*)\/\*\*\/\*\.md$/)
     if (!m) m = pat.match(/^(.*)\/\*\.md$/)
     if (!m) m = pat.match(/^(.*)\/$/)

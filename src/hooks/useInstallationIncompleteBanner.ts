@@ -23,7 +23,7 @@ export function useInstallationIncompleteBanner(): {
       setDetail(plugin.installationIncompleteDetail)
       setDismissed(plugin.isInstallationIncompleteBannerDismissed())
     }
-    // 与 onload 中 notify 的时序对齐：先同步一次，避免订阅晚于 notify 导致永远不显示
+    // Align timing with onload notify: sync once first to avoid the subscription being later than notify, which would cause the banner to never show
     sync()
     return plugin.addInstallationIncompleteListener(sync)
   }, [plugin])

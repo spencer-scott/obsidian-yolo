@@ -94,9 +94,9 @@ export type ChatUserInputProps = {
   addedBlockKey?: string | null
   modelId?: string
   onModelChange?: (modelId: string) => void
-  // 用于显示聚合后的 mentionables(包含历史消息中的文件)
+  // Used to display aggregated mentionables (including files from historical messages)
   displayMentionables?: Mentionable[]
-  // 删除时从所有消息中删除的回调
+  // Callback to delete from all messages when removing
   onDeleteFromAll?: (mentionable: Mentionable) => void
   // Reasoning level
   reasoningLevel?: ReasoningLevel
@@ -497,7 +497,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             ),
         )
       }
-      // 默认保持收起状态，不自动展开新添加的徽章
+      // Keep collapsed by default, do not auto-expand newly added badges
     }
 
     const handleSkillNodeMutation = (mutations: NodeMutations<SkillNode>) => {
@@ -843,7 +843,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           })
         }
         setMentionables([...mentionables, ...newMentionableImages])
-        // 默认保持收起状态，不自动展开新添加的徽章
+        // Keep collapsed by default, do not auto-expand newly added badges
       },
       [currentModel, mentionableUnitLabel, mentionables, setMentionables, t],
     )
@@ -1305,7 +1305,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               effectiveSelectedSkills.length === 0 &&
               compact && (
                 <div className="smtcmp-chat-user-input-placeholder">
-                  {t('chat.placeholderCompact', '点击展开编辑...')}
+                  {t('chat.placeholderCompact', 'Click to expand and edit...')}
                 </div>
               )}
             {showPlaceholder &&
@@ -1314,7 +1314,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               effectiveMentionables.length === 0 &&
               effectiveSelectedSkills.length === 0 && (
                 <div className="smtcmp-chat-user-input-placeholder">
-                  {t('chat.placeholderPrefix', '输入消息...')}{' '}
+                  {t('chat.placeholderPrefix', 'Type a message...')}{' '}
                   <span
                     className="smtcmp-placeholder-trigger"
                     role="button"
@@ -1325,8 +1325,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                   >
                     @
                   </span>
-                  {t('chat.placeholderMention', '添加引用或模型')}
-                  {'，'}
+                  {t('chat.placeholderMention', ' to add references or models')}
+                  {', '}
                   <span
                     className="smtcmp-placeholder-trigger"
                     role="button"
@@ -1337,7 +1337,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                   >
                     /
                   </span>
-                  {t('chat.placeholderSkill', '选择技能或命令')}
+                  {t('chat.placeholderSkill', ' to select skills or commands')}
                 </div>
               )}
             <LexicalContentEditable

@@ -767,7 +767,7 @@ export class McpManager {
         if (localResult.status === ToolCallResponseStatus.Aborted) {
           return {
             status: ToolCallResponseStatus.Aborted,
-            // 透传中断时已采集的部分输出（外部 CLI 等场景）
+            // Pass through partial output collected before abort (e.g. external CLI scenarios)
             ...(localResult.data !== undefined && { data: localResult.data }),
           }
         }

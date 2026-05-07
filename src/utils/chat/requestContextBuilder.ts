@@ -116,7 +116,7 @@ export function stripUnsupportedImages(
 
     const stripped: ContentPart[] = message.content.flatMap((part) => {
       if (part.type === 'image_url') {
-        return [{ type: 'text' as const, text: '[图片已省略：模型不支持视觉]' }]
+        return [{ type: 'text' as const, text: '[Image omitted: model does not support vision]' }]
       }
       return [part]
     })

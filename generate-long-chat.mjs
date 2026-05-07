@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const CHAT_SCHEMA_VERSION = 1
-const DEFAULT_TITLE = '长对话性能压测样本'
+const DEFAULT_TITLE = 'Long Conversation Performance Test Sample'
 const DEFAULT_TURNS = 120
 const DEFAULT_ASSISTANT_PARAGRAPHS = 6
 const DEFAULT_TARGET_SIZE_MB = 3
@@ -103,9 +103,9 @@ function createTextEditorState(text) {
 
 function createUserMessage(turn, topic) {
   const text = [
-    `第 ${turn} 轮问题：请继续分析「${topic}」在真实产品环境里的性能瓶颈。`,
-    '请重点关注渲染、状态更新、滚动、消息体积、引用内容和历史回放。',
-    `我希望你这轮给出更细的拆分，并且补充第 ${turn} 轮和前文之间的承接关系。`,
+    `Turn ${turn} question: please continue analyzing the performance bottlenecks of "${topic}" in a real product environment.`,
+    'Please focus on rendering, state updates, scrolling, message size, referenced content, and history replay.',
+    `I want you to provide a more granular breakdown this turn, and elaborate on the connection between turn ${turn} and the preceding context.`,
   ].join('\n')
 
   return {
@@ -122,12 +122,12 @@ function createUserMessage(turn, topic) {
 
 function createAssistantParagraph(turn, paragraphIndex, topic) {
   return [
-    `### 第 ${turn} 轮分析块 ${paragraphIndex + 1}`,
-    `围绕「${topic}」的长会话性能压测，这一段专门用来放大历史消息渲染成本。当前观察点包括：长 Markdown 段落、重复结构、代码块、列表和多段落内容在 React 树中的累计影响。`,
-    `当会话进入第 ${turn} 轮时，旧消息如果仍然完整参与 reconciliation，那么输入区每次变动都可能让主线程重新遍历整棵消息树，尤其在存在大量历史用户输入、长 assistant 回复和工具输出时，开销会显著上升。`,
-    `这里额外补充一段冗长文本用于模拟真实用户环境：我们希望验证在消息总量、段落层级、可见区域切换、滚动跟随、历史编辑进入退出、代码块高亮和引用块渲染共同叠加时，界面是否还能保持丝滑、稳定、不抖动，并且不会影响 Obsidian 其他区域的输入响应。`,
-    `进一步地，这一段也模拟“模型不断复述前文并补充细节”的真实场景，所以文本会刻意较长、句式重复、信息密集。这样在渲染器、选择器、memo 边界或虚拟列表策略设计得不够好时，就更容易暴露掉帧、卡顿、自动滚动失效、布局抖动或输入延迟。`,
-    `结论性建议 ${paragraphIndex + 1}：把历史消息展示与编辑器实例分离、按需挂载重型组件、仅渲染视口附近消息、把流式更新限制在尾部活跃片段，并避免让底部 composer 的输入状态驱动整个长列表重渲染。`,
+    `### Turn ${turn} Analysis Block ${paragraphIndex + 1}`,
+    `Long conversation performance stress test around "${topic}": this section is designed to amplify historical message rendering costs. Current observation points include: long Markdown paragraphs, repeated structures, code blocks, lists, and the cumulative impact of multi-paragraph content in the React tree.`,
+    `When the conversation enters turn ${turn}, if old messages still fully participate in reconciliation, every change in the input area may cause the main thread to re-traverse the entire message tree, especially when there are many historical user inputs, long assistant replies, and tool outputs, causing overhead to increase significantly.`,
+    `Here we add an extra lengthy paragraph to simulate a real user environment: we want to verify that when message volume, paragraph nesting, visible area switching, scroll following, history edit enter/exit, code block highlighting, and quote block rendering all stack together, the UI can still remain smooth, stable, and jitter-free without affecting input responsiveness in other areas of Obsidian.`,
+    `Furthermore, this section simulates the real-world scenario of “the model continuously restating prior context and adding details,” so the text is intentionally long, repetitive in structure, and information-dense. This makes it easier to expose frame drops, stuttering, broken auto-scroll, layout jitter, or input lag when the renderer, selectors, memo boundaries, or virtual list strategy are not well-designed.`,
+    `Recommendation ${paragraphIndex + 1}: separate historical message display from editor instances, mount heavy components on demand, only render messages near the viewport, restrict streaming updates to the active tail segment, and avoid letting the bottom composer's input state drive a full re-render of the long list.`,
   ].join('\n\n')
 }
 

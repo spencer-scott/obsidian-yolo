@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README_zh-CN.md">简体中文</a> | <b>Italiano</b>
+  <a href="./README.md">English</a> | <a href="./README_zh-CN.md">Chinese</a> | <b>Italiano</b>
 </p>
 
 ## Novita recenti
@@ -130,7 +130,7 @@ Se trovi YOLO utile, considera di supportare il progetto:
 
 <p align="center">
   <a href="https://afdian.com/a/lapis0x0" target="_blank">
-    <img src="https://img.shields.io/badge/爱发电-Support Developer-fd6c9e?style=for-the-badge" alt="爱发电">
+    <img src="https://img.shields.io/badge/Afdian-Support Developer-fd6c9e?style=for-the-badge" alt="Afdian">
   </a>
   &nbsp;
   <a href="https://github.com/Lapis0x0/obsidian-yolo/blob/main/donation-qr.jpg" target="_blank">

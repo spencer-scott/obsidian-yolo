@@ -107,7 +107,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 }
 
 /**
- * 默认助手图标
+ * Default assistant icon
  */
 export const DEFAULT_ASSISTANT_ICON: AssistantIcon = {
   type: 'lucide',
@@ -115,12 +115,12 @@ export const DEFAULT_ASSISTANT_ICON: AssistantIcon = {
 }
 
 /**
- * 常用的 Lucide 图标列表（用于图标选择器）
+ * List of common Lucide icons (used by the icon picker)
  */
 export const PRESET_LUCIDE_ICONS = Object.keys(ICON_MAP) as readonly string[]
 
 /**
- * 常用的 Emoji 列表（用于图标选择器）
+ * List of common emojis (used by the icon picker)
  */
 export const PRESET_EMOJIS = [
   '🤖',
@@ -175,7 +175,7 @@ export const PRESET_EMOJIS = [
 ] as const
 
 /**
- * 渲染助手图标
+ * Render an assistant icon
  */
 export const renderAssistantIcon = (
   icon: AssistantIcon | undefined,

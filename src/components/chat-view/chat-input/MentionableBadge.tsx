@@ -250,7 +250,7 @@ function AssistantQuoteBadge({
   const { t } = useLanguage()
   const { count } = getBlockMentionableCountInfo(mentionable.content)
   const unitLabel = t('common.characters', 'chars')
-  const quoteLabel = t('chat.assistantQuote.badge', '回复引用')
+  const quoteLabel = t('chat.assistantQuote.badge', 'Reply quote')
 
   return (
     <BadgeBase

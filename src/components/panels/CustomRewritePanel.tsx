@@ -42,7 +42,7 @@ function CustomRewritePanelBody({
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault()
-      // Shift+Enter 作为确定
+      // Shift+Enter to confirm
       handleConfirm()
       return
     }
@@ -51,12 +51,12 @@ function CustomRewritePanelBody({
       onClose()
       return
     }
-    // Enter 默认换行，保持原行为（不拦截）
+    // Enter defaults to newline, keep original behavior (do not intercept)
   }
 
   return (
     <>
-      {/* 输入区占满剩余空间 */}
+      {/* Input area fills remaining space */}
       <div className="smtcmp-instruction-editor-container">
         <ObsidianTextArea
           value={instruction}
@@ -68,7 +68,7 @@ function CustomRewritePanelBody({
         />
       </div>
 
-      {/* 底部轻量工具条 */}
+      {/* Bottom lightweight toolbar */}
       <ObsidianSetting>
         <ObsidianButton
           text={t('common.confirm')}

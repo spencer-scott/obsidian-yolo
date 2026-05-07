@@ -134,9 +134,9 @@ function ChatGPTOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('已打开 ChatGPT OAuth 登录页面，请在浏览器中完成授权。', 8000)
+      new Notice('ChatGPT OAuth login page opened. Please complete authorization in your browser.', 8000)
       await authorization.complete
-      new Notice('ChatGPT OAuth 连接成功')
+      new Notice('ChatGPT OAuth connected successfully')
       await refreshStatus()
     }
 
@@ -163,7 +163,7 @@ function ChatGPTOAuthPanel({
         .cancelPendingBrowserAuthorization()
       await plugin.disconnectChatGPTOAuthAccount(provider.id)
       setPendingCode(null)
-      new Notice('ChatGPT OAuth 已断开')
+      new Notice('ChatGPT OAuth disconnected')
       await refreshStatus()
     }
 
@@ -280,9 +280,9 @@ function GeminiOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('已打开 Gemini OAuth 登录页面，请在浏览器中完成授权。', 8000)
+      new Notice('Gemini OAuth login page opened. Please complete authorization in your browser.', 8000)
       await authorization.complete
-      new Notice('Gemini OAuth 连接成功')
+      new Notice('Gemini OAuth connected successfully')
       await refreshStatus()
     }
 
@@ -306,7 +306,7 @@ function GeminiOAuthPanel({
         .getGeminiOAuthService(provider.id)
         .cancelPendingBrowserAuthorization()
       await plugin.disconnectGeminiOAuthAccount(provider.id)
-      new Notice('Gemini OAuth 已断开')
+      new Notice('Gemini OAuth disconnected')
       await refreshStatus()
     }
 
@@ -420,9 +420,9 @@ function QwenOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('已打开 Qwen OAuth 登录页面，请在浏览器中完成授权。', 8000)
+      new Notice('Qwen OAuth login page opened. Please complete authorization in your browser.', 8000)
       await authorization.complete
-      new Notice('Qwen OAuth 连接成功')
+      new Notice('Qwen OAuth connected successfully')
       await refreshStatus()
     }
 
@@ -446,7 +446,7 @@ function QwenOAuthPanel({
         .getQwenOAuthService(provider.id)
         .cancelPendingBrowserAuthorization()
       await plugin.disconnectQwenOAuthAccount(provider.id)
-      new Notice('Qwen OAuth 已断开')
+      new Notice('Qwen OAuth disconnected')
       await refreshStatus()
     }
 
@@ -536,8 +536,8 @@ function ProviderSectionItem({
   const isGeminiOAuth = provider.presetType === 'gemini-oauth'
   const isQwenOAuth = provider.presetType === 'qwen-oauth'
   const displayBaseUrl = getProviderDisplayBaseUrl(provider)
-  const chatModelsLabel = `${chatModels.length} ${t('settings.providers.chatModels').replace(/^个/, '')}`
-  const embeddingModelsLabel = `${embeddingModels.length} ${t('settings.providers.embeddingModels').replace(/^个/, '')}`
+  const chatModelsLabel = `${chatModels.length} ${t('settings.providers.chatModels')}`
+  const embeddingModelsLabel = `${embeddingModels.length} ${t('settings.providers.embeddingModels')}`
   const {
     attributes,
     listeners,
@@ -639,7 +639,7 @@ function ProviderSectionItem({
               onRequestDeleteProvider(provider.id)
             }}
             className="clickable-icon"
-            aria-label={t('settings.providers.requestDelete', '删除提供商')}
+            aria-label={t('settings.providers.requestDelete', 'Delete provider')}
           >
             <Trash2 />
           </button>
@@ -656,13 +656,13 @@ function ProviderSectionItem({
             <span className="smtcmp-provider-delete-confirm-title">
               {t(
                 'settings.providers.deleteConfirmTitle',
-                '删除提供商「{provider}」？',
+                'Delete provider "{provider}"?',
               ).replace('{provider}', provider.id)}
             </span>
             <span className="smtcmp-provider-delete-confirm-meta">
               {t(
                 'settings.providers.deleteConfirmImpact',
-                '这会同时删除 {chatCount} 个聊天模型、{embeddingCount} 个嵌入模型，并清理相关向量数据。',
+                'This will also delete {chatCount} chat models, {embeddingCount} embedding models, and clean up related vector data.',
               )
                 .replace('{chatCount}', String(chatModels.length))
                 .replace('{embeddingCount}', String(embeddingModels.length))}
@@ -674,14 +674,14 @@ function ProviderSectionItem({
               className="smtcmp-provider-delete-cancel"
               onClick={() => onCancelDeleteProvider()}
             >
-              {t('common.cancel', '取消')}
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="button"
               className="smtcmp-provider-delete-confirm-btn"
               onClick={() => onConfirmDeleteProvider(provider)}
             >
-              {t('settings.providers.confirmDeleteAction', '确认删除')}
+              {t('settings.providers.confirmDeleteAction', 'Confirm delete')}
             </button>
           </div>
         </div>
@@ -1122,7 +1122,7 @@ export function ProvidersAndModelsSection({
   )
   const providersCountLabel = t(
     'settings.providers.providersCount',
-    '已添加 {count} 个提供商',
+    '{count} providers added',
   ).replace('{count}', String(settings.providers.length))
 
   const clearDeleteConfirmTimeout = useCallback(() => {

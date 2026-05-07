@@ -96,13 +96,13 @@ export const ModelSelect = forwardRef<
         (m) => m.id === selectedModelId,
       )
       if (currentModel) {
-        // 优先显示「展示名称」，其次调用ID(model)，最后回退到内部 id
+        // Prefer display name, then model ID, then fall back to internal id
         const provider = settings.providers.find(
           (p) => p.id === currentModel.providerId,
         )
         const display =
           currentModel.name || currentModel.model || currentModel.id
-        // 使用 provider 展示后缀
+        // Use provider as display suffix
         const suffix = provider?.id ? ` (${provider.id})` : ''
         return `${display}${suffix}`
       }
@@ -114,7 +114,7 @@ export const ModelSelect = forwardRef<
       if (!target) return
       target.focus({ preventScroll: true })
 
-      // 打开时把选中项滚动到列表中部，避免贴边
+      // When opening, scroll the selected item to the center of the list to avoid edge alignment
       target.scrollIntoView({
         block: 'center',
         inline: 'nearest',
@@ -159,9 +159,9 @@ export const ModelSelect = forwardRef<
     const handleTriggerKeyDown = (
       event: React.KeyboardEvent<HTMLButtonElement>,
     ) => {
-      // 处理键盘导航
+      // Handle keyboard navigation
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        // 先让外部有机会消费（例如切回输入框）
+        // Let external handlers consume first (e.g. switch back to input field)
         if (onKeyDown) {
           onKeyDown(event, isOpen)
         }
@@ -169,13 +169,13 @@ export const ModelSelect = forwardRef<
           return
         }
 
-        // 如果下拉菜单未打开，按上下方向键时打开它
+        // If the dropdown menu is not open, open it when pressing arrow keys
         if (!isOpen) {
           event.preventDefault()
           setIsOpen(true)
           return
         }
-        // 菜单已打开时，确保焦点移入列表，让 Radix 接管
+        // When menu is open, ensure focus moves into the list and let Radix take over
         event.preventDefault()
         focusSelectedItem()
         return
@@ -187,7 +187,7 @@ export const ModelSelect = forwardRef<
         return
       }
 
-      // 调用传入的 onKeyDown 处理器来处理其他导航键
+      // Call the provided onKeyDown handler for other navigation keys
       if (onKeyDown) {
         onKeyDown(event, isOpen)
       }
@@ -227,7 +227,7 @@ export const ModelSelect = forwardRef<
           collisionPadding={8}
           loop
           onPointerDownOutside={(e) => {
-            // 阻止事件冒泡，防止关闭父容器
+            // Prevent event bubbling to avoid closing the parent container
             e.stopPropagation()
           }}
           onCloseAutoFocus={(e) => {
@@ -284,7 +284,7 @@ export const ModelSelect = forwardRef<
                 )
 
                 const items = groupModels.map((chatModelOption, index) => {
-                  // 列表项名称：优先显示「展示名称」，其次调用ID(model)，最后回退到内部 id
+                  // List item name: prefer display name, then model ID, then fall back to internal id
                   const displayName =
                     chatModelOption.name ||
                     chatModelOption.model ||
