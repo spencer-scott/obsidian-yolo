@@ -182,15 +182,15 @@
   white-space: pre-wrap;
 }
 
-.smtcmp-mcp-tool-description
-  > button.smtcmp-mcp-tool-description-toggle {
+.smtcmp-mcp-tool-description > button.smtcmp-mcp-tool-description-toggle {
   position: absolute;
   top: 0;
   right: 0;
 }
 
 .smtcmp-mcp-tool-description
-  > button.smtcmp-mcp-tool-description-toggle ~ .smtcmp-mcp-tool-description-text {
+  > button.smtcmp-mcp-tool-description-toggle
+  ~ .smtcmp-mcp-tool-description-text {
   padding-right: var(--size-4-6);
 }
 

@@ -144,7 +144,6 @@ export class NativeAgentRuntime implements AgentRuntime {
                   abortSignal,
                   reasoningLevel: input.reasoningLevel,
                   requestParams: input.requestParams,
-                  maxContextOverride: input.maxContextOverride,
                   contextualInjections: input.contextualInjections,
                   geminiTools: input.geminiTools,
                   onAssistantMessage: (assistantMessage) => {
@@ -254,7 +253,6 @@ export class NativeAgentRuntime implements AgentRuntime {
                             allowedToolNames: input.allowedToolNames,
                             allowedSkillIds: input.allowedSkillIds,
                             allowedSkillNames: input.allowedSkillNames,
-                            maxContextOverride: input.maxContextOverride,
                             contextualInjections: input.contextualInjections,
                           })
                       } catch (error) {
@@ -400,7 +398,6 @@ export class NativeAgentRuntime implements AgentRuntime {
       abortSignal,
       reasoningLevel: input.reasoningLevel,
       requestParams: input.requestParams,
-      maxContextOverride: input.maxContextOverride,
       contextualInjections: input.contextualInjections,
       geminiTools: input.geminiTools,
       onAssistantMessage: (assistantMessage) => {

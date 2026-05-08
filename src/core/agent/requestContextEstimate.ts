@@ -22,7 +22,6 @@ export const estimateContinuationRequestContextTokens = async ({
   allowedToolNames,
   allowedSkillIds,
   allowedSkillNames,
-  maxContextOverride,
   contextualInjections,
 }: {
   requestContextBuilder: RequestContextBuilder
@@ -36,7 +35,6 @@ export const estimateContinuationRequestContextTokens = async ({
   allowedToolNames?: string[]
   allowedSkillIds?: string[]
   allowedSkillNames?: string[]
-  maxContextOverride?: number
   contextualInjections?: ContextualInjection[]
 }): Promise<number> => {
   const availableTools = enableTools
@@ -53,7 +51,6 @@ export const estimateContinuationRequestContextTokens = async ({
     messages,
     hasTools,
     hasMemoryTools,
-    maxContextOverride,
     model,
     conversationId,
     compaction,

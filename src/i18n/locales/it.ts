@@ -305,8 +305,6 @@ export const it: TranslationKeys = {
       addAssistantAria: 'Aggiungi nuovo assistente',
       deleteAssistantAria: 'Elimina assistente',
       dragHandleAria: 'Trascina per riordinare',
-      maxContextMessagesDesc:
-        "Numero di messaggi precedenti da includere nel contesto (lascia vuoto per usare l'impostazione globale).",
       duplicate: 'Duplica',
       copySuffix: '(copia)',
       currentBadge: 'Corrente',

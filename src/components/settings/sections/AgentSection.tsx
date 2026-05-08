@@ -374,10 +374,7 @@ export function AgentSection({ app }: AgentSectionProps) {
                   type="button"
                   className="smtcmp-agent-chip smtcmp-agent-chip--more"
                   onClick={handleOpenToolsModal}
-                  title={t(
-                    'settings.agent.viewAllTools',
-                    'View all tools',
-                  )}
+                  title={t('settings.agent.viewAllTools', 'View all tools')}
                 >
                   +{hiddenToolTagsCount}
                 </button>
@@ -415,10 +412,7 @@ export function AgentSection({ app }: AgentSectionProps) {
                   type="button"
                   className="smtcmp-agent-chip smtcmp-agent-chip--more"
                   onClick={handleOpenSkillsModal}
-                  title={t(
-                    'settings.agent.viewAllSkills',
-                    'View all skills',
-                  )}
+                  title={t('settings.agent.viewAllSkills', 'View all skills')}
                 >
                   +{hiddenSkillEntriesCount}
                 </button>

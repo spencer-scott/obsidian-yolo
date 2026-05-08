@@ -51,7 +51,6 @@ type AgentLlmTurnExecutorInput = {
     primaryRequestTimeoutMs?: number
     streamFallbackRecoveryEnabled?: boolean
   }
-  maxContextOverride?: number
   contextualInjections?: ContextualInjection[]
   geminiTools?: {
     useWebSearch?: boolean
@@ -108,7 +107,6 @@ export class AgentLlmTurnExecutor {
         messages: this.input.messages,
         hasTools,
         hasMemoryTools,
-        maxContextOverride: this.input.maxContextOverride,
         model: this.input.model,
         conversationId: this.input.conversationId,
         compaction: this.input.compaction,

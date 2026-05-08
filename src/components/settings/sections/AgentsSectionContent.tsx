@@ -1087,89 +1087,89 @@ export function AgentsSectionContent({
       {draftAgent && (
         <div className="smtcmp-agent-editor-sheet">
           <div className="smtcmp-agent-editor-sheet-top">
-          <div className="smtcmp-agent-editor-sheet-header">
-            <div>
-              <div className="smtcmp-settings-sub-header">
-                {draftAgent.name ||
-                  t('settings.agent.editorDefaultName', 'New agent')}
+            <div className="smtcmp-agent-editor-sheet-header">
+              <div>
+                <div className="smtcmp-settings-sub-header">
+                  {draftAgent.name ||
+                    t('settings.agent.editorDefaultName', 'New agent')}
+                </div>
+                <div className="smtcmp-settings-desc">
+                  {t(
+                    'settings.agent.editorIntro',
+                    "Configure this agent's capabilities, model, and behavior.",
+                  )}
+                </div>
               </div>
-              <div className="smtcmp-settings-desc">
-                {t(
-                  'settings.agent.editorIntro',
-                  "Configure this agent's capabilities, model, and behavior.",
-                )}
-              </div>
+              {!isDirectEntry && (
+                <div className="smtcmp-agent-editor-sheet-actions">
+                  <ObsidianButton
+                    text={t('common.cancel', 'Cancel')}
+                    onClick={() => setDraftAgent(null)}
+                  />
+                  <ObsidianButton
+                    text={t('common.save', 'Save')}
+                    cta
+                    onClick={() => void upsertDraft()}
+                  />
+                </div>
+              )}
             </div>
-            {!isDirectEntry && (
-              <div className="smtcmp-agent-editor-sheet-actions">
-                <ObsidianButton
-                  text={t('common.cancel', 'Cancel')}
-                  onClick={() => setDraftAgent(null)}
-                />
-                <ObsidianButton
-                  text={t('common.save', 'Save')}
-                  cta
-                  onClick={() => void upsertDraft()}
-                />
-              </div>
-            )}
-          </div>
 
-          <div
-            className="smtcmp-agent-editor-tabs smtcmp-agent-editor-tabs--glider"
-            role="tablist"
-            ref={tabsNavRef}
-            style={
-              {
-                '--smtcmp-agent-tab-count': AGENT_EDITOR_TABS.length,
-                '--smtcmp-agent-tab-index': activeTabIndex,
-              } as React.CSSProperties
-            }
-          >
             <div
-              className="smtcmp-agent-editor-tabs-glider"
-              aria-hidden="true"
-            />
-            {AGENT_EDITOR_TABS.map((tab, index) => {
-              const TabIcon = AGENT_EDITOR_TAB_ICONS[tab]
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  className={`smtcmp-agent-editor-tab ${activeTab === tab ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab(tab)}
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  ref={(element) => {
-                    tabRefs.current[index] = element
-                  }}
-                >
-                  <span
-                    className="smtcmp-agent-editor-tab-icon"
-                    aria-hidden="true"
+              className="smtcmp-agent-editor-tabs smtcmp-agent-editor-tabs--glider"
+              role="tablist"
+              ref={tabsNavRef}
+              style={
+                {
+                  '--smtcmp-agent-tab-count': AGENT_EDITOR_TABS.length,
+                  '--smtcmp-agent-tab-index': activeTabIndex,
+                } as React.CSSProperties
+              }
+            >
+              <div
+                className="smtcmp-agent-editor-tabs-glider"
+                aria-hidden="true"
+              />
+              {AGENT_EDITOR_TABS.map((tab, index) => {
+                const TabIcon = AGENT_EDITOR_TAB_ICONS[tab]
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={`smtcmp-agent-editor-tab ${activeTab === tab ? 'is-active' : ''}`}
+                    onClick={() => setActiveTab(tab)}
+                    role="tab"
+                    aria-selected={activeTab === tab}
+                    ref={(element) => {
+                      tabRefs.current[index] = element
+                    }}
                   >
-                    <TabIcon size={14} />
-                  </span>
-                  <span className="smtcmp-agent-editor-tab-label">
-                    {
+                    <span
+                      className="smtcmp-agent-editor-tab-icon"
+                      aria-hidden="true"
+                    >
+                      <TabIcon size={14} />
+                    </span>
+                    <span className="smtcmp-agent-editor-tab-label">
                       {
-                        profile: t(
-                          'settings.agent.editorTabProfile',
-                          'Profile',
-                        ),
-                        tools: t('settings.agent.editorTabTools', 'Tools'),
-                        skills: t('settings.agent.editorTabSkills', 'Skills'),
-                        workspace: t(
-                          'settings.agent.editorTabWorkspace',
-                          'Workspace',
-                        ),
-                      }[tab]
-                    }
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+                        {
+                          profile: t(
+                            'settings.agent.editorTabProfile',
+                            'Profile',
+                          ),
+                          tools: t('settings.agent.editorTabTools', 'Tools'),
+                          skills: t('settings.agent.editorTabSkills', 'Skills'),
+                          workspace: t(
+                            'settings.agent.editorTabWorkspace',
+                            'Workspace',
+                          ),
+                        }[tab]
+                      }
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {activeTab === 'profile' && (
@@ -1393,110 +1393,112 @@ export function AgentsSectionContent({
                     (tool) => tool.toggleTargets,
                   )
                   return (
-                  <div key={group.key} className="smtcmp-agent-tool-group">
-                    <div className="smtcmp-agent-tool-group-title">
-                      <span className="smtcmp-agent-tool-group-title-main">
-                        <span>{group.title}</span>
-                        {estimatedToolContextTokens.perTool.size > 0 && (
-                          <span className="smtcmp-agent-tool-group-tokens">
-                            {t(
-                              'settings.agent.editorEstimatedContextTokens',
-                              '~{count} tokens',
-                            ).replace(
-                              '{count}',
-                              formatTokenCount(
-                                groupEnabledTokens.get(group.key) ?? 0,
-                              ),
-                            )}
-                          </span>
-                        )}
-                      </span>
-                      <span className="smtcmp-agent-tool-group-meta">
-                        <span className="smtcmp-agent-tool-group-count">
-                          {`${groupEnabledCount} / ${group.tools.length} ${t(
-                            'settings.agent.toolsActive',
-                            'active',
-                          )}`}
-                        </span>
-                        {group.tools.length > 0 && (
-                          <button
-                            type="button"
-                            className="smtcmp-agent-tool-group-bulk-toggle"
-                            onClick={() =>
-                              toggleTool(
-                                groupToggleTargets,
-                                !allGroupToolsEnabled,
-                              )
-                            }
-                          >
-                            {allGroupToolsEnabled
-                              ? t(
-                                  'settings.agent.disableAllTools',
-                                  'Disable all',
-                                )
-                              : t(
-                                  'settings.agent.enableAllTools',
-                                  'Enable all',
-                                )}
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                    <div className="smtcmp-agent-tool-list">
-                      {group.tools.map((tool) => {
-                        const selected = tool.toggleTargets.every((target) =>
-                          isAssistantToolEnabled(draftAgent, target),
-                        )
-                        const approvalMode = tool.toggleTargets.every(
-                          (target) =>
-                            getAssistantToolApprovalMode(draftAgent, target) ===
-                            'full_access',
-                        )
-                          ? 'full_access'
-                          : 'require_approval'
-
-                        return (
-                          <div
-                            key={tool.fullName}
-                            className="smtcmp-agent-tool-row"
-                          >
-                            <div className="smtcmp-agent-tool-main">
-                              <div className="smtcmp-agent-tool-name smtcmp-agent-tool-name--mono">
-                                {tool.displayName}
-                              </div>
-                              <div className="smtcmp-agent-tool-source smtcmp-agent-tool-source--preview">
-                                {tool.description}
-                              </div>
-                            </div>
-                            <div className="smtcmp-agent-tool-controls">
-                              {selected && (
-                                <div className="smtcmp-agent-tool-approval">
-                                  <SimpleSelect
-                                    value={approvalMode}
-                                    options={toolApprovalOptions}
-                                    onChange={(value) =>
-                                      setToolApprovalMode(
-                                        tool.toggleTargets,
-                                        value as AssistantToolApprovalMode,
-                                      )
-                                    }
-                                    align="end"
-                                    contentClassName="smtcmp-agent-tool-approval-menu"
-                                  />
-                                </div>
+                    <div key={group.key} className="smtcmp-agent-tool-group">
+                      <div className="smtcmp-agent-tool-group-title">
+                        <span className="smtcmp-agent-tool-group-title-main">
+                          <span>{group.title}</span>
+                          {estimatedToolContextTokens.perTool.size > 0 && (
+                            <span className="smtcmp-agent-tool-group-tokens">
+                              {t(
+                                'settings.agent.editorEstimatedContextTokens',
+                                '~{count} tokens',
+                              ).replace(
+                                '{count}',
+                                formatTokenCount(
+                                  groupEnabledTokens.get(group.key) ?? 0,
+                                ),
                               )}
-                              <ObsidianToggle
-                                value={Boolean(selected)}
-                                onChange={(value) =>
-                                  toggleTool(tool.toggleTargets, value)
-                                }
-                              />
+                            </span>
+                          )}
+                        </span>
+                        <span className="smtcmp-agent-tool-group-meta">
+                          <span className="smtcmp-agent-tool-group-count">
+                            {`${groupEnabledCount} / ${group.tools.length} ${t(
+                              'settings.agent.toolsActive',
+                              'active',
+                            )}`}
+                          </span>
+                          {group.tools.length > 0 && (
+                            <button
+                              type="button"
+                              className="smtcmp-agent-tool-group-bulk-toggle"
+                              onClick={() =>
+                                toggleTool(
+                                  groupToggleTargets,
+                                  !allGroupToolsEnabled,
+                                )
+                              }
+                            >
+                              {allGroupToolsEnabled
+                                ? t(
+                                    'settings.agent.disableAllTools',
+                                    'Disable all',
+                                  )
+                                : t(
+                                    'settings.agent.enableAllTools',
+                                    'Enable all',
+                                  )}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="smtcmp-agent-tool-list">
+                        {group.tools.map((tool) => {
+                          const selected = tool.toggleTargets.every((target) =>
+                            isAssistantToolEnabled(draftAgent, target),
+                          )
+                          const approvalMode = tool.toggleTargets.every(
+                            (target) =>
+                              getAssistantToolApprovalMode(
+                                draftAgent,
+                                target,
+                              ) === 'full_access',
+                          )
+                            ? 'full_access'
+                            : 'require_approval'
+
+                          return (
+                            <div
+                              key={tool.fullName}
+                              className="smtcmp-agent-tool-row"
+                            >
+                              <div className="smtcmp-agent-tool-main">
+                                <div className="smtcmp-agent-tool-name smtcmp-agent-tool-name--mono">
+                                  {tool.displayName}
+                                </div>
+                                <div className="smtcmp-agent-tool-source smtcmp-agent-tool-source--preview">
+                                  {tool.description}
+                                </div>
+                              </div>
+                              <div className="smtcmp-agent-tool-controls">
+                                {selected && (
+                                  <div className="smtcmp-agent-tool-approval">
+                                    <SimpleSelect
+                                      value={approvalMode}
+                                      options={toolApprovalOptions}
+                                      onChange={(value) =>
+                                        setToolApprovalMode(
+                                          tool.toggleTargets,
+                                          value as AssistantToolApprovalMode,
+                                        )
+                                      }
+                                      align="end"
+                                      contentClassName="smtcmp-agent-tool-approval-menu"
+                                    />
+                                  </div>
+                                )}
+                                <ObsidianToggle
+                                  value={Boolean(selected)}
+                                  onChange={(value) =>
+                                    toggleTool(tool.toggleTargets, value)
+                                  }
+                                />
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
                   )
                 })}
 

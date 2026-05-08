@@ -58,7 +58,6 @@ export type AgentRuntimeRunInput = {
   }
   allowedSkillIds?: string[]
   allowedSkillNames?: string[]
-  maxContextOverride?: number
   contextualInjections?: ContextualInjection[]
   geminiTools?: {
     useWebSearch?: boolean

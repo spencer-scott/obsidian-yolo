@@ -15,7 +15,7 @@ export type ChatConversation = {
   schemaVersion: number
   isPinned?: boolean
   pinnedAt?: number
-  // Optional per-conversation overrides (temperature, top_p, maxContextMessages, stream)
+  // Optional per-conversation overrides (temperature, top_p, stream)
   overrides?: ConversationOverrideSettings | null
   conversationModelId?: string
   messageModelMap?: Record<string, string>

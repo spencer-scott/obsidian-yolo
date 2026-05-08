@@ -195,7 +195,6 @@ export type TranslationKeys = {
       addAssistantAria?: string
       deleteAssistantAria?: string
       dragHandleAria?: string
-      maxContextMessagesDesc?: string
       duplicate?: string
       copySuffix?: string
       currentBadge?: string

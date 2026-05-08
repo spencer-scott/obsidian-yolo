@@ -1018,46 +1018,16 @@
   height: 18px;
 }
 
-/* Improved toggle control styles */
+/* Outer container hook for the ObsidianToggle component:
+   provides a target for the right-alignment rule in .smtcmp-composer-option-control
+   (see margin-left: auto around line 949).
+   Previously had a full override that forced the opacity:0 <input> into a purple track
+   with a custom white dot, which clashed with Obsidian's native .checkbox-container::after.
+   Removed. Switch appearance now uses native Obsidian styling. */
 .smtcmp-checkbox-container {
   position: relative;
   display: inline-flex;
-  align-items: center;
   gap: var(--size-2-2);
-}
-
-.smtcmp-checkbox-container input[type='checkbox'] {
-  width: 44px;
-  height: 24px;
-  appearance: none;
-  background: var(--background-modifier-border);
-  border-radius: 12px;
-  position: relative;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 2px solid transparent;
-}
-
-.smtcmp-checkbox-container input[type='checkbox']:checked {
-  background: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-}
-
-.smtcmp-checkbox-container input[type='checkbox']::before {
-  content: '';
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  top: 1px;
-  left: 1px;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.smtcmp-checkbox-container input[type='checkbox']:checked::before {
-  transform: translateX(20px);
 }
 
 /* Priority reference directory style improvements */

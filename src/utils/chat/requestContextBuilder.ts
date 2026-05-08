@@ -227,7 +227,6 @@ function getMentionedFileProperties(
 export class RequestContextBuilder {
   private app: App
   private settings: SmartComposerSettings
-  private MAX_CONTEXT_MESSAGES = 32
   private includeSkills: boolean
 
   constructor(
@@ -252,7 +251,6 @@ export class RequestContextBuilder {
     messages,
     hasTools = false,
     hasMemoryTools = false,
-    maxContextOverride,
     model: _model,
     conversationId,
     compaction,
@@ -261,7 +259,6 @@ export class RequestContextBuilder {
     messages: ChatMessage[]
     hasTools?: boolean
     hasMemoryTools?: boolean
-    maxContextOverride?: number
     model: ChatModel
     conversationId: string
     compaction?: ChatConversationCompactionLike | null
@@ -306,13 +303,7 @@ export class RequestContextBuilder {
       settings: this.settings,
     })
 
-    const maxContext = Math.max(
-      0,
-      maxContextOverride ?? this.MAX_CONTEXT_MESSAGES,
-    )
-    const contextStartIndex = Math.max(0, compiledMessages.length - maxContext)
-
-    for (let i = contextStartIndex; i < compiledMessages.length; i += 1) {
+    for (let i = 0; i < compiledMessages.length; i += 1) {
       if (i === lastUserMessageIndex) {
         continue
       }
@@ -347,7 +338,6 @@ export class RequestContextBuilder {
       ...(systemMessage ? [systemMessage] : []),
       ...(await this.getChatHistoryMessages({
         messages: compiledMessages,
-        maxContextOverride: maxContext,
         snapshotEntries,
         compaction,
       })),
@@ -364,26 +354,14 @@ export class RequestContextBuilder {
 
   private async getChatHistoryMessages({
     messages,
-    maxContextOverride,
     snapshotEntries,
     compaction,
   }: {
     messages: ChatMessage[]
-    maxContextOverride?: number
     snapshotEntries: Record<string, string | ContentPart[]>
     compaction?: ChatConversationCompactionLike | null
   }): Promise<RequestMessage[]> {
-    // Determine max context messages with priority:
-    // 1) explicit override from conversation settings
-    // 2) class default (32)
-    const maxContext = Math.max(
-      0,
-      maxContextOverride ?? this.MAX_CONTEXT_MESSAGES,
-    )
-
-    // Get the last N messages and parse them into request messages
     const requestMessages: RequestMessage[] = []
-    const contextMessages = messages.slice(-maxContext)
     const prunedToolCallIds = collectContextPrunedToolCallIds(messages)
 
     const latestCompaction = getLatestChatConversationCompaction(compaction)
@@ -400,11 +378,7 @@ export class RequestContextBuilder {
             ? anchorIndex - 1
             : anchorIndex
           : anchorIndex + 1
-        const compactContextStartIndex = Math.max(
-          messages.length - contextMessages.length,
-          retainedStartIndex,
-        )
-        const compactContextMessages = messages.slice(compactContextStartIndex)
+        const compactContextMessages = messages.slice(retainedStartIndex)
 
         for (const message of compactContextMessages) {
           if (message.role === 'user') {
@@ -447,7 +421,7 @@ export class RequestContextBuilder {
       }
     }
 
-    for (const message of contextMessages) {
+    for (const message of messages) {
       if (message.role === 'user') {
         requestMessages.push({
           role: 'user',

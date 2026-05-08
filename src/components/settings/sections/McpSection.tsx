@@ -22,8 +22,8 @@ import {
 } from '../../../types/mcp.types'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianToggle } from '../../common/ObsidianToggle'
-import { CollapsibleToolDescription } from '../common/CollapsibleToolDescription'
 import { ConfirmModal } from '../../modals/ConfirmModal'
+import { CollapsibleToolDescription } from '../common/CollapsibleToolDescription'
 import {
   AddMcpServerModal,
   EditMcpServerModal,

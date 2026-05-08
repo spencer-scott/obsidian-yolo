@@ -298,8 +298,6 @@ export const en: TranslationKeys = {
       addAssistantAria: 'Add new assistant',
       deleteAssistantAria: 'Delete assistant',
       actions: 'Actions',
-      maxContextMessagesDesc:
-        'If set, this assistant will use this number of previous chat messages, overriding the global default.',
       noAssistants: 'No assistants available',
       noAssistant: 'Default',
       selectAssistant: 'Select assistant',

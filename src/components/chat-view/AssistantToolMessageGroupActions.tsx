@@ -185,9 +185,7 @@ function InsertButton({ messages }: { messages: AssistantToolMessageGroup }) {
           const el = (leaf.view as { containerEl?: HTMLElement }).containerEl
           return el ? el.isShown() : true
         }) ?? markdownLeaves[0]
-      return visibleLeaf?.view instanceof MarkdownView
-        ? visibleLeaf.view
-        : null
+      return visibleLeaf?.view instanceof MarkdownView ? visibleLeaf.view : null
     })()
     const markdownView =
       activeMarkdownView ?? recentMarkdownView ?? fallbackMarkdownView

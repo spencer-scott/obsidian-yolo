@@ -969,7 +969,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     ])
   })
 
-  it('keeps compaction history within the recent context window', async () => {
+  it('preserves all messages when history exceeds 32', async () => {
     const app = {
       vault: {
         adapter: {
@@ -983,112 +983,49 @@ describe('RequestContextBuilder generateRequestMessages', () => {
 
     const builder = new RequestContextBuilder(app as never, settings)
 
+    // Build 34 messages (17 user + 17 assistant alternating), first user is the one we track
+    const historyMessages: Parameters<typeof builder.generateRequestMessages>[0]['messages'] = []
+    for (let i = 0; i < 34; i++) {
+      if (i % 2 === 0) {
+        historyMessages.push({
+          role: 'user',
+          id: `user-${i}`,
+          content: null,
+          promptContent: i === 0 ? 'first user message' : `user message ${i}`,
+          mentionables: [],
+        })
+      } else {
+        historyMessages.push({
+          role: 'assistant',
+          id: `assistant-${i}`,
+          content: `assistant reply ${i}`,
+        })
+      }
+    }
+
     const requestMessages = await builder.generateRequestMessages({
-      messages: [
-        {
-          role: 'user',
-          id: 'user-before',
-          content: null,
-          promptContent: 'old question before compact',
-          mentionables: [],
-        },
-        {
-          role: 'assistant',
-          id: 'assistant-tools',
-          content: 'checking files',
-          toolCallRequests: [
-            {
-              id: 'compact-1',
-              name: 'yolo_local__context_compact',
-              arguments: emptyArgs,
-            },
-          ],
-        },
-        {
-          role: 'tool',
-          id: 'tool-compact',
-          toolCalls: [
-            {
-              request: {
-                id: 'compact-1',
-                name: 'yolo_local__context_compact',
-                arguments: emptyArgs,
-              },
-              response: {
-                status: ToolCallResponseStatus.Success,
-                data: {
-                  type: 'text',
-                  text: JSON.stringify({
-                    tool: 'context_compact',
-                    toolCallId: 'compact-1',
-                    operation: 'compact_restart',
-                  }),
-                },
-              },
-            },
-          ],
-        },
-        {
-          role: 'user',
-          id: 'user-2',
-          content: null,
-          promptContent: 'follow-up 1',
-          mentionables: [],
-        },
-        {
-          role: 'assistant',
-          id: 'assistant-2',
-          content: 'answer 1',
-        },
-        {
-          role: 'user',
-          id: 'user-3',
-          content: null,
-          promptContent: 'follow-up 2',
-          mentionables: [],
-        },
-        {
-          role: 'assistant',
-          id: 'assistant-3',
-          content: 'answer 2',
-        },
-      ],
-      hasTools: true,
+      messages: historyMessages,
+      hasTools: false,
       hasMemoryTools: false,
       model: {
         provider: 'openai',
         model: 'gpt-test',
         name: 'gpt-test',
       } as never,
-      conversationId: 'conversation-1',
-      maxContextOverride: 2,
-      compaction: {
-        anchorMessageId: 'tool-compact',
-        summary: 'Earlier history summary',
-        compactedAt: 1,
-        triggerToolCallId: 'compact-1',
-      },
+      conversationId: 'conversation-truncation-regression',
     })
 
-    expect(requestMessages[1]).toEqual({
+    const systemMessages = requestMessages.filter((m) => m.role === 'system')
+    const nonSystemMessages = requestMessages.filter((m) => m.role !== 'system')
+
+    // No truncation: total = system + all 34 history messages
+    expect(requestMessages).toHaveLength(systemMessages.length + 34)
+
+    // First non-system message must be the earliest user message
+    expect(nonSystemMessages[0]).toEqual({
       role: 'user',
-      content: expect.stringContaining('Earlier history summary'),
+      content: 'first user message',
     })
-    expect(requestMessages).toEqual([
-      expect.objectContaining({ role: 'system' }),
-      expect.objectContaining({
-        role: 'user',
-        content: expect.stringContaining('Earlier history summary'),
-      }),
-      {
-        role: 'user',
-        content: 'follow-up 2',
-      },
-      {
-        role: 'assistant',
-        content: 'answer 2',
-      },
-    ])
   })
 })
 

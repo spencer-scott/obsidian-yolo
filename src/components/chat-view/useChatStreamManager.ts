@@ -535,8 +535,6 @@ export function useChatStreamManager({
             allowedToolNames: effectiveAllowedToolNames,
             allowedSkillIds,
             allowedSkillNames,
-            maxContextOverride:
-              conversationOverrides?.maxContextMessages ?? undefined,
             contextualInjections: buildChatContextualInjections({
               includeCurrentFileContent:
                 settings.chatOptions.includeCurrentFileContent,
@@ -569,7 +567,6 @@ export function useChatStreamManager({
       app,
       assistantIdOverride,
       chatMode,
-      conversationOverrides?.maxContextMessages,
       currentConversationId,
       currentFileOverride,
       currentFileViewState,
@@ -705,8 +702,6 @@ export function useChatStreamManager({
           streamFallbackRecoveryEnabled:
             settings.continuationOptions.streamFallbackRecoveryEnabled,
         }
-        const maxContextOverride =
-          conversationOverrides?.maxContextMessages ?? undefined
         const effectiveCompactionForRequest = compactionOverride ?? compaction
         const baseInput = {
           messages: chatMessages,
@@ -723,7 +718,6 @@ export function useChatStreamManager({
           allowedSkillIds,
           allowedSkillNames,
           requestParams,
-          maxContextOverride,
           contextualInjections: buildChatContextualInjections({
             includeCurrentFileContent:
               settings.chatOptions.includeCurrentFileContent,
