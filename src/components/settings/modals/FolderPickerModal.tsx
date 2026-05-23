@@ -194,7 +194,7 @@ function FolderPickerModalComponent({
       const guides = ancestorLast.map((isLastAncestor, levelIdx) => (
         <span
           key={`guide-${node.path}-${levelIdx}`}
-          className={`smtcmp-tree-guide ${isLastAncestor ? 'is-empty' : ''}`}
+          className={`yolo-tree-guide ${isLastAncestor ? 'is-empty' : ''}`}
         />
       ))
 
@@ -211,9 +211,9 @@ function FolderPickerModalComponent({
         node.type === 'folder' ? folderIcon : <FileText size={16} />
 
       return (
-        <li key={node.path} className="smtcmp-tree-item">
+        <li key={node.path} className="yolo-tree-item">
           <div
-            className={`smtcmp-provider-header smtcmp-folder-row${isDisabled ? ' is-disabled' : ''}`}
+            className={`yolo-provider-header yolo-folder-row${isDisabled ? ' is-disabled' : ''}`}
             onClick={() => {
               if (isDisabled) return
               onPick(node.path)
@@ -231,16 +231,16 @@ function FolderPickerModalComponent({
             }}
             data-depth={depth}
           >
-            <div className="smtcmp-tree-guides">
+            <div className="yolo-tree-guides">
               {guides}
               {depth > 0 && (
                 <span
-                  className={`smtcmp-tree-guide smtcmp-tree-guide-branch${isLast ? ' is-last' : ''}`}
+                  className={`yolo-tree-guide yolo-tree-guide-branch${isLast ? ' is-last' : ''}`}
                 />
               )}
             </div>
             <div
-              className={`smtcmp-provider-expand-btn ${hasChildren ? '' : 'no-children'}`}
+              className={`yolo-provider-expand-btn ${hasChildren ? '' : 'no-children'}`}
               onClick={(e) => {
                 e.stopPropagation()
                 if (hasChildren) toggle(node.path)
@@ -253,15 +253,15 @@ function FolderPickerModalComponent({
                   <ChevronRight size={16} />
                 )
               ) : (
-                <span className="smtcmp-icon-placeholder" />
+                <span className="yolo-icon-placeholder" />
               )}
             </div>
-            <div className="smtcmp-tree-icon" aria-hidden="true">
+            <div className="yolo-tree-icon" aria-hidden="true">
               {itemIcon}
             </div>
-            <div className="smtcmp-provider-info">
+            <div className="yolo-provider-info">
               <span
-                className="smtcmp-folder-name"
+                className="yolo-folder-name"
                 title={
                   isSelected
                     ? 'Already selected'
@@ -275,7 +275,7 @@ function FolderPickerModalComponent({
             </div>
           </div>
           {hasChildren && isOpen && node.children.length > 0 && (
-            <ul className="smtcmp-list-reset smtcmp-tree-children">
+            <ul className="yolo-list-reset yolo-tree-children">
               {renderNodes(node.children, depth + 1, [...ancestorLast, isLast])}
             </ul>
           )}
@@ -285,7 +285,7 @@ function FolderPickerModalComponent({
   }
 
   return (
-    <div className="smtcmp-folder-picker">
+    <div className="yolo-folder-picker">
       <input
         type="text"
         placeholder="Search folders..."
@@ -294,17 +294,17 @@ function FolderPickerModalComponent({
         className="svelte-obsidian-text-input"
       />
 
-      <div className="smtcmp-scroll-panel">
+      <div className="yolo-scroll-panel">
         {filteredRoots.length === 0 ? (
-          <div className="smtcmp-folder-empty">No matching folders found</div>
+          <div className="yolo-folder-empty">No matching folders found</div>
         ) : (
-          <ul className="smtcmp-list-reset smtcmp-tree-root">
+          <ul className="yolo-list-reset yolo-tree-root">
             {renderNodes(filteredRoots, 0, [])}
           </ul>
         )}
       </div>
 
-      <div className="smtcmp-actions-right-gap-8">
+      <div className="yolo-actions-right-gap-8">
         <button onClick={onClose} className="mod-cancel">
           Close
         </button>

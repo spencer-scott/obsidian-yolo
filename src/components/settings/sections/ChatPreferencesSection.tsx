@@ -62,7 +62,7 @@ export function ChatPreferencesSection({
       <ObsidianSetting
         name={t('settings.chatPreferences.chatFontScale')}
         desc={t('settings.chatPreferences.chatFontScaleDesc')}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
         <FontScaleSlider
           value={settings.chatOptions.chatFontScale ?? 1}
@@ -78,7 +78,7 @@ export function ChatPreferencesSection({
       <ObsidianSetting
         name={t('settings.chatPreferences.historyArchiveEnabled')}
         desc={t('settings.chatPreferences.historyArchiveEnabledDesc')}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
         <ObsidianToggle
           value={settings.chatOptions.historyArchiveEnabled ?? true}
@@ -96,7 +96,7 @@ export function ChatPreferencesSection({
       <ObsidianSetting
         name={t('settings.chatPreferences.historyArchiveThreshold')}
         desc={t('settings.chatPreferences.historyArchiveThresholdDesc')}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
         <ObsidianTextInput
           value={historyArchiveThresholdInput}
@@ -137,17 +137,17 @@ export function ChatPreferencesSection({
   if (embedded) return settingsContent
 
   return (
-    <div className="smtcmp-settings-section">
-      <section className="smtcmp-settings-block">
-        <div className="smtcmp-settings-block-head">
-          <div className="smtcmp-settings-block-head-title-row">
-            <div className="smtcmp-settings-sub-header smtcmp-settings-block-title">
+    <div className="yolo-settings-section">
+      <section className="yolo-settings-block">
+        <div className="yolo-settings-block-head">
+          <div className="yolo-settings-block-head-title-row">
+            <div className="yolo-settings-sub-header yolo-settings-block-title">
               {t('settings.chatPreferences.title')}
             </div>
           </div>
         </div>
 
-        <div className="smtcmp-settings-block-content">{settingsContent}</div>
+        <div className="yolo-settings-block-content">{settingsContent}</div>
       </section>
     </div>
   )

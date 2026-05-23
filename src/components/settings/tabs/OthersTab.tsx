@@ -1,10 +1,9 @@
-import { App } from 'obsidian'
-import React from 'react'
+import { App, Platform } from 'obsidian'
 
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
 import { selectionHighlightController } from '../../../features/editor/selection-highlight/selectionHighlightController'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianDropdown } from '../../common/ObsidianDropdown'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
@@ -14,7 +13,7 @@ import { EtcSection } from '../sections/EtcSection'
 
 type OthersTabProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export function OthersTab({ app, plugin }: OthersTabProps) {
@@ -72,6 +71,32 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
     })()
   }
 
+  const handleRibbonClickActionChange = (value: string) => {
+    if (
+      value !== 'sidebar' &&
+      value !== 'tab' &&
+      value !== 'split' &&
+      value !== 'window' &&
+      value !== 'last'
+    ) {
+      return
+    }
+    if (value === 'window' && !Platform.isDesktop) return
+    void (async () => {
+      try {
+        await setSettings({
+          ...settings,
+          chatOptions: {
+            ...settings.chatOptions,
+            ribbonClickAction: value,
+          },
+        })
+      } catch (error: unknown) {
+        console.error('Failed to update ribbon click action', error)
+      }
+    })()
+  }
+
   const handlePersistSelectionHighlightChange = (value: boolean) => {
     void (async () => {
       try {
@@ -91,36 +116,17 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
     })()
   }
 
-  const handleTabTitleFollowsConversationChange = (value: boolean) => {
-    void (async () => {
-      try {
-        await setSettings({
-          ...settings,
-          chatOptions: {
-            ...settings.chatOptions,
-            tabTitleFollowsConversation: value,
-          },
-        })
-      } catch (error: unknown) {
-        console.error(
-          'Failed to update chat tab title follow conversation setting',
-          error,
-        )
-      }
-    })()
-  }
-
   return (
     <>
-      <div className="smtcmp-settings-section">
+      <div className="yolo-settings-section">
         <ObsidianSetting
-          name={t('settings.supportSmartComposer.name')}
-          desc={t('settings.supportSmartComposer.desc')}
+          name={t('settings.supportYolo.name')}
+          desc={t('settings.supportYolo.desc')}
           heading
-          className="smtcmp-settings-support-smart-composer"
+          className="yolo-settings-support-yolo"
         >
           <ObsidianButton
-            text={t('settings.supportSmartComposer.buyMeACoffee')}
+            text={t('settings.supportYolo.buyMeACoffee')}
             onClick={() =>
               window.open('https://afdian.com/a/lapis0x0', '_blank')
             }
@@ -129,25 +135,45 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
         </ObsidianSetting>
       </div>
 
-      <div className="smtcmp-settings-section smtcmp-settings-section--tight">
-        <section className="smtcmp-settings-block">
-          <div className="smtcmp-settings-block-head">
-            <div className="smtcmp-settings-block-head-title-row">
-              <div className="smtcmp-settings-sub-header smtcmp-settings-block-title">
+      <div className="yolo-settings-section yolo-settings-section--tight">
+        <section className="yolo-settings-block">
+          <div className="yolo-settings-block-head">
+            <div className="yolo-settings-block-head-title-row">
+              <div className="yolo-settings-sub-header yolo-settings-block-title">
                 {t('settings.etc.interactionSectionTitle', 'Interaction')}
               </div>
             </div>
           </div>
 
-          <div className="smtcmp-settings-block-content">
+          <div className="yolo-settings-block-content">
             <ObsidianSetting
-              name={t('settings.etc.tabTitleFollowsConversation')}
-              desc={t('settings.etc.tabTitleFollowsConversationDesc')}
-              className="smtcmp-settings-card"
+              name={t('settings.etc.ribbonClickAction', 'Ribbon icon click location')}
+              desc={t(
+                'settings.etc.ribbonClickActionDesc',
+                'Choose where the Chat view opens when clicking the YOLO icon in the left ribbon. If a Chat view already exists at the selected location, it will be activated and reused; otherwise a new one is created.',
+              )}
+              className="yolo-settings-card"
             >
-              <ObsidianToggle
-                value={settings.chatOptions.tabTitleFollowsConversation ?? true}
-                onChange={handleTabTitleFollowsConversationChange}
+              <ObsidianDropdown
+                value={settings.chatOptions.ribbonClickAction ?? 'sidebar'}
+                options={{
+                  sidebar: t(
+                    'settings.etc.ribbonClickActionSidebar',
+                    'Right sidebar',
+                  ),
+                  tab: t('settings.etc.ribbonClickActionTab', 'New tab'),
+                  split: t('settings.etc.ribbonClickActionSplit', 'Right split'),
+                  ...(Platform.isDesktop
+                    ? {
+                        window: t(
+                          'settings.etc.ribbonClickActionWindow',
+                          'Standalone window',
+                        ),
+                      }
+                    : {}),
+                  last: t('settings.etc.ribbonClickActionLast', 'Last used location'),
+                }}
+                onChange={handleRibbonClickActionChange}
               />
             </ObsidianSetting>
             <ObsidianSetting
@@ -156,7 +182,7 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 'settings.etc.mentionDisplayModeDesc',
                 'Choose whether @ file mentions and / skill selections are displayed inline in the input box or as badges at the top of the input box.',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianDropdown
                 value={settings.chatOptions.mentionDisplayMode ?? 'inline'}
@@ -179,7 +205,7 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 'settings.etc.mentionContextModeDesc',
                 'Controls how @ file content is injected into the model. In light mode, only the file path, note properties, and Markdown structure are injected, encouraging the Agent to read only what is necessary.',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianDropdown
                 value={settings.chatOptions.mentionContextMode ?? 'light'}
@@ -196,7 +222,7 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 'settings.etc.chatApplyModeDesc',
                 'Only affects “Apply” in the Chat sidebar. Choose to enter inline review first, or write directly to the file. When review is disabled, clicking Apply will no longer require a second approval.',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianDropdown
                 value={settings.chatOptions.chatApplyMode ?? 'review-required'}
@@ -222,7 +248,7 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                 'settings.etc.persistSelectionHighlightDesc',
                 'Persistently display block-level highlighting of selected content in the editor during sidebar Chat or Quick Ask interactions.',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianToggle
                 value={
@@ -240,7 +266,7 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
       <EtcSection
         app={app}
         plugin={plugin}
-        className="smtcmp-settings-section--tight"
+        className="yolo-settings-section--tight"
       />
     </>
   )

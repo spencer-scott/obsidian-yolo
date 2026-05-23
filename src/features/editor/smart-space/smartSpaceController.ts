@@ -5,8 +5,8 @@ import type { SerializedEditorState } from 'lexical'
 import type { Editor, MarkdownView } from 'obsidian'
 
 import { SmartSpaceWidget } from '../../../components/panels/SmartSpacePanel'
-import type SmartComposerPlugin from '../../../main'
-import type { SmartComposerSettings } from '../../../settings/schema/setting.types'
+import type YoloPlugin from '../../../main'
+import type { YoloSettings } from '../../../settings/schema/setting.types'
 import type { SerializedMentionable } from '../../../types/mentionable'
 
 export type SmartSpaceDraftState = {
@@ -18,7 +18,7 @@ export type SmartSpaceDraftState = {
 type SmartSpaceWidgetPayload = {
   pos: number
   options: {
-    plugin: SmartComposerPlugin
+    plugin: YoloPlugin
     editor: Editor
     view: EditorView
     onClose: () => void
@@ -39,8 +39,8 @@ type SmartSpaceLastTrigger = {
 } | null
 
 type SmartSpaceControllerDeps = {
-  plugin: SmartComposerPlugin
-  getSettings: () => SmartComposerSettings
+  plugin: YoloPlugin
+  getSettings: () => YoloSettings
   getActiveMarkdownView: () => MarkdownView | null
   getEditorView: (editor: Editor) => EditorView | null
   clearPendingSelectionRewrite: () => void

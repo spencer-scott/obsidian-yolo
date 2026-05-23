@@ -3,7 +3,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import React, { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
-import { getNodeBody, getNodeWindow } from '../../utils/dom/window-context'
+import { getNodeWindow } from '../../utils/dom/window-context'
 
 import { YoloDropdownContent, YoloPopoverVariant } from './popover'
 
@@ -156,8 +156,8 @@ const RollerSelect: React.FC<RollerSelectProps> = ({
         ref={triggerRef}
         className={
           triggerClassName
-            ? `smtcmp-roller-select-trigger ${triggerClassName}${isOpen ? ' is-open' : ''}`
-            : `smtcmp-roller-select-trigger${isOpen ? ' is-open' : ''}`
+            ? `yolo-roller-select-trigger ${triggerClassName}${isOpen ? ' is-open' : ''}`
+            : `yolo-roller-select-trigger${isOpen ? ' is-open' : ''}`
         }
         aria-label={ariaLabel}
         onClick={() => {
@@ -167,41 +167,41 @@ const RollerSelect: React.FC<RollerSelectProps> = ({
         onMouseLeave={onTriggerMouseLeave}
         disabled={disabled}
       >
-        <div className="smtcmp-roller-select-window" aria-hidden="true">
+        <div className="yolo-roller-select-window" aria-hidden="true">
           <div
-            className={`smtcmp-roller-select-track ${isRolling ? 'is-rolling' : ''}`}
+            className={`yolo-roller-select-track ${isRolling ? 'is-rolling' : ''}`}
           >
-            <div className="smtcmp-roller-select-item">
+            <div className="yolo-roller-select-item">
               {visibleOption?.icon ? (
-                <span className="smtcmp-view-toggle-button-icon">
+                <span className="yolo-view-toggle-button-icon">
                   {visibleOption.icon}
                 </span>
               ) : null}
-              <span className="smtcmp-view-toggle-button-label smtcmp-roller-select-item-label">
+              <span className="yolo-view-toggle-button-label yolo-roller-select-item-label">
                 {visibleOption?.label}
               </span>
             </div>
             {incomingOption ? (
-              <div className="smtcmp-roller-select-item">
+              <div className="yolo-roller-select-item">
                 {incomingOption.icon ? (
-                  <span className="smtcmp-view-toggle-button-icon">
+                  <span className="yolo-view-toggle-button-icon">
                     {incomingOption.icon}
                   </span>
                 ) : null}
-                <span className="smtcmp-view-toggle-button-label smtcmp-roller-select-item-label">
+                <span className="yolo-view-toggle-button-label yolo-roller-select-item-label">
                   {incomingOption.label}
                 </span>
               </div>
             ) : null}
           </div>
         </div>
-        <span className="smtcmp-roller-select-caret" aria-hidden="true">
+        <span className="yolo-roller-select-caret" aria-hidden="true">
           <ChevronDown size={14} strokeWidth={2.4} />
         </span>
       </DropdownMenu.Trigger>
 
       <YoloDropdownContent
-        container={getNodeBody(triggerRef.current)}
+        anchorRef={triggerRef}
         variant={popover?.variant ?? 'default'}
         minWidth={popover?.minWidth}
         maxWidth={popover?.maxWidth}
@@ -219,7 +219,7 @@ const RollerSelect: React.FC<RollerSelectProps> = ({
         onMouseLeave={onContentMouseLeave}
       >
         <DropdownMenu.RadioGroup
-          className="smtcmp-roller-select-list"
+          className="yolo-roller-select-list"
           value={value}
           onValueChange={(nextValue) => {
             if (!options.some((option) => option.value === nextValue)) {
@@ -232,25 +232,25 @@ const RollerSelect: React.FC<RollerSelectProps> = ({
             <DropdownMenu.RadioItem
               key={option.value}
               value={option.value}
-              className="smtcmp-roller-select-list-item"
+              className="yolo-roller-select-list-item"
             >
               {option.icon ? (
-                <span className="smtcmp-roller-select-list-item-icon">
+                <span className="yolo-roller-select-list-item-icon">
                   {option.icon}
                 </span>
               ) : null}
-              <span className="smtcmp-roller-select-list-item-content">
-                <span className="smtcmp-roller-select-list-item-label">
+              <span className="yolo-roller-select-list-item-content">
+                <span className="yolo-roller-select-list-item-label">
                   {option.label}
                 </span>
                 {option.description ? (
-                  <span className="smtcmp-roller-select-list-item-desc">
+                  <span className="yolo-roller-select-list-item-desc">
                     {option.description}
                   </span>
                 ) : null}
               </span>
               <span
-                className="smtcmp-roller-select-list-item-check"
+                className="yolo-roller-select-list-item-check"
                 aria-hidden="true"
               >
                 {value === option.value ? <Check size={12} /> : null}

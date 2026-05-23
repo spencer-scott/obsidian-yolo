@@ -60,7 +60,7 @@ function UserActionButton({
       disabled={disabled}
     >
       {children}
-      <span id={labelId} className="smtcmp-sr-only">
+      <span id={labelId} className="yolo-sr-only">
         {label}
       </span>
     </button>
@@ -187,10 +187,7 @@ function UserMessageItem({
   )
 
   return (
-    <div
-      className="smtcmp-chat-messages-user"
-      data-user-message-id={message.id}
-    >
+    <div className="yolo-chat-messages-user" data-user-message-id={message.id}>
       {isFocused ? (
         <EditableUserMessageItem
           message={message}

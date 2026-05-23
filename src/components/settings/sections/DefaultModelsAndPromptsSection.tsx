@@ -134,24 +134,22 @@ export function DefaultModelsAndPromptsSection({
 
   return (
     <div
-      className={['smtcmp-settings-section', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={['yolo-settings-section', className].filter(Boolean).join(' ')}
     >
-      <section className="smtcmp-models-block smtcmp-default-models-block">
-        <div className="smtcmp-models-block-head">
-          <div className="smtcmp-models-block-head-title-row">
-            <div className="smtcmp-settings-sub-header smtcmp-models-block-title">
+      <section className="yolo-models-block yolo-default-models-block">
+        <div className="yolo-models-block-head">
+          <div className="yolo-models-block-head-title-row">
+            <div className="yolo-settings-sub-header yolo-models-block-title">
               {t('settings.defaults.title')}
             </div>
           </div>
         </div>
 
-        <div className="smtcmp-models-block-content">
+        <div className="yolo-models-block-content">
           <ObsidianSetting
             name={t('settings.defaults.defaultChatModel')}
             desc={t('settings.defaults.defaultChatModelDesc')}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianDropdown
               value={settings.chatModelId}
@@ -165,7 +163,7 @@ export function DefaultModelsAndPromptsSection({
           <ObsidianSetting
             name={t('settings.defaults.chatTitleModel')}
             desc={t('settings.defaults.chatTitleModelDesc')}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianDropdown
               value={settings.chatTitleModelId}
@@ -182,7 +180,7 @@ export function DefaultModelsAndPromptsSection({
           <ObsidianSetting
             name={t('settings.defaults.streamFallbackRecovery')}
             desc={t('settings.defaults.streamFallbackRecoveryDesc')}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianToggle
               value={streamFallbackRecoveryEnabled}
@@ -203,7 +201,7 @@ export function DefaultModelsAndPromptsSection({
           <ObsidianSetting
             name={t('settings.defaults.primaryRequestTimeout')}
             desc={t('settings.defaults.primaryRequestTimeoutDesc')}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianTextInput
               type="number"
@@ -247,14 +245,14 @@ export function DefaultModelsAndPromptsSection({
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-models-textarea-card">
+          <div className="yolo-models-textarea-card">
             <ObsidianSetting
               name={t('settings.defaults.globalSystemPrompt')}
               desc={t('settings.defaults.globalSystemPromptDesc')}
-              className="smtcmp-settings-textarea-header smtcmp-models-textarea-card-header smtcmp-settings-desc-copyable"
+              className="yolo-settings-textarea-header yolo-models-textarea-card-header yolo-settings-desc-copyable"
             />
 
-            <ObsidianSetting className="smtcmp-settings-textarea smtcmp-models-textarea-card-body">
+            <ObsidianSetting className="yolo-settings-textarea yolo-models-textarea-card-body">
               <ObsidianTextArea
                 value={settings.systemPrompt}
                 onChange={(value: string) => {
@@ -264,14 +262,14 @@ export function DefaultModelsAndPromptsSection({
             </ObsidianSetting>
           </div>
 
-          <div className="smtcmp-models-textarea-card">
+          <div className="yolo-models-textarea-card">
             <ObsidianSetting
               name={t('settings.defaults.chatTitlePrompt')}
               desc={t('settings.defaults.chatTitlePromptDesc')}
-              className="smtcmp-settings-textarea-header smtcmp-models-textarea-card-header"
+              className="yolo-settings-textarea-header yolo-models-textarea-card-header"
             />
 
-            <ObsidianSetting className="smtcmp-settings-textarea smtcmp-models-textarea-card-body">
+            <ObsidianSetting className="yolo-settings-textarea yolo-models-textarea-card-body">
               <ObsidianTextArea
                 value={chatTitlePromptValue}
                 onChange={(value: string) => {

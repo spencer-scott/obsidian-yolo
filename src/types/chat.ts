@@ -26,6 +26,23 @@ export type ChatConversationCompaction = {
   estimatedNextContextTokens?: number
   compactedMessageCount?: number
   estimatedTokensSaved?: number
+  loadedDeferredToolNames?: string[]
+  /**
+   * Full schemas for on-demand tools that have already been disclosed via
+   * `load_tool_schemas` before compaction. Persisted so that — after compaction
+   * discards the original `load_tool_schemas` results — the request builder can
+   * re-inject them at the head of the message stream and the model can keep
+   * calling those tools without re-running `load_tool_schemas`.
+   *
+   * Schemas exceeding the size protector are intentionally dropped: in that
+   * case the tool reverts to the standard on-demand path (model must call
+   * `load_tool_schemas` again). The injected prompt tells the model this.
+   */
+  loadedDeferredToolSchemas?: Array<{
+    name: string
+    description: string
+    parameters: unknown
+  }>
 }
 
 export type ChatConversationCompactionState = ChatConversationCompaction[]
@@ -75,6 +92,7 @@ export type ChatAssistantMessage = {
     durationMs?: number
     generationState?: 'streaming' | 'completed' | 'aborted' | 'error'
     errorMessage?: string
+    llmDebugTraceId?: string
     providerMetadata?: ProviderMetadata
     sourceUserMessageId?: string
     branchId?: string
@@ -172,6 +190,7 @@ export type SerializedChatAssistantMessage = {
     durationMs?: number
     generationState?: 'streaming' | 'completed' | 'aborted' | 'error'
     errorMessage?: string
+    llmDebugTraceId?: string
     providerMetadata?: ProviderMetadata
     sourceUserMessageId?: string
     branchId?: string

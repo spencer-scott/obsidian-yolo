@@ -52,6 +52,29 @@ export const buildPdfTextCacheKey = (
   size: number,
 ): string => fnv1aHash(`${vaultPath}:${mtime}:${size}`)
 
+/**
+ * Key derived from PDF byte content (base64). Used for chat-uploaded PDFs that
+ * have no vault path / mtime — same content uploaded twice (or under different
+ * filenames) shares one cache entry. Prefixed with `c:` to avoid any future
+ * collision with the vault-path key space.
+ *
+ * Uses SHA-256 instead of fnv1a-32: the path-key keyspace is disambiguated by
+ * the path prefix itself, but a content-only key relies entirely on the hash.
+ * 32 bits gives a non-trivial birthday-collision probability once a user has
+ * a few thousand PDFs in their cache, and a collision would silently serve the
+ * wrong text. SHA-256 makes collisions a non-concern.
+ */
+export const buildPdfTextCacheKeyFromContent = async (
+  base64: string,
+): Promise<string> => {
+  const bytes = new TextEncoder().encode(base64)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+  return `c:${hex}`
+}
+
 const getCacheDirPath = async (
   app: App,
   settings?: YoloSettingsLike | null,

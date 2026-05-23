@@ -46,9 +46,9 @@ function ErrorModalComponent({
   options,
 }: ErrorModalComponentProps & { onClose: () => void }) {
   return (
-    <div className="smtcmp-error-modal-content">
-      <div className="smtcmp-error-modal-message">{message}</div>
-      {log && <pre className="smtcmp-error-modal-log">{log}</pre>}
+    <div className="yolo-error-modal-content">
+      <div className="yolo-error-modal-message">{message}</div>
+      {log && <pre className="yolo-error-modal-log">{log}</pre>}
       <div className="modal-button-container">
         {options.showReportBugButton && (
           <button
@@ -56,7 +56,7 @@ function ErrorModalComponent({
             onClick={() => {
               onClose()
               window.open(
-                'https://github.com/glowingjade/obsidian-smart-composer/issues',
+                'https://github.com/Lapis0x0/obsidian-yolo/issues',
                 '_blank',
               )
             }}

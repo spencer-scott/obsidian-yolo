@@ -276,9 +276,9 @@ export function SmartSpaceQuickActionsSettings({
 
   if (variant === 'composer') {
     return (
-      <div className="smtcmp-smart-space-settings">
-        <div className="smtcmp-smart-space-settings-row">
-          <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
+      <div className="yolo-smart-space-settings">
+        <div className="yolo-smart-space-settings-row">
+          <div className="yolo-settings-desc">{actionsCountLabel}</div>
           <ObsidianButton
             text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
             onClick={handleOpenModal}
@@ -289,7 +289,7 @@ export function SmartSpaceQuickActionsSettings({
   }
 
   return (
-    <div className="smtcmp-smart-space-settings">
+    <div className="yolo-smart-space-settings">
       <ObsidianSetting
         name={t(
           'settings.smartSpace.quickActionsTitle',
@@ -299,9 +299,9 @@ export function SmartSpaceQuickActionsSettings({
           'settings.smartSpace.quickActionsDesc',
           'Customize quick actions and prompts shown in Smart Space',
         )}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
-        <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
+        <div className="yolo-settings-desc">{actionsCountLabel}</div>
         <ObsidianButton
           text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
           onClick={handleOpenModal}
@@ -476,9 +476,9 @@ export function SmartSpaceQuickActionsSettingsContent() {
         `div[data-action-id="${movedId}"]`,
       )
       if (movedItem) {
-        movedItem.classList.add('smtcmp-quick-action-drop-success')
+        movedItem.classList.add('yolo-quick-action-drop-success')
         window.setTimeout(() => {
-          movedItem.classList.remove('smtcmp-quick-action-drop-success')
+          movedItem.classList.remove('yolo-quick-action-drop-success')
         }, 700)
       } else if (attempt < 8) {
         window.setTimeout(() => tryFind(attempt + 1), 50)
@@ -552,7 +552,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
   }
 
   return (
-    <div className="smtcmp-smart-space-settings">
+    <div className="yolo-smart-space-settings">
       <ObsidianSetting
         name={t(
           'settings.smartSpace.quickActionsTitle',
@@ -575,7 +575,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
 
       {/* Add new action form (shown at top when adding) */}
       {isAddingAction && editingAction && (
-        <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-new">
+        <div className="yolo-quick-action-editor yolo-quick-action-editor-new">
           <ObsidianSetting
             name={t('settings.smartSpace.actionLabel', 'Action name')}
             desc={t(
@@ -601,9 +601,9 @@ export function SmartSpaceQuickActionsSettingsContent() {
               'settings.smartSpace.actionInstructionDesc',
               'Instruction sent to the AI',
             )}
-            className="smtcmp-settings-textarea-header"
+            className="yolo-settings-textarea-header"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={editingAction.instruction}
               placeholder={t(
@@ -645,7 +645,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-quick-action-editor-buttons">
+          <div className="yolo-quick-action-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}
@@ -673,10 +673,10 @@ export function SmartSpaceQuickActionsSettingsContent() {
           items={quickActionIds}
           strategy={verticalListSortingStrategy}
         >
-          <div className="smtcmp-quick-actions-list">
+          <div className="yolo-quick-actions-list">
             {groupedActions.map((group, groupIndex) => (
               <React.Fragment key={group.category}>
-                <div className="smtcmp-quick-actions-group-header">
+                <div className="yolo-quick-actions-group-header">
                   {categoryOptions[group.category || 'custom']}
                 </div>
 
@@ -707,7 +707,7 @@ export function SmartSpaceQuickActionsSettingsContent() {
                 })}
 
                 {groupIndex < groupedActions.length - 1 && (
-                  <div className="smtcmp-quick-actions-group-divider" />
+                  <div className="yolo-quick-actions-group-divider" />
                 )}
               </React.Fragment>
             ))}
@@ -769,25 +769,25 @@ function QuickActionItem({
         ref={setNodeRef}
         style={style}
         data-action-id={action.id}
-        className={`smtcmp-quick-action-item ${isEditing ? 'editing' : ''} ${isDragging ? 'smtcmp-quick-action-dragging' : ''}`}
+        className={`yolo-quick-action-item ${isEditing ? 'editing' : ''} ${isDragging ? 'yolo-quick-action-dragging' : ''}`}
         {...attributes}
       >
-        <div className="smtcmp-quick-action-drag-handle">
+        <div className="yolo-quick-action-drag-handle">
           <span
-            className={`smtcmp-drag-handle ${isDragging ? 'smtcmp-drag-handle--active' : ''}`}
+            className={`yolo-drag-handle ${isDragging ? 'yolo-drag-handle--active' : ''}`}
             aria-label={t('settings.smartSpace.dragHandleAria', 'Drag to reorder')}
             {...listeners}
           >
             <GripVertical size={16} />
           </span>
         </div>
-        <div className="smtcmp-quick-action-content">
-          <div className="smtcmp-quick-action-header">
-            <IconComponent size={16} className="smtcmp-quick-action-icon" />
-            <span className="smtcmp-quick-action-label">{action.label}</span>
+        <div className="yolo-quick-action-content">
+          <div className="yolo-quick-action-header">
+            <IconComponent size={16} className="yolo-quick-action-icon" />
+            <span className="yolo-quick-action-label">{action.label}</span>
           </div>
         </div>
-        <div className="smtcmp-quick-action-controls">
+        <div className="yolo-quick-action-controls">
           <ObsidianButton
             onClick={() => {
               if (isEditing) {
@@ -816,7 +816,7 @@ function QuickActionItem({
       </div>
 
       {isEditing && currentEditing && (
-        <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-inline">
+        <div className="yolo-quick-action-editor yolo-quick-action-editor-inline">
           <ObsidianSetting
             name={t('settings.smartSpace.actionLabel', 'Action name')}
             desc={t(
@@ -845,9 +845,9 @@ function QuickActionItem({
               'settings.smartSpace.actionInstructionDesc',
               'Instruction sent to the AI',
             )}
-            className="smtcmp-settings-textarea-header"
+            className="yolo-settings-textarea-header"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={currentEditing.instruction}
               placeholder={t(
@@ -895,7 +895,7 @@ function QuickActionItem({
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-quick-action-editor-buttons">
+          <div className="yolo-quick-action-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}

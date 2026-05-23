@@ -124,7 +124,7 @@ export class DatabaseManager {
       console.warn('[YOLO] Failed to clean up legacy staging rows', error)
     }
 
-    console.debug('Smart composer database initialized.', dbManager)
+    console.debug('YOLO database initialized.', dbManager)
 
     return dbManager
   }

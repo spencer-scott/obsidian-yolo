@@ -107,9 +107,7 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
     const updateWidth = () => {
       const nextToggleWidth = Math.round(element.getBoundingClientRect().width)
       const totalWidth = Number.parseFloat(
-        window
-          .getComputedStyle(element)
-          .getPropertyValue('--smtcmp-total-width'),
+        window.getComputedStyle(element).getPropertyValue('--yolo-total-width'),
       )
 
       setToggleWidth(nextToggleWidth)
@@ -158,7 +156,7 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
   return (
     <div
       ref={toggleRef}
-      className={`smtcmp-view-toggle${showComposer ? '' : ' smtcmp-view-toggle--single'}`}
+      className={`yolo-view-toggle${showComposer ? '' : ' yolo-view-toggle--single'}`}
       data-expanded-view={expandedView}
       data-active-expanded={isActiveExpanded ? 'true' : 'false'}
     >
@@ -197,10 +195,10 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
           setIsModeMenuOpen(false)
         }}
         disabled={disabled}
-        triggerClassName={`smtcmp-view-toggle-button smtcmp-view-toggle-button--roller ${
-          activeView === 'chat' ? 'smtcmp-view-toggle-button--active' : ''
+        triggerClassName={`yolo-view-toggle-button yolo-view-toggle-button--roller ${
+          activeView === 'chat' ? 'yolo-view-toggle-button--active' : ''
         } ${
-          expandedView === 'chat' ? 'smtcmp-view-toggle-button--expanded' : ''
+          expandedView === 'chat' ? 'yolo-view-toggle-button--expanded' : ''
         }`}
         contentStyle={
           (showComposer ? toggleWidth : popoverWidth)
@@ -240,11 +238,11 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
       {showComposer ? (
         <button
           type="button"
-          className={`smtcmp-view-toggle-button ${
-            activeView === 'composer' ? 'smtcmp-view-toggle-button--active' : ''
+          className={`yolo-view-toggle-button ${
+            activeView === 'composer' ? 'yolo-view-toggle-button--active' : ''
           } ${
             expandedView === 'composer'
-              ? 'smtcmp-view-toggle-button--expanded'
+              ? 'yolo-view-toggle-button--expanded'
               : ''
           }`}
           onClick={() => onChangeView('composer')}
@@ -253,16 +251,14 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
           disabled={disabled}
           aria-pressed={activeView === 'composer'}
         >
-          <span className="smtcmp-view-toggle-button-icon" aria-hidden="true">
+          <span className="yolo-view-toggle-button-icon" aria-hidden="true">
             <PenLine size={16} strokeWidth={2} />
           </span>
-          <span className="smtcmp-view-toggle-button-label">
-            {composerLabel}
-          </span>
+          <span className="yolo-view-toggle-button-label">{composerLabel}</span>
         </button>
       ) : null}
       <div
-        className={`smtcmp-view-toggle-indicator${showComposer ? '' : ' smtcmp-view-toggle-indicator--single'}`}
+        className={`yolo-view-toggle-indicator${showComposer ? '' : ' yolo-view-toggle-indicator--single'}`}
         data-active-view={activeView}
       />
     </div>

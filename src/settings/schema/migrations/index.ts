@@ -45,13 +45,23 @@ import { migrateFrom47To48 } from './47_to_48'
 import { migrateFrom48To49 } from './48_to_49'
 import { migrateFrom49To50 } from './49_to_50'
 import { migrateFrom4To5 } from './4_to_5'
+import { migrateFrom50To51 } from './50_to_51'
+import { migrateFrom51To52 } from './51_to_52'
+import { migrateFrom52To53 } from './52_to_53'
+import { migrateFrom53To54 } from './53_to_54'
+import { migrateFrom54To55 } from './54_to_55'
+import { migrateFrom55To56 } from './55_to_56'
+import { migrateFrom56To57 } from './56_to_57'
+import { migrateFrom57To58 } from './57_to_58'
+import { migrateFrom58To59 } from './58_to_59'
+import { migrateFrom59To60 } from './59_to_60'
 import { migrateFrom5To6 } from './5_to_6'
 import { migrateFrom6To7 } from './6_to_7'
 import { migrateFrom7To8 } from './7_to_8'
 import { migrateFrom8To9 } from './8_to_9'
 import { migrateFrom9To10 } from './9_to_10'
 
-export const SETTINGS_SCHEMA_VERSION = 50
+export const SETTINGS_SCHEMA_VERSION = 60
 
 export const SETTING_MIGRATIONS: SettingMigration[] = [
   {
@@ -303,5 +313,55 @@ export const SETTING_MIGRATIONS: SettingMigration[] = [
     fromVersion: 49,
     toVersion: 50,
     migrate: migrateFrom49To50,
+  },
+  {
+    fromVersion: 50,
+    toVersion: 51,
+    migrate: migrateFrom50To51,
+  },
+  {
+    fromVersion: 51,
+    toVersion: 52,
+    migrate: migrateFrom51To52,
+  },
+  {
+    fromVersion: 52,
+    toVersion: 53,
+    migrate: migrateFrom52To53,
+  },
+  {
+    fromVersion: 53,
+    toVersion: 54,
+    migrate: migrateFrom53To54,
+  },
+  {
+    fromVersion: 54,
+    toVersion: 55,
+    migrate: migrateFrom54To55,
+  },
+  {
+    fromVersion: 55,
+    toVersion: 56,
+    migrate: migrateFrom55To56,
+  },
+  {
+    fromVersion: 56,
+    toVersion: 57,
+    migrate: migrateFrom56To57,
+  },
+  {
+    fromVersion: 57,
+    toVersion: 58,
+    migrate: migrateFrom57To58,
+  },
+  {
+    fromVersion: 58,
+    toVersion: 59,
+    migrate: migrateFrom58To59,
+  },
+  {
+    fromVersion: 59,
+    toVersion: 60,
+    migrate: migrateFrom59To60,
   },
 ]

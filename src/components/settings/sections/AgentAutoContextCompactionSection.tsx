@@ -80,7 +80,7 @@ export function AgentAutoContextCompactionSection() {
       <ObsidianSetting
         name={t('settings.agent.autoContextCompaction')}
         desc={t('settings.agent.autoContextCompactionDesc')}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
         <ObsidianToggle
           value={isAutoCompactionEnabled}
@@ -99,7 +99,7 @@ export function AgentAutoContextCompactionSection() {
         <>
           <ObsidianSetting
             name={t('settings.agent.autoContextCompactionThresholdMode')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianDropdown
               value={
@@ -129,7 +129,7 @@ export function AgentAutoContextCompactionSection() {
               desc={t(
                 'settings.agent.autoContextCompactionThresholdTokensDesc',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianTextInput
                 value={
@@ -187,7 +187,7 @@ export function AgentAutoContextCompactionSection() {
               desc={t(
                 'settings.agent.autoContextCompactionThresholdRatioPercentDesc',
               )}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianTextInput
                 value={autoCompactionRatioPercentInput}

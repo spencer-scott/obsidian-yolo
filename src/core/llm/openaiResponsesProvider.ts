@@ -20,8 +20,7 @@ import {
   REASONING_META,
   resolveRequestReasoningLevel,
 } from '../../types/reasoning'
-import { getHostedToolsForModel } from '../../utils/llm/model-tools'
-import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
+import { getBuiltinProviderTools } from '../../utils/llm/model-tools'
 import { resolveProviderBaseUrl } from '../../utils/llm/provider-base-url'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 
@@ -41,7 +40,7 @@ import {
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
+import { createTransportClients } from './transportClients'
 
 export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
   private readonly adapter = new ChatGPTOAuthResponsesAdapter()
@@ -81,11 +80,8 @@ export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
     if (level === undefined || level === 'auto' || request.reasoning_effort) {
       return request
     }
-    const reasoning_effort =
-      level === 'off'
-        ? 'low'
-        : (REASONING_META[level]
-            .effort as LLMRequestNonStreaming['reasoning_effort'])
+    const reasoning_effort = REASONING_META[level]
+      .effort as LLMRequestNonStreaming['reasoning_effort']
     return {
       ...request,
       reasoning_effort,
@@ -123,23 +119,31 @@ export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
       }),
       timeout: options?.requestPolicy?.timeoutMs,
     }
-    this.browserClient = new OpenAI(clientOptions)
-    this.obsidianClient = new OpenAI({
-      ...clientOptions,
-      fetch: createObsidianFetch(),
-    })
-    this.nodeClient = new OpenAI({
-      ...clientOptions,
-      fetch: createDesktopNodeFetch(),
-    })
+    const clients = createTransportClients(
+      (transportFetch) =>
+        new OpenAI({
+          ...clientOptions,
+          fetch: transportFetch,
+        }),
+    )
+    this.browserClient = clients.browserClient
+    this.obsidianClient = clients.obsidianClient
+    this.nodeClient = clients.nodeClient
   }
 
-  private mergeHostedTools(
+  private mergeBuiltinProviderTools(
     model: ChatModel,
     body: ResponseCreateParamsStreaming,
   ): ResponseCreateParamsStreaming {
-    const hostedTools = getHostedToolsForModel(model)
-    if (hostedTools.length === 0) {
+    // Only the OpenAI hosted `web_search` family is forwarded on the Responses
+    // transport (mapped to `web_search_preview`). Other families
+    // (`openrouter:web_search`, `grok:live_search`, `gemini:web_search`) are
+    // dropped — they target different endpoints and rewriting them here would
+    // change user intent.
+    const webSearchCount = getBuiltinProviderTools(model).filter(
+      (t) => t.type === 'web_search',
+    ).length
+    if (webSearchCount === 0) {
       return body
     }
 
@@ -147,7 +151,9 @@ export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
       ...body,
       tools: [
         ...(body.tools ?? []),
-        ...hostedTools.map(() => ({ type: 'web_search_preview' as const })),
+        ...Array.from({ length: webSearchCount }, () => ({
+          type: 'web_search_preview' as const,
+        })),
       ],
     }
   }
@@ -164,7 +170,7 @@ export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
     }
 
     try {
-      const body = this.mergeHostedTools(
+      const body = this.mergeBuiltinProviderTools(
         model,
         this.adapter.buildRequest(
           this.applyCustomModelParameters(model, {
@@ -214,7 +220,7 @@ export class OpenAIResponsesProvider extends BaseLLMProvider<LLMProvider> {
       )
     }
 
-    const body = this.mergeHostedTools(
+    const body = this.mergeBuiltinProviderTools(
       model,
       this.adapter.buildRequest(
         this.applyCustomModelParameters(

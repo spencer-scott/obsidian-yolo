@@ -4,7 +4,7 @@ jest.mock('obsidian', () => ({
   TFolder: class {},
 }))
 
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 
 import { RagAutoUpdateService } from './ragAutoUpdateService'
 
@@ -34,7 +34,7 @@ describe('RagAutoUpdateService', () => {
         lastAutoUpdateAt: 0,
         indexPdf: true,
       },
-    } as unknown as SmartComposerSettings
+    } as unknown as YoloSettings
     const runIndex = jest.fn().mockResolvedValue(undefined)
     const setSettings = jest.fn().mockResolvedValue(undefined)
     const markRetryScheduled = jest.fn().mockResolvedValue(undefined)

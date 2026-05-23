@@ -50,6 +50,12 @@ export const BUILTIN_TOOL_UI_META: Record<string, BuiltinToolUiMeta> = {
     descFallback:
       'Compress earlier conversation history into a summary and continue in a fresh context window.',
   },
+  load_tool_schemas: {
+    labelKey: 'settings.agent.builtinToolSearchLabel',
+    descKey: 'settings.agent.builtinToolSearchDesc',
+    labelFallback: 'Load Tool',
+    descFallback: 'Load full schemas for on-demand tools.',
+  },
   fs_edit: {
     labelKey: 'settings.agent.builtinFsEditLabel',
     descKey: 'settings.agent.builtinFsEditDesc',
@@ -123,6 +129,20 @@ export const BUILTIN_TOOL_UI_META: Record<string, BuiltinToolUiMeta> = {
     descFallback:
       'Spawn a local CLI agent (codex exec or claude -p) as a subprocess, stream its output back into the chat, and feed the result to the LLM. Desktop-only. Requires manual approval every time.',
   },
+  todo_write: {
+    labelKey: 'settings.agent.builtinTodoWriteLabel',
+    descKey: 'settings.agent.builtinTodoWriteDesc',
+    labelFallback: 'Task List',
+    descFallback:
+      'Let the agent plan and track multi-step task progress autonomously. Agent mode only.',
+  },
+  ask_user_question: {
+    labelKey: 'settings.agent.builtinAskUserQuestionLabel',
+    descKey: 'settings.agent.builtinAskUserQuestionDesc',
+    labelFallback: 'Ask User',
+    descFallback:
+      'Pause the run and ask the user 1-3 structured questions (free text / single / multi). The agent resumes after the user submits answers.',
+  },
 }
 
 export const getBuiltinToolUiMeta = (
@@ -147,6 +167,9 @@ const BUILTIN_TOOL_CATEGORY_MAP: Record<string, BuiltinToolCategory> = {
   [FILE_OPS_GROUP_TOOL_NAME]: 'vault',
   context_prune_tool_results: 'context',
   context_compact: 'context',
+  load_tool_schemas: 'context',
+  todo_write: 'context',
+  ask_user_question: 'context',
   [MEMORY_OPS_GROUP_TOOL_NAME]: 'context',
   [WEB_OPS_GROUP_TOOL_NAME]: 'external',
   open_skill: 'external',

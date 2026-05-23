@@ -34,10 +34,10 @@ export default function AssistantMessageEditor({
   const syncHeight = useCallback(() => {
     if (!textareaRef.current) return
     textareaRef.current.setCssProps({
-      '--smtcmp-assistant-editor-height': 'auto',
+      '--yolo-assistant-editor-height': 'auto',
     })
     textareaRef.current.setCssProps({
-      '--smtcmp-assistant-editor-height': `${textareaRef.current.scrollHeight}px`,
+      '--yolo-assistant-editor-height': `${textareaRef.current.scrollHeight}px`,
     })
   }, [])
 
@@ -84,10 +84,10 @@ export default function AssistantMessageEditor({
   }
 
   return (
-    <div className="smtcmp-assistant-message-editor">
+    <div className="yolo-assistant-message-editor">
       <textarea
         ref={textareaRef}
-        className="smtcmp-assistant-message-editor-textarea"
+        className="yolo-assistant-message-editor-textarea"
         value={value}
         onChange={(event) => {
           setValue(event.target.value)
@@ -97,7 +97,7 @@ export default function AssistantMessageEditor({
         autoFocus
         disabled={disabled}
       />
-      <div className="smtcmp-assistant-editor-buttons">
+      <div className="yolo-assistant-editor-buttons">
         <button onClick={onCancel} disabled={disabled}>
           {t('common.cancel', 'Cancel')}
         </button>

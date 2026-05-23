@@ -1,8 +1,10 @@
 import {
   DEFAULT_MODEL_REQUEST_TIMEOUT_MS,
-  SmartComposerSettings,
+  YoloSettings,
 } from '../../settings/schema/setting.types'
 import { RequestTransportMode } from '../../types/provider.types'
+
+import { inheritLLMDebugTraceSignal } from './debugCapture'
 
 export type ModelRequestPolicy = {
   timeoutMs: number
@@ -20,7 +22,7 @@ export const DEFAULT_MODEL_REQUEST_POLICY: ModelRequestPolicy = {
 }
 
 export const resolveModelRequestPolicy = (
-  settings: Pick<SmartComposerSettings, 'continuationOptions'>,
+  settings: Pick<YoloSettings, 'continuationOptions'>,
 ): ModelRequestPolicy => {
   const timeoutMs = Math.min(
     600000,
@@ -54,6 +56,7 @@ const createLinkedAbortController = (
   cleanup: () => void
 } => {
   const controller = new AbortController()
+  inheritLLMDebugTraceSignal({ source: signal, target: controller.signal })
 
   if (!signal) {
     return {

@@ -16,6 +16,7 @@ import { readEditReviewSnapshot } from '../../database/json/chat/editReviewSnaps
 import {
   AssistantToolMessageGroup,
   ChatAssistantMessage,
+  ChatMessage,
   ChatToolMessage,
 } from '../../types/chat'
 import { shouldRenderAssistantToolPreview } from '../../utils/chat/assistantToolPreview'
@@ -64,24 +65,24 @@ const BranchStateIcon = ({
     return (
       <Loader2
         size={12}
-        className="smtcmp-multi-model-tab__status-icon is-spinning"
+        className="yolo-multi-model-tab__status-icon is-spinning"
       />
     )
   }
   if (state === 'waiting-approval') {
     return (
-      <CircleAlert size={12} className="smtcmp-multi-model-tab__status-icon" />
+      <CircleAlert size={12} className="yolo-multi-model-tab__status-icon" />
     )
   }
   if (state === 'error') {
     return (
-      <CircleAlert size={12} className="smtcmp-multi-model-tab__status-icon" />
+      <CircleAlert size={12} className="yolo-multi-model-tab__status-icon" />
     )
   }
   if (state === 'aborted') {
-    return <Ban size={12} className="smtcmp-multi-model-tab__status-icon" />
+    return <Ban size={12} className="yolo-multi-model-tab__status-icon" />
   }
-  return <Check size={12} className="smtcmp-multi-model-tab__status-icon" />
+  return <Check size={12} className="yolo-multi-model-tab__status-icon" />
 }
 
 const getBranchTabState = (
@@ -195,6 +196,10 @@ export type AssistantToolMessageGroupItemProps = {
     request: ChatToolMessage['toolCalls'][number]['request']
     allowForConversation?: boolean
   }) => Promise<boolean>
+  onRecoverAnswerUserQuestion?: (payload: {
+    resolvedMessages: ChatMessage[]
+    toolCallId: string
+  }) => void
   editingAssistantMessageId?: string | null
   onEditStart: (messageId: string) => void
   onEditCancel: () => void
@@ -235,6 +240,7 @@ export default function AssistantToolMessageGroupItem({
   onApply,
   onToolMessageUpdate,
   onRecoverToolCall,
+  onRecoverAnswerUserQuestion,
   editingAssistantMessageId,
   onEditStart,
   onEditCancel,
@@ -308,7 +314,7 @@ export default function AssistantToolMessageGroupItem({
       }
 
       const scrollContainer = containerRef.current?.closest<HTMLElement>(
-        '.smtcmp-chat-messages',
+        '.yolo-chat-messages',
       )
       if (scrollContainer) {
         pendingScrollRestoreRef.current = {
@@ -543,9 +549,9 @@ export default function AssistantToolMessageGroupItem({
   const effectiveGroupEditSummaryKey = groupEditSummaryKey ?? ''
 
   return (
-    <div className="smtcmp-assistant-tool-message-group" ref={containerRef}>
+    <div className="yolo-assistant-tool-message-group" ref={containerRef}>
       {hasMultipleBranches && (
-        <div className="smtcmp-multi-model-tabs" role="tablist">
+        <div className="yolo-multi-model-tabs" role="tablist">
           {branchGroups.map((group) => {
             const isActive = group.key === resolvedActiveBranchKey
             const state = getBranchTabState(group.messages)
@@ -556,20 +562,20 @@ export default function AssistantToolMessageGroupItem({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                className={`smtcmp-multi-model-tab smtcmp-multi-model-tab--${state}${isActive ? ' is-active' : ''}`}
+                className={`yolo-multi-model-tab yolo-multi-model-tab--${state}${isActive ? ' is-active' : ''}`}
                 onClick={() => handleBranchSwitch(group.key)}
                 title={`${group.label} · ${stateLabel}`}
               >
-                <span className="smtcmp-multi-model-tab__label">
+                <span className="yolo-multi-model-tab__label">
                   {group.label}
                 </span>
                 <span
-                  className={`smtcmp-multi-model-tab__status${state === 'completed' ? ' is-icon-only' : ''}`}
+                  className={`yolo-multi-model-tab__status${state === 'completed' ? ' is-icon-only' : ''}`}
                   title={stateLabel}
                 >
                   <BranchStateIcon state={state} />
                   {state !== 'completed' && (
-                    <span className="smtcmp-multi-model-tab__status-text">
+                    <span className="yolo-multi-model-tab__status-text">
                       {stateLabel}
                     </span>
                   )}
@@ -619,7 +625,7 @@ export default function AssistantToolMessageGroupItem({
             !message.content &&
             !message.reasoning) ||
           shouldShowAssistantToolPreview ? (
-            <div key={message.id} className="smtcmp-chat-messages-assistant">
+            <div key={message.id} className="yolo-chat-messages-assistant">
               {(message.reasoning ||
                 (message.metadata?.generationState === 'streaming' &&
                   !message.content &&
@@ -629,11 +635,6 @@ export default function AssistantToolMessageGroupItem({
                   reasoning={message.reasoning ?? ''}
                   hasAnswerContent={message.content.trim().length > 0}
                   generationState={message.metadata?.generationState}
-                />
-              )}
-              {message.annotations && (
-                <AssistantMessageAnnotations
-                  annotations={message.annotations}
                 />
               )}
               {message.id === editingAssistantMessageId ? (
@@ -649,6 +650,7 @@ export default function AssistantToolMessageGroupItem({
                   messageId={message.id}
                   conversationId={effectiveConversationId}
                   content={message.content}
+                  annotations={message.annotations}
                   handleApply={onApply}
                   isApplying={isApplying}
                   activeApplyRequestKey={activeApplyRequestKey}
@@ -657,6 +659,11 @@ export default function AssistantToolMessageGroupItem({
                   showToolCallPreview={shouldShowAssistantToolPreview}
                   onQuote={onQuoteAssistantSelection}
                   enableSelectionQuote={showQuoteAction}
+                />
+              )}
+              {message.annotations && (
+                <AssistantMessageAnnotations
+                  annotations={message.annotations}
                 />
               )}
               {message.metadata?.generationState === 'error' &&
@@ -677,6 +684,7 @@ export default function AssistantToolMessageGroupItem({
                 // Async dispatch results are terminal messages; the UI will not trigger update internally.
                 // Even if this is called, it will not be persisted (result messages have their own storage path).
               }}
+              onRecoverAnswerUserQuestion={onRecoverAnswerUserQuestion}
             />
           </div>
         ) : (
@@ -690,6 +698,7 @@ export default function AssistantToolMessageGroupItem({
               showRunningFooter={showRunningToolFooter}
               onMessageUpdate={onToolMessageUpdate}
               onRecoverToolCall={onRecoverToolCall}
+              onRecoverAnswerUserQuestion={onRecoverAnswerUserQuestion}
             />
           </div>
         )
@@ -725,7 +734,7 @@ export default function AssistantToolMessageGroupItem({
         !hasPendingAssistantShell &&
         !isRunActive &&
         !suppressFooter && (
-          <div className="smtcmp-assistant-message-footer">
+          <div className="yolo-assistant-message-footer">
             {showInlineInfo && (
               <LLMResponseInlineInfo messages={displayedMessages} />
             )}

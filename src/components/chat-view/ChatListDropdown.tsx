@@ -17,7 +17,7 @@ import type { ChatConversationMetadata } from '../../database/json/chat/types'
 import { useChatManager } from '../../hooks/useJsonManagers'
 import type { SerializedChatMessage } from '../../types/chat'
 import type { ContentPart } from '../../types/llm/request'
-import { getNodeBody, getNodeWindow } from '../../utils/dom/window-context'
+import { getNodeWindow } from '../../utils/dom/window-context'
 import { YoloPopoverContent } from '../common/popover'
 
 import { editorStateToPlainText } from './chat-input/utils/editor-state-to-plain-text'
@@ -48,7 +48,7 @@ function TitleInput({
       type="text"
       value={value}
       disabled={disabled}
-      className="smtcmp-chat-list-dropdown-item-title-input"
+      className="yolo-chat-list-dropdown-item-title-input"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => onChange(e.target.value)}
@@ -148,7 +148,7 @@ function ChatListItem({
           activeElement.blur()
         }
       }}
-      className={`smtcmp-chat-list-dropdown-item${isFocused ? ' selected' : ''}`}
+      className={`yolo-chat-list-dropdown-item${isFocused ? ' selected' : ''}`}
       data-highlighted={isFocused ? 'true' : undefined}
     >
       {isEditing ? (
@@ -160,17 +160,17 @@ function ChatListItem({
         />
       ) : (
         <div
-          className={`smtcmp-chat-list-dropdown-item-title${
+          className={`yolo-chat-list-dropdown-item-title${
             isRetrying ? ' is-retrying' : ''
           }`}
         >
-          <span className="smtcmp-chat-list-dropdown-item-title-text">
+          <span className="yolo-chat-list-dropdown-item-title-text">
             {title}
           </span>
           {runSummary &&
           (runSummary.isRunning || runSummary.isWaitingApproval) ? (
             <span
-              className={`smtcmp-chat-list-dropdown-item-status${
+              className={`yolo-chat-list-dropdown-item-status${
                 runSummary.isRunning ? ' is-running' : ' is-waiting'
               }`}
               aria-label={
@@ -187,14 +187,14 @@ function ChatListItem({
           ) : null}
           {isRetrying && (
             <span
-              className="smtcmp-chat-list-dropdown-item-title-skeleton"
+              className="yolo-chat-list-dropdown-item-title-skeleton"
               aria-hidden="true"
             />
           )}
         </div>
       )}
       <div
-        className={`smtcmp-chat-list-dropdown-item-actions${
+        className={`yolo-chat-list-dropdown-item-actions${
           isMoreMenuOpen ? ' is-more-open' : ''
         }`}
       >
@@ -208,7 +208,7 @@ function ChatListItem({
               }
               onFinishEdit(editingTitle)
             }}
-            className="clickable-icon smtcmp-chat-list-dropdown-item-icon"
+            className="clickable-icon yolo-chat-list-dropdown-item-icon"
             disabled={isUpdatingTitle}
             aria-label={t('common.save', 'Save')}
             title={t('common.save', 'Save')}
@@ -223,7 +223,7 @@ function ChatListItem({
             onCloseMoreMenu()
             onDelete()
           }}
-          className="clickable-icon smtcmp-chat-list-dropdown-item-icon"
+          className="clickable-icon yolo-chat-list-dropdown-item-icon"
         >
           <Trash2 />
         </button>
@@ -234,7 +234,7 @@ function ChatListItem({
             onCloseMoreMenu()
             onTogglePinned()
           }}
-          className={`clickable-icon smtcmp-chat-list-pin-button${
+          className={`clickable-icon yolo-chat-list-pin-button${
             isPinned ? ' is-pinned' : ''
           }`}
         >
@@ -242,12 +242,12 @@ function ChatListItem({
         </button>
         {!isEditing ? (
           <div
-            className={`smtcmp-chat-list-inline-actions${
+            className={`yolo-chat-list-inline-actions${
               isMoreMenuOpen ? ' is-open' : ''
             }`}
             aria-hidden={isMoreMenuOpen ? undefined : 'true'}
           >
-            <div className="smtcmp-chat-list-inline-actions-inner">
+            <div className="yolo-chat-list-inline-actions-inner">
               <button
                 type="button"
                 onClick={(e) => {
@@ -255,7 +255,7 @@ function ChatListItem({
                   onCloseMoreMenu()
                   onStartEdit()
                 }}
-                className="clickable-icon smtcmp-chat-list-dropdown-item-icon"
+                className="clickable-icon yolo-chat-list-dropdown-item-icon"
                 aria-label={t('common.edit', 'Edit')}
                 title={t('common.edit', 'Edit')}
                 tabIndex={isMoreMenuOpen ? undefined : -1}
@@ -270,7 +270,7 @@ function ChatListItem({
                   onCloseMoreMenu()
                   onRetryTitle()
                 }}
-                className={`clickable-icon smtcmp-chat-list-dropdown-item-icon${
+                className={`clickable-icon yolo-chat-list-dropdown-item-icon${
                   isRetrying ? ' is-pending' : ''
                 }`}
                 aria-label={t('sidebar.chatList.retryTitle', 'Retry title')}
@@ -279,7 +279,7 @@ function ChatListItem({
                 tabIndex={isMoreMenuOpen ? undefined : -1}
               >
                 <RotateCcw
-                  className={isRetrying ? 'smtcmp-spinner' : undefined}
+                  className={isRetrying ? 'yolo-spinner' : undefined}
                 />
               </button>
               <button
@@ -289,7 +289,7 @@ function ChatListItem({
                   onCloseMoreMenu()
                   onExport()
                 }}
-                className="clickable-icon smtcmp-chat-list-dropdown-item-icon"
+                className="clickable-icon yolo-chat-list-dropdown-item-icon"
                 aria-label={t(
                   'sidebar.chatList.exportConversation',
                   'Export conversation to vault',
@@ -312,14 +312,14 @@ function ChatListItem({
               e.stopPropagation()
               onToggleMoreMenu()
             }}
-            className={`clickable-icon smtcmp-chat-list-dropdown-item-icon smtcmp-chat-list-more-button${
+            className={`clickable-icon yolo-chat-list-dropdown-item-icon yolo-chat-list-more-button${
               isMoreMenuOpen ? ' is-open' : ''
             }`}
             aria-labelledby={moreActionsLabelId}
             aria-expanded={isMoreMenuOpen ? 'true' : 'false'}
           >
             <Ellipsis size={16} />
-            <span id={moreActionsLabelId} className="smtcmp-sr-only">
+            <span id={moreActionsLabelId} className="yolo-sr-only">
               {t('sidebar.chatList.moreActions', 'More actions')}
             </span>
           </button>
@@ -574,7 +574,7 @@ export function ChatListDropdown({
     const content = contentRef.current
     const trigger = triggerRef.current
     if (!content || !trigger) return
-    const sidebar = trigger.closest('.smtcmp-chat-container')
+    const sidebar = trigger.closest('.yolo-chat-container')
     if (!sidebar) return
     const { width } = sidebar.getBoundingClientRect()
     if (width > 0) {
@@ -676,7 +676,7 @@ export function ChatListDropdown({
   useEffect(() => {
     if (!open) return
     syncPopoverWidth()
-    const sidebar = triggerRef.current?.closest('.smtcmp-chat-container')
+    const sidebar = triggerRef.current?.closest('.yolo-chat-container')
     if (!sidebar) return
     const ownerWindow = getNodeWindow(triggerRef.current)
     const handleResize = () => {
@@ -761,17 +761,17 @@ export function ChatListDropdown({
 
       <YoloPopoverContent
         ref={contentRef}
-        container={getNodeBody(triggerRef.current)}
+        anchorRef={triggerRef}
         variant="default"
         minWidth={280}
         maxHeight={400}
-        className="smtcmp-chat-list-dropdown-content"
+        className="yolo-chat-list-dropdown-content"
         sideOffset={8}
         onKeyDown={handleKeyDown}
       >
-        <div className="smtcmp-chat-list-search">
-          <div className="smtcmp-chat-list-search-field">
-            <Search size={13} className="smtcmp-chat-list-search-icon" />
+        <div className="yolo-chat-list-search">
+          <div className="yolo-chat-list-search-field">
+            <Search size={13} className="yolo-chat-list-search-icon" />
             <input
               type="search"
               value={searchQuery}
@@ -783,19 +783,19 @@ export function ChatListDropdown({
                 'sidebar.chatList.searchPlaceholder',
                 'Search conversations',
               )}
-              className="smtcmp-chat-list-search-input"
+              className="yolo-chat-list-search-input"
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
             />
           </div>
         </div>
-        <ul className="smtcmp-model-select-list">
+        <ul className="yolo-model-select-list">
           {chatList.length === 0 ? (
-            <li className="smtcmp-chat-list-dropdown-empty">
+            <li className="yolo-chat-list-dropdown-empty">
               {t('sidebar.chatList.empty', 'No conversations')}
             </li>
           ) : filteredChatList.length === 0 ? (
-            <li className="smtcmp-chat-list-dropdown-empty">
+            <li className="yolo-chat-list-dropdown-empty">
               {t('common.noResults', 'No matches found')}
             </li>
           ) : (
@@ -942,7 +942,7 @@ export function ChatListDropdown({
               ))}
               {shouldUseArchive && archivedChatList.length > 0 && (
                 <li
-                  className="smtcmp-chat-list-dropdown-archive-row"
+                  className="yolo-chat-list-dropdown-archive-row"
                   onMouseEnter={() => {
                     setIsHoveringArchiveRow(true)
                   }}
@@ -952,12 +952,12 @@ export function ChatListDropdown({
                 >
                   <button
                     type="button"
-                    className="smtcmp-chat-list-dropdown-archive-toggle"
+                    className="yolo-chat-list-dropdown-archive-toggle"
                     onClick={() => {
                       setShowArchived((prev) => !prev)
                     }}
                   >
-                    <span className="smtcmp-chat-list-dropdown-archive-toggle-label">
+                    <span className="yolo-chat-list-dropdown-archive-toggle-label">
                       {showArchived
                         ? t('sidebar.chatList.hideArchived', 'Hide archived')
                         : `${t('sidebar.chatList.archived', 'Archived')} (${archivedChatList.length})`}

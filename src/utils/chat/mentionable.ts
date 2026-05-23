@@ -69,9 +69,12 @@ export const serializeMentionable = (
       return {
         type: 'pdf',
         name: mentionable.name,
+        // rawData (base64 of original bytes) is the source-of-truth for new
+        // uploads; legacy mentionables only have `data` (extracted text).
+        // Persist whichever is present so reload/replay reproduces faithfully.
+        rawData: mentionable.rawData,
         data: mentionable.data,
         pageCount: mentionable.pageCount,
-        truncated: mentionable.truncated,
       }
     case 'model':
       return {
@@ -184,15 +187,20 @@ export const deserializeMentionable = (
         }
       }
       case 'pdf': {
-        if (typeof mentionable.data !== 'string') {
+        const rawData =
+          typeof mentionable.rawData === 'string' ? mentionable.rawData : null
+        const data =
+          typeof mentionable.data === 'string' ? mentionable.data : null
+        // Need at least one of: rawData (native path) or data (legacy text fallback).
+        if (!rawData && !data) {
           return null
         }
         return {
           type: 'pdf',
           name: mentionable.name,
-          data: mentionable.data,
+          ...(rawData ? { rawData } : {}),
+          ...(data ? { data } : {}),
           pageCount: mentionable.pageCount,
-          truncated: mentionable.truncated,
         }
       }
       case 'model': {
@@ -229,8 +237,13 @@ export function getMentionableKey(mentionable: SerializedMentionable): string {
       return `url:${mentionable.url}`
     case 'image':
       return `image:${mentionable.name}:${mentionable.data.length}:${mentionable.data.slice(-32)}`
-    case 'pdf':
-      return `pdf:${mentionable.name}:${mentionable.data.length}:${mentionable.data.slice(-32)}`
+    case 'pdf': {
+      // Identity is keyed by whichever payload is present: rawData (new
+      // uploads) or the legacy `data` text (mentionables serialized before
+      // native PDF support). Both are persistent enough to dedupe with.
+      const payload = mentionable.rawData ?? mentionable.data ?? ''
+      return `pdf:${mentionable.name}:${payload.length}:${payload.slice(-32)}`
+    }
     case 'model':
       return `model:${mentionable.modelId}`
   }

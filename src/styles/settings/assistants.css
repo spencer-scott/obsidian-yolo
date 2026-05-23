@@ -1,10 +1,10 @@
 /* Template Section Styles */
-.smtcmp-templates-container {
+.yolo-templates-container {
   display: flex;
   flex-direction: column;
 }
 
-.smtcmp-templates-header {
+.yolo-templates-header {
   display: grid;
   grid-template-columns: 1fr 112px; /* Name and Actions columns */
   gap: var(--size-4-4);
@@ -25,7 +25,7 @@
   }
 }
 
-.smtcmp-templates-empty {
+.yolo-templates-empty {
   padding: var(--size-4-4) 0;
   display: flex;
   justify-content: center;
@@ -33,13 +33,13 @@
   color: var(--text-muted);
 }
 
-.smtcmp-template {
+.yolo-template {
   border-bottom: var(--border-width) solid var(--background-modifier-border);
 }
 
-.smtcmp-template-row {
+.yolo-template-row {
   display: grid;
-  grid-template-columns: 1fr 112px; /* Match columns with .smtcmp-templates-header */
+  grid-template-columns: 1fr 112px; /* Match columns with .yolo-templates-header */
   gap: var(--size-4-4);
   align-items: center;
   min-height: var(--size-4-10);
@@ -49,12 +49,12 @@
   }
 }
 
-.smtcmp-template-name {
+.yolo-template-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.smtcmp-template-actions {
+.yolo-template-actions {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -67,20 +67,20 @@
   }
 }
 
-.smtcmp-continue-response-button-container {
+.yolo-continue-response-button-container {
   display: flex;
   justify-content: center;
   padding: var(--size-4-1) 0;
 }
 
-.smtcmp-continue-response-button {
+.yolo-continue-response-button {
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
 }
 
 /* Assistant selector styles - matched with model selector */
-.smtcmp-chat-header-right button.smtcmp-assistant-selector-button {
+.yolo-chat-header-right button.yolo-assistant-selector-button {
   all: unset;
   display: flex !important;
   align-items: center !important;
@@ -96,31 +96,31 @@
   height: auto !important;
 }
 
-.smtcmp-chat-header-right button.smtcmp-assistant-selector-button:hover {
+.yolo-chat-header-right button.yolo-assistant-selector-button:hover {
   color: var(--text-normal) !important;
   background-color: transparent !important;
 }
 
-.smtcmp-chat-header-right
-  button.smtcmp-assistant-selector-button[data-state='open'] {
+.yolo-chat-header-right
+  button.yolo-assistant-selector-button[data-state='open'] {
   color: var(--text-normal) !important;
 }
 
-.smtcmp-chat-header-right .smtcmp-assistant-selector-current {
+.yolo-chat-header-right .yolo-assistant-selector-current {
   flex-shrink: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.smtcmp-chat-header-right .smtcmp-assistant-selector-icon {
+.yolo-chat-header-right .yolo-assistant-selector-icon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.smtcmp-assistant-selector-current-icon {
+.yolo-assistant-selector-current-icon {
   width: 18px;
   height: 18px;
   border-radius: 6px;
@@ -145,12 +145,12 @@
   box-shadow: 0 0 8px rgba(var(--interactive-accent-rgb, 128 90 213), 0.25);
 }
 
-.smtcmp-assistant-selector-current-icon svg {
+.yolo-assistant-selector-current-icon svg {
   width: 12px;
   height: 12px;
 }
 
-.smtcmp-assistant-selector-content {
+.yolo-assistant-selector-content {
   padding: var(--size-2-1);
   min-width: 240px;
   max-width: 320px;
@@ -158,20 +158,20 @@
   overflow: hidden;
 }
 
-.smtcmp-assistant-selector-content.smtcmp-assistant-selector-content--workspace-floating {
+.yolo-assistant-selector-content.yolo-assistant-selector-content--workspace-floating {
   width: auto;
   min-width: max(var(--radix-popover-trigger-width, 0px), 200px);
   max-width: 240px;
 }
 
-.smtcmp-assistant-selector-empty {
+.yolo-assistant-selector-empty {
   padding: var(--size-4-2);
   color: var(--text-muted);
   text-align: center;
   font-size: var(--font-smallest);
 }
 
-.smtcmp-assistant-selector-list {
+.yolo-assistant-selector-list {
   max-height: 300px;
   overflow-y: auto;
   padding: var(--size-2-1);
@@ -179,11 +179,11 @@
   scrollbar-width: thin;
 }
 
-.smtcmp-assistant-selector-row {
+.yolo-assistant-selector-row {
   list-style: none;
 }
 
-.smtcmp-assistant-selector-content .smtcmp-assistant-selector-row {
+.yolo-assistant-selector-content .yolo-assistant-selector-row {
   margin: 0;
   padding: 0;
   min-width: 0;
@@ -200,32 +200,32 @@
   gap: 0;
 }
 
-.smtcmp-assistant-selector-content
-  .smtcmp-assistant-selector-list::-webkit-scrollbar {
+.yolo-assistant-selector-content
+  .yolo-assistant-selector-list::-webkit-scrollbar {
   width: 8px;
 }
 
-.smtcmp-assistant-selector-content
-  .smtcmp-assistant-selector-list::-webkit-scrollbar-track {
+.yolo-assistant-selector-content
+  .yolo-assistant-selector-list::-webkit-scrollbar-track {
   background: transparent;
   margin: 8px 0;
 }
 
-.smtcmp-assistant-selector-content
-  .smtcmp-assistant-selector-list::-webkit-scrollbar-thumb {
+.yolo-assistant-selector-content
+  .yolo-assistant-selector-list::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: 4px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
-.smtcmp-assistant-selector-content
-  .smtcmp-assistant-selector-list::-webkit-scrollbar-thumb:hover {
+.yolo-assistant-selector-content
+  .yolo-assistant-selector-list::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text-muted) 50%, transparent);
   background-clip: padding-box;
 }
 
-.smtcmp-assistant-selector-content .smtcmp-assistant-selector-item {
+.yolo-assistant-selector-content .yolo-assistant-selector-item {
   display: flex;
   width: 100%;
   align-items: center;
@@ -244,7 +244,7 @@
   border: 0;
 }
 
-.smtcmp-assistant-selector-content .smtcmp-assistant-selector-item:hover {
+.yolo-assistant-selector-content .yolo-assistant-selector-item:hover {
   background-color: color-mix(
     in srgb,
     var(--background-modifier-hover) 90%,
@@ -252,7 +252,7 @@
   );
 }
 
-.smtcmp-assistant-selector-content .smtcmp-assistant-selector-item.selected {
+.yolo-assistant-selector-content .yolo-assistant-selector-item.selected {
   background-color: color-mix(
     in srgb,
     var(--interactive-accent) 10%,
@@ -262,12 +262,12 @@
     color-mix(in srgb, var(--interactive-accent) 60%, transparent);
 }
 
-.smtcmp-assistant-selector-content .smtcmp-assistant-selector-item:active {
+.yolo-assistant-selector-content .yolo-assistant-selector-item:active {
   transform: translateY(1px);
 }
 
-.smtcmp-assistant-selector-content
-  .smtcmp-assistant-selector-item[data-highlighted='true'] {
+.yolo-assistant-selector-content
+  .yolo-assistant-selector-item[data-highlighted='true'] {
   background-color: color-mix(
     in srgb,
     var(--interactive-accent) 14%,
@@ -277,7 +277,7 @@
     color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
 
-.smtcmp-assistant-selector-item-icon {
+.yolo-assistant-selector-item-icon {
   width: 22px;
   height: 22px;
   border-radius: var(--radius-s);
@@ -300,22 +300,22 @@
   justify-content: center;
 }
 
-.smtcmp-assistant-selector-item-icon svg {
+.yolo-assistant-selector-item-icon svg {
   width: 12px;
   height: 12px;
 }
 
-.smtcmp-assistant-selector-item-content {
+.yolo-assistant-selector-item-content {
   flex: 1;
   min-width: 0;
 }
 
-.smtcmp-assistant-selector-item-name {
+.yolo-assistant-selector-item-name {
   font-weight: var(--font-medium);
   color: var(--text-normal);
 }
 
-.smtcmp-assistant-selector-item-description {
+.yolo-assistant-selector-item-description {
   font-size: var(--font-smallest);
   color: var(--text-muted);
   text-overflow: ellipsis;
@@ -323,14 +323,286 @@
   overflow: hidden;
 }
 
-.smtcmp-assistant-selector-item-current {
+.yolo-assistant-selector-item-current {
   font-size: var(--font-smallest);
   color: var(--interactive-accent);
   font-weight: var(--font-medium);
 }
 
+/* ───────────────────────────────────────────────────────────────
+   Palette variant: command-palette-style rich rows with model /
+   tool meta and hover edit/duplicate actions.
+   See src/components/chat-view/AssistantSelector.tsx
+   ─────────────────────────────────────────────────────────────── */
+
+.yolo-assistant-selector-content--palette {
+  min-width: 240px;
+  max-width: 280px;
+  padding: var(--size-2-1);
+  /* Flex column so the list shrinks with the surface's clamped max-height
+     (see resolveYoloPopoverStyle); footer stays at natural height. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* In compact workspace-floating mode, keep palette rich rows but
+   shrink width back to the floating constraints. */
+.yolo-assistant-selector-content--palette.yolo-assistant-selector-content--workspace-floating {
+  min-width: max(var(--radix-popover-trigger-width, 0px), 220px);
+  max-width: 260px;
+}
+
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-list {
+  /* Let the list flex-shrink within the (potentially viewport-clamped) outer
+     surface; min-height: 0 is what actually unlocks shrinking in flex. The
+     base rule already provides `overflow-y: auto`. */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 360px;
+  padding: var(--size-2-1);
+}
+
+/* Defeat the global `.yolo-popover-surface li { border / background /
+   padding / border-radius / hover-bg }` rule that gives every <li>
+   inside any popover a "card" look. Scoped to the palette variant. */
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-row,
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-row:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  border-radius: var(--radius-m);
+  transition: background-color 0.15s ease;
+}
+
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-item:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--background-modifier-hover) 90%,
+    transparent
+  );
+}
+
+.yolo-assistant-selector-content--palette
+  .yolo-assistant-selector-item.selected {
+  background-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 10%,
+    transparent
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+}
+
+button.yolo-assistant-selector-item-main {
+  all: unset;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--size-4-2) !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  padding: 6px 8px !important;
+  cursor: pointer !important;
+  border-radius: var(--radius-m) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.yolo-assistant-selector-item-main:active {
+  transform: translateY(1px);
+}
+
+.yolo-assistant-selector-item-main:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+  outline-offset: -2px;
+}
+
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-item-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.yolo-assistant-selector-content--palette
+  .yolo-assistant-selector-item-icon
+  svg {
+  width: 12px;
+  height: 12px;
+}
+
+.yolo-assistant-selector-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.yolo-assistant-selector-content--palette .yolo-assistant-selector-item-name {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yolo-assistant-selector-item-check {
+  color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.yolo-assistant-selector-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  min-width: 0;
+}
+
+.yolo-assistant-selector-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.yolo-assistant-selector-meta-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yolo-assistant-selector-meta-chip svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.yolo-assistant-selector-item-actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.yolo-assistant-selector-item:hover .yolo-assistant-selector-item-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+button.yolo-assistant-selector-action-btn {
+  all: unset;
+  width: 24px !important;
+  height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 5px !important;
+  background: var(--background-primary) !important;
+  background-color: var(--background-primary) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-muted) 22%, transparent) !important;
+  border: 0 !important;
+  padding: 0 !important;
+  color: var(--text-normal) !important;
+  cursor: pointer !important;
+  transition:
+    background-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+button.yolo-assistant-selector-action-btn:hover {
+  background: var(--background-modifier-hover) !important;
+  background-color: var(--background-modifier-hover) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-muted) 40%, transparent) !important;
+}
+
+.yolo-assistant-selector-action-btn:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+  outline-offset: 1px;
+}
+
+/* In workspace-floating mode actions stay (Default is also editable),
+   but allow the tool-count chip to wrap below model id on narrow widths. */
+.yolo-assistant-selector-content--palette.yolo-assistant-selector-content--workspace-floating
+  .yolo-assistant-selector-item-meta {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.yolo-assistant-selector-footer {
+  border-top: 1px solid color-mix(in srgb, var(--text-muted) 16%, transparent);
+  margin-top: var(--size-2-1);
+  padding: var(--size-2-1);
+}
+
+button.yolo-assistant-selector-footer-btn {
+  all: unset;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 5px 8px !important;
+  border-radius: var(--radius-s) !important;
+  font-size: var(--font-ui-smaller) !important;
+  color: var(--text-normal) !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transition: background-color 0.12s ease;
+}
+
+button.yolo-assistant-selector-footer-btn:hover {
+  background: color-mix(
+    in srgb,
+    var(--background-modifier-hover) 90%,
+    transparent
+  ) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--background-modifier-hover) 90%,
+    transparent
+  ) !important;
+}
+
+.yolo-assistant-selector-footer-btn svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 /* Folder Picker: flatten rows and remove container visuals */
-.smtcmp-folder-picker .smtcmp-provider-header {
+.yolo-folder-picker .yolo-provider-header {
   background-color: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -339,25 +611,25 @@
   gap: 8px;
 }
 
-.smtcmp-folder-picker .smtcmp-provider-header:hover {
+.yolo-folder-picker .yolo-provider-header:hover {
   background-color: var(--background-modifier-hover) !important;
 }
 
-.smtcmp-folder-picker .smtcmp-provider-header * {
+.yolo-folder-picker .yolo-provider-header * {
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
-.smtcmp-folder-picker [role='button']:focus,
-.smtcmp-folder-picker [role='button']:focus-visible,
-.smtcmp-folder-picker [role='button']:active {
+.yolo-folder-picker [role='button']:focus,
+.yolo-folder-picker [role='button']:focus-visible,
+.yolo-folder-picker [role='button']:active {
   outline: none !important;
   box-shadow: none !important;
 }
 
-.smtcmp-folder-picker .smtcmp-provider-expand-btn {
+.yolo-folder-picker .yolo-provider-expand-btn {
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -368,34 +640,34 @@
 /* ===== Added for review fixes: move inline styles to CSS ===== */
 
 /* Wide modal (instead of setting width via JS) */
-.smtcmp-modal--wide {
+.yolo-modal--wide {
   width: 720px;
 }
 
 /* Typeahead menu container (avoid inline display/position) */
-.smtcmp-typeahead-menu {
+.yolo-typeahead-menu {
   position: absolute;
   display: block;
 }
 
 /* ApplyView: diff content width */
-.smtcmp-diff-block-content {
+.yolo-diff-block-content {
   width: 100%;
 }
 
 /* Assistants Section */
-.smtcmp-settings-header-row {
+.yolo-settings-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.smtcmp-settings-header-row .smtcmp-settings-header {
+.yolo-settings-header-row .yolo-settings-header {
   margin: 0;
 }
 
-.smtcmp-add-assistant-btn {
+.yolo-add-assistant-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -410,7 +682,7 @@
   transition: background-color 0.2s ease;
 }
 
-.smtcmp-no-assistants {
+.yolo-no-assistants {
   padding: 24px;
   text-align: center;
   background: var(--background-secondary);
@@ -420,12 +692,12 @@
   font-size: 15px;
 }
 
-.smtcmp-no-assistants-text {
+.yolo-no-assistants-text {
   margin: 0;
 }
 
 /* Assistant Editor */
-.smtcmp-assistant-editor {
+.yolo-assistant-editor {
   background: var(--background-secondary);
   border-radius: var(--radius-m);
   padding: 16px;
@@ -433,16 +705,15 @@
   border: 1px solid var(--background-modifier-border);
 }
 
-.smtcmp-assistant-editor-inline {
+.yolo-assistant-editor-inline {
   margin-top: 0;
   border-top: none;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  animation: smtcmp-assistant-editor-slide-in 0.25s
-    cubic-bezier(0.16, 1, 0.3, 1);
+  animation: yolo-assistant-editor-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes smtcmp-assistant-editor-slide-in {
+@keyframes yolo-assistant-editor-slide-in {
   0% {
     opacity: 0;
     max-height: 0;
@@ -457,11 +728,11 @@
   }
 }
 
-.smtcmp-assistant-editor-new {
-  animation: smtcmp-assistant-editor-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+.yolo-assistant-editor-new {
+  animation: yolo-assistant-editor-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes smtcmp-assistant-editor-fade-in {
+@keyframes yolo-assistant-editor-fade-in {
   0% {
     opacity: 0;
     transform: translateY(-8px);
@@ -472,7 +743,7 @@
   }
 }
 
-.smtcmp-assistant-editor-buttons {
+.yolo-assistant-editor-buttons {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -480,7 +751,7 @@
 }
 
 /* Assistants List */
-.smtcmp-assistants-list {
+.yolo-assistants-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -488,7 +759,7 @@
 }
 
 /* Assistant Item */
-.smtcmp-assistant-item {
+.yolo-assistant-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -500,40 +771,40 @@
   cursor: grab;
 }
 
-.smtcmp-assistant-item:hover {
+.yolo-assistant-item:hover {
   background: var(--background-secondary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.smtcmp-assistant-item.editing {
+.yolo-assistant-item.editing {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.1);
   cursor: default;
 }
 
-.smtcmp-assistant-item.active {
+.yolo-assistant-item.active {
   border-color: var(--interactive-accent);
   background: var(--background-primary-alt);
 }
 
-.smtcmp-assistant-item.disabled {
+.yolo-assistant-item.disabled {
   opacity: 0.5;
 }
 
-.smtcmp-assistant-item.disabled .smtcmp-assistant-content {
+.yolo-assistant-item.disabled .yolo-assistant-content {
   pointer-events: none;
 }
 
-.smtcmp-assistant-item.smtcmp-assistant-item-dragging {
+.yolo-assistant-item.yolo-assistant-item-dragging {
   opacity: 0.5;
   cursor: grabbing;
 }
 
-.smtcmp-assistant-item.smtcmp-assistant-item-drop-success {
-  animation: smtcmp-assistant-drop-success 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+.yolo-assistant-item.yolo-assistant-item-drop-success {
+  animation: yolo-assistant-drop-success 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes smtcmp-assistant-drop-success {
+@keyframes yolo-assistant-drop-success {
   0%,
   100% {
     transform: scale(1);
@@ -549,7 +820,7 @@
 }
 
 /* Drag Handle */
-.smtcmp-assistant-drag-handle {
+.yolo-assistant-drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -559,21 +830,21 @@
   flex-shrink: 0;
 }
 
-.smtcmp-assistant-drag-handle:hover {
+.yolo-assistant-drag-handle:hover {
   color: var(--text-muted);
 }
 
-.smtcmp-assistant-drag-handle .smtcmp-drag-handle {
+.yolo-assistant-drag-handle .yolo-drag-handle {
   display: flex;
   padding: 2px;
 }
 
-.smtcmp-assistant-drag-handle .smtcmp-drag-handle.smtcmp-drag-handle--active {
+.yolo-assistant-drag-handle .yolo-drag-handle.yolo-drag-handle--active {
   color: var(--interactive-accent);
 }
 
 /* Assistant Content */
-.smtcmp-assistant-content {
+.yolo-assistant-content {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -581,13 +852,13 @@
   gap: 4px;
 }
 
-.smtcmp-assistant-header {
+.yolo-assistant-header {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.smtcmp-assistant-icon {
+.yolo-assistant-icon {
   width: 28px;
   height: 28px;
   border-radius: var(--radius-s);
@@ -600,17 +871,17 @@
   transition: all 0.2s ease;
 }
 
-.smtcmp-assistant-icon svg {
+.yolo-assistant-icon svg {
   width: 16px;
   height: 16px;
 }
 
-.smtcmp-assistant-info {
+.yolo-assistant-info {
   flex: 1;
   min-width: 0;
 }
 
-.smtcmp-assistant-name {
+.yolo-assistant-name {
   font-weight: 500;
   font-size: 14px;
   color: var(--text-normal);
@@ -620,7 +891,7 @@
   line-height: 1.4;
 }
 
-.smtcmp-assistant-badge {
+.yolo-assistant-badge {
   font-size: 11px;
   font-weight: 600;
   color: var(--interactive-accent);
@@ -631,7 +902,7 @@
   letter-spacing: 0.5px;
 }
 
-.smtcmp-assistant-description {
+.yolo-assistant-description {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.4;
@@ -641,7 +912,7 @@
 }
 
 /* Assistant Controls */
-.smtcmp-assistant-controls {
+.yolo-assistant-controls {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -649,60 +920,60 @@
   margin-left: auto;
 }
 
-.smtcmp-assistant-controls button {
+.yolo-assistant-controls button {
   padding: 6px;
   min-width: unset;
   height: auto;
 }
 
-.smtcmp-assistant-controls button:hover:not(:disabled) {
+.yolo-assistant-controls button:hover:not(:disabled) {
   background: var(--background-modifier-hover);
 }
 
-.smtcmp-assistant-controls button:disabled {
+.yolo-assistant-controls button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.smtcmp-assistant-controls button svg {
+.yolo-assistant-controls button svg {
   width: 16px;
   height: 16px;
 }
 
 /* Editor specific styles */
-.smtcmp-assistant-editor .setting-item {
+.yolo-assistant-editor .setting-item {
   margin-bottom: 12px;
 }
 
-.smtcmp-assistant-editor .setting-item:first-child {
+.yolo-assistant-editor .setting-item:first-child {
   margin-top: 0;
 }
 
-.smtcmp-assistant-editor textarea {
+.yolo-assistant-editor textarea {
   min-height: 100px;
 }
 
 /* ==================== Assistant Icon Picker Modal ==================== */
 
-.smtcmp-icon-picker-modal {
+.yolo-icon-picker-modal {
   padding: var(--size-4-4);
 }
 
-.smtcmp-icon-picker-content h2 {
+.yolo-icon-picker-content h2 {
   margin: 0 0 var(--size-4-4) 0;
   font-size: var(--font-ui-medium);
   font-weight: 600;
   color: var(--text-normal);
 }
 
-.smtcmp-icon-picker-tabs {
+.yolo-icon-picker-tabs {
   display: flex;
   gap: var(--size-2-1);
   margin-bottom: var(--size-4-4);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.smtcmp-icon-picker-tab {
+.yolo-icon-picker-tab {
   padding: var(--size-4-1) var(--size-4-3);
   background: transparent;
   border: none;
@@ -714,17 +985,17 @@
   transition: all 0.2s ease;
 }
 
-.smtcmp-icon-picker-tab:hover {
+.yolo-icon-picker-tab:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
 
-.smtcmp-icon-picker-tab.active {
+.yolo-icon-picker-tab.active {
   color: var(--interactive-accent);
   border-bottom-color: var(--interactive-accent);
 }
 
-.smtcmp-icon-picker-grid {
+.yolo-icon-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
   gap: var(--size-2-2);
@@ -735,7 +1006,7 @@
   border-radius: var(--radius-m);
 }
 
-.smtcmp-icon-picker-item {
+.yolo-icon-picker-item {
   width: 48px;
   height: 48px;
   display: flex;
@@ -748,18 +1019,18 @@
   transition: all 0.15s ease;
 }
 
-.smtcmp-icon-picker-item:hover {
+.yolo-icon-picker-item:hover {
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border-hover);
   transform: scale(1.05);
 }
 
-.smtcmp-icon-picker-item.selected {
+.yolo-icon-picker-item.selected {
   background: var(--interactive-accent-hover);
   border-color: var(--interactive-accent);
 }
 
-.smtcmp-icon-picker-item-preview {
+.yolo-icon-picker-item-preview {
   width: 32px;
   height: 32px;
   display: flex;
@@ -768,14 +1039,14 @@
   color: var(--text-normal);
 }
 
-.smtcmp-icon-picker-custom-emoji {
+.yolo-icon-picker-custom-emoji {
   display: flex;
   gap: var(--size-4-2);
   margin-bottom: var(--size-4-4);
   align-items: center;
 }
 
-.smtcmp-icon-picker-emoji-input {
+.yolo-icon-picker-emoji-input {
   flex: 1;
   padding: var(--size-4-2);
   border: 1px solid var(--background-modifier-border);
@@ -785,12 +1056,12 @@
   font-size: var(--font-ui-medium);
 }
 
-.smtcmp-icon-picker-emoji-input:focus {
+.yolo-icon-picker-emoji-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
 }
 
-.smtcmp-icon-picker-confirm-btn {
+.yolo-icon-picker-confirm-btn {
   padding: var(--size-4-2) var(--size-4-4);
   background: var(--interactive-accent);
   color: var(--text-on-accent);
@@ -801,7 +1072,7 @@
   transition: all 0.2s ease;
 }
 
-.smtcmp-icon-picker-confirm-btn:hover {
+.yolo-icon-picker-confirm-btn:hover {
   background: var(--interactive-accent-hover);
 }
 
@@ -810,23 +1081,23 @@
 /* ==================== Emoji Icon Styles (No Background) ==================== */
 
 /* Assistant selector current icon - no background for emoji */
-.smtcmp-assistant-selector-current-icon:has(.smtcmp-icon-emoji) {
+.yolo-assistant-selector-current-icon:has(.yolo-icon-emoji) {
   background: none;
   box-shadow: none;
 }
 
 /* Assistant selector list item icon - no background for emoji */
-.smtcmp-assistant-selector-item-icon:has(.smtcmp-icon-emoji) {
+.yolo-assistant-selector-item-icon:has(.yolo-icon-emoji) {
   background: none;
 }
 
 /* Settings panel assistant list icon - no background for emoji */
-.smtcmp-assistant-icon:has(.smtcmp-icon-emoji) {
+.yolo-assistant-icon:has(.yolo-icon-emoji) {
   background: none;
 }
 
 /* Emoji icon font size adjustments */
-.smtcmp-icon-emoji {
+.yolo-icon-emoji {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -834,18 +1105,18 @@
   font-size: 16px;
 }
 
-.smtcmp-icon-emoji[data-size='14'] {
+.yolo-icon-emoji[data-size='14'] {
   font-size: 14px;
 }
 
-.smtcmp-icon-emoji[data-size='20'] {
+.yolo-icon-emoji[data-size='20'] {
   font-size: 20px;
 }
 
-.smtcmp-icon-emoji[data-size='16'] {
+.yolo-icon-emoji[data-size='16'] {
   font-size: 16px;
 }
 
-.smtcmp-icon-emoji[data-size='24'] {
+.yolo-icon-emoji[data-size='24'] {
   font-size: 24px;
 }

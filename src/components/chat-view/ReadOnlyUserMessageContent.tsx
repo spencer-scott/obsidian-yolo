@@ -61,7 +61,7 @@ function renderInlineNodes(
 
     if (node.type === SKILL_NODE_TYPE) {
       return (
-        <span key={key} className="mention smtcmp-skill-mention">
+        <span key={key} className="mention yolo-skill-mention">
           {getNodeText(node as SerializedSkillLikeNode)}
         </span>
       )
@@ -105,7 +105,7 @@ function renderEditorStateContent(
     if (node.type === PARAGRAPH_NODE_TYPE) {
       const children = renderInlineNodes(getChildren(node), key)
       return (
-        <div key={key} className="smtcmp-lexical-content-editable-paragraph">
+        <div key={key} className="yolo-lexical-content-editable-paragraph">
           {children.length > 0 ? children : '\u00a0'}
         </div>
       )
@@ -113,7 +113,7 @@ function renderEditorStateContent(
 
     if (node.type === LINE_BREAK_NODE_TYPE) {
       return (
-        <div key={key} className="smtcmp-lexical-content-editable-paragraph">
+        <div key={key} className="yolo-lexical-content-editable-paragraph">
           <br />
         </div>
       )
@@ -125,7 +125,7 @@ function renderEditorStateContent(
     }
 
     return (
-      <div key={key} className="smtcmp-lexical-content-editable-paragraph">
+      <div key={key} className="yolo-lexical-content-editable-paragraph">
         {children}
       </div>
     )
@@ -148,9 +148,7 @@ function ReadOnlyUserMessageContent({
   )
 
   return (
-    <div className="smtcmp-lexical-content-editable-root">
-      {renderedContent}
-    </div>
+    <div className="yolo-lexical-content-editable-root">{renderedContent}</div>
   )
 }
 

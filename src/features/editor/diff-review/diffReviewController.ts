@@ -5,7 +5,7 @@ import type { Editor, MarkdownView } from 'obsidian'
 import { ApplyReviewOverlay } from '../../../components/apply-view/ApplyReviewOverlay'
 import { InlineDiffReviewOverlay } from '../../../components/apply-view/InlineDiffReviewOverlay'
 import type { ApplyViewActions } from '../../../components/apply-view/types'
-import type SmartComposerPlugin from '../../../main'
+import type YoloPlugin from '../../../main'
 import type {
   ApplyViewCallbacks,
   ApplyViewState,
@@ -16,7 +16,7 @@ import { buildInlineReviewBlocks, countModifiedBlocks } from './review-model'
 const INLINE_DIFF_REVIEW_THRESHOLD = 3
 
 type DiffReviewControllerDeps = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   getActiveMarkdownView: () => MarkdownView | null
   getEditorView: (editor: Editor) => EditorView | null
 }

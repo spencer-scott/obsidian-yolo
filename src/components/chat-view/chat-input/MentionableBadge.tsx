@@ -39,13 +39,13 @@ function BadgeBase({
 }>) {
   return (
     <div
-      className={`smtcmp-chat-user-input-file-badge ${isFocused ? 'smtcmp-chat-user-input-file-badge-focused' : ''}`}
+      className={`yolo-chat-user-input-file-badge ${isFocused ? 'yolo-chat-user-input-file-badge-focused' : ''}`}
       onClick={onClick}
       title={title}
     >
       {showExpandButton && (
         <div
-          className="smtcmp-chat-user-input-file-badge-expand"
+          className="yolo-chat-user-input-file-badge-expand"
           onClick={(evt) => {
             evt.stopPropagation()
             onToggleExpand?.()
@@ -55,7 +55,7 @@ function BadgeBase({
       {children}
       {showDeleteButton && (
         <div
-          className="smtcmp-chat-user-input-file-badge-delete"
+          className="yolo-chat-user-input-file-badge-delete"
           onClick={(evt) => {
             evt.stopPropagation()
             onDelete()
@@ -96,11 +96,11 @@ function FileBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.file.name}</span>
@@ -131,11 +131,11 @@ function FolderBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.folder.name}</span>
@@ -182,16 +182,16 @@ function BlockBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.file.name}</span>
       </div>
-      <div className="smtcmp-chat-user-input-file-badge-name-suffix">
+      <div className="yolo-chat-user-input-file-badge-name-suffix">
         {suffix}
       </div>
     </BadgeBase>
@@ -220,11 +220,11 @@ function UrlBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.url}</span>
@@ -261,16 +261,16 @@ function AssistantQuoteBadge({
       showDeleteButton={showDeleteButton}
       title={mentionable.content}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{quoteLabel}</span>
       </div>
-      <div className="smtcmp-chat-user-input-file-badge-name-suffix">
+      <div className="yolo-chat-user-input-file-badge-name-suffix">
         {` (${count} ${unitLabel})`}
       </div>
     </BadgeBase>
@@ -305,11 +305,11 @@ function ImageBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.name}</span>
@@ -341,11 +341,11 @@ function PdfBadge({
       showDeleteButton={showDeleteButton}
       title={mentionable.name}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.name}</span>
@@ -376,11 +376,11 @@ function ModelBadge({
       showExpandButton={false}
       showDeleteButton={showDeleteButton}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         {Icon && (
           <Icon
             size={12}
-            className="smtcmp-chat-user-input-file-badge-name-icon"
+            className="yolo-chat-user-input-file-badge-name-icon"
           />
         )}
         <span>{mentionable.name}</span>

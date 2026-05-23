@@ -19,18 +19,18 @@ import {
   useSettings,
 } from '../../../contexts/settings-context'
 import { getEmbeddingModelClient } from '../../../core/rag/embedding'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { EmbeddingDbStats } from '../../../types/embedding'
 import { IndexProgress } from '../../chat-view/QueryProgress'
 import { ReactModal } from '../../common/ReactModal'
 
 type EmbeddingDbManagerModalComponentWrapperProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class EmbeddingDbManageModal extends ReactModal<EmbeddingDbManagerModalComponentWrapperProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app: app,
       Component: EmbeddingDbManagerModalComponentWrapper,
@@ -39,7 +39,7 @@ export class EmbeddingDbManageModal extends ReactModal<EmbeddingDbManagerModalCo
         title: 'Manage embedding database',
       },
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 
@@ -181,8 +181,8 @@ function EmbeddingDbManageModalComponent({
   }
 
   return (
-    <div className="smtcmp-settings-embedding-db-manage-root">
-      <div className="smtcmp-settings-embedding-db-manage-header">
+    <div className="yolo-settings-embedding-db-manage-root">
+      <div className="yolo-settings-embedding-db-manage-header">
         <button
           className="clickable-icon"
           aria-label="Refresh"
@@ -193,14 +193,14 @@ function EmbeddingDbManageModalComponent({
           }}
           disabled={isFetching}
         >
-          <RefreshCw size={16} className={cx(isFetching && 'smtcmp-spinner')} />
+          <RefreshCw size={16} className={cx(isFetching && 'yolo-spinner')} />
         </button>
 
-        <span className="smtcmp-settings-embedding-db-manage-last-updated">
+        <span className="yolo-settings-embedding-db-manage-last-updated">
           Last updated: {dayjs(dataUpdatedAt).format('YYYY-MM-DD HH:mm:ss')}
         </span>
       </div>
-      <table className="smtcmp-settings-embedding-db-manage-table">
+      <table className="yolo-settings-embedding-db-manage-table">
         <thead>
           <tr>
             <th>Model</th>
@@ -216,8 +216,8 @@ function EmbeddingDbManageModalComponent({
               <td>{stat.rowCount}</td>
               <td>{(stat.totalDataBytes / 1000 / 1000).toFixed(2)}</td>
               {indexProgressMap.get(stat.model) ? (
-                <td className="smtcmp-settings-embedding-db-manage-actions-loading">
-                  <Loader2 className="smtcmp-spinner" size={14} />
+                <td className="yolo-settings-embedding-db-manage-actions-loading">
+                  <Loader2 className="yolo-spinner" size={14} />
                   <div>
                     {Math.round(
                       ((indexProgressMap.get(stat.model)?.completedChunks ??
@@ -229,7 +229,7 @@ function EmbeddingDbManageModalComponent({
                   </div>
                 </td>
               ) : (
-                <td className="smtcmp-settings-embedding-db-manage-actions">
+                <td className="yolo-settings-embedding-db-manage-actions">
                   <button
                     className="clickable-icon"
                     aria-label="Rebuild index"

@@ -3,7 +3,7 @@ import { App } from 'obsidian'
 import { QueryProgressState } from '../../components/chat-view/QueryProgress'
 import { VectorManager } from '../../database/modules/vector/VectorManager'
 import { SelectEmbedding } from '../../database/schema'
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 import { EmbeddingModelClient } from '../../types/embedding'
 
 import { getEmbeddingModelClient } from './embedding'
@@ -32,16 +32,12 @@ export const dedupeRagQueryResults = (
 // TODO: do we really need this class? It seems like unnecessary abstraction.
 export class RAGEngine {
   private app: App
-  private settings: SmartComposerSettings
+  private settings: YoloSettings
   private vectorManager: VectorManager | null = null
   private embeddingModel: EmbeddingModelClient | null = null
   private indexUpdateQueue: Promise<void> = Promise.resolve()
 
-  constructor(
-    app: App,
-    settings: SmartComposerSettings,
-    vectorManager: VectorManager,
-  ) {
+  constructor(app: App, settings: YoloSettings, vectorManager: VectorManager) {
     this.app = app
     this.settings = settings
     this.vectorManager = vectorManager
@@ -57,7 +53,7 @@ export class RAGEngine {
   }
 
   // TODO: use addSettingsChangeListener
-  setSettings(settings: SmartComposerSettings) {
+  setSettings(settings: YoloSettings) {
     this.settings = settings
     this.embeddingModel = getEmbeddingModelClient({
       settings,
@@ -92,6 +88,7 @@ export class RAGEngine {
           excludePatterns: this.settings.ragOptions.excludePatterns,
           includePatterns: this.settings.ragOptions.includePatterns,
           indexPdf: this.settings.ragOptions.indexPdf ?? true,
+          embeddingConcurrency: this.settings.ragOptions.embeddingConcurrency,
           settings: this.settings,
         },
         {

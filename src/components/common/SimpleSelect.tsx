@@ -59,13 +59,13 @@ export function SimpleSelect({
   return (
     <DropdownMenu.Root open={isOpen} onOpenChange={(open) => setIsOpen(open)}>
       <DropdownMenu.Trigger
-        className="smtcmp-simple-select__trigger"
+        className="yolo-simple-select__trigger"
         disabled={disabled}
       >
-        <div className="smtcmp-simple-select__label">
+        <div className="yolo-simple-select__label">
           {selected?.label ?? placeholder}
         </div>
-        <div className="smtcmp-simple-select__icon">
+        <div className="yolo-simple-select__icon">
           {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </div>
       </DropdownMenu.Trigger>
@@ -74,8 +74,8 @@ export function SimpleSelect({
         <DropdownMenu.Content
           className={
             contentClassName
-              ? `smtcmp-simple-select__content ${contentClassName}`
-              : 'smtcmp-simple-select__content'
+              ? `yolo-simple-select__content ${contentClassName}`
+              : 'yolo-simple-select__content'
           }
           side={side}
           sideOffset={sideOffset}
@@ -89,7 +89,7 @@ export function SimpleSelect({
           }}
         >
           <DropdownMenu.RadioGroup
-            className="smtcmp-simple-select__list"
+            className="yolo-simple-select__list"
             value={value}
             onValueChange={(nextValue) => {
               if (nextValue === value) return
@@ -103,20 +103,20 @@ export function SimpleSelect({
               const items = group.options.map((option) => (
                 <DropdownMenu.RadioItem
                   key={option.value}
-                  className="smtcmp-simple-select__item"
+                  className="yolo-simple-select__item"
                   value={option.value}
                 >
-                  <div className="smtcmp-simple-select__item-text">
-                    <div className="smtcmp-simple-select__item-label">
+                  <div className="yolo-simple-select__item-text">
+                    <div className="yolo-simple-select__item-label">
                       {option.label}
                     </div>
                     {option.description ? (
-                      <div className="smtcmp-simple-select__item-desc">
+                      <div className="yolo-simple-select__item-desc">
                         {option.description}
                       </div>
                     ) : null}
                   </div>
-                  <DropdownMenu.ItemIndicator className="smtcmp-simple-select__item-indicator">
+                  <DropdownMenu.ItemIndicator className="yolo-simple-select__item-indicator">
                     <Check size={12} />
                   </DropdownMenu.ItemIndicator>
                 </DropdownMenu.RadioItem>
@@ -125,7 +125,7 @@ export function SimpleSelect({
               const label = group.label ? (
                 <DropdownMenu.Label
                   key={`group-${groupIndex}`}
-                  className="smtcmp-simple-select__group-label"
+                  className="yolo-simple-select__group-label"
                 >
                   {group.label}
                 </DropdownMenu.Label>
@@ -139,7 +139,7 @@ export function SimpleSelect({
                 groupIndex < totalGroups - 1 ? (
                   <DropdownMenu.Separator
                     key={`sep-${groupIndex}`}
-                    className="smtcmp-simple-select__group-separator"
+                    className="yolo-simple-select__group-separator"
                   />
                 ) : null
 

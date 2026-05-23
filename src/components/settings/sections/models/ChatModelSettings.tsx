@@ -1,7 +1,7 @@
 import { App, Notice } from 'obsidian'
 import { useState } from 'react'
 
-import SmartComposerPlugin from '../../../../main'
+import YoloPlugin from '../../../../main'
 import { ChatModel } from '../../../../types/chat-model.types'
 import { ObsidianButton } from '../../../common/ObsidianButton'
 import { ObsidianDropdown } from '../../../common/ObsidianDropdown'
@@ -10,11 +10,11 @@ import { ReactModal } from '../../../common/ReactModal'
 
 type SettingsComponentProps = {
   model: ChatModel
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class ChatModelSettingsModal extends ReactModal<SettingsComponentProps> {
-  constructor(model: ChatModel, app: App, plugin: SmartComposerPlugin) {
+  constructor(model: ChatModel, app: App, plugin: YoloPlugin) {
     const modelSettings = getModelSettings(model)
     super({
       app: app,

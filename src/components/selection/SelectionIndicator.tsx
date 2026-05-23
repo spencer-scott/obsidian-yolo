@@ -97,7 +97,7 @@ export function SelectionIndicator({
   )
 
   const classes =
-    `smtcmp-selection-indicator ${isVisible ? 'visible' : ''}`.trim()
+    `yolo-selection-indicator ${isVisible ? 'visible' : ''}`.trim()
 
   return (
     <div

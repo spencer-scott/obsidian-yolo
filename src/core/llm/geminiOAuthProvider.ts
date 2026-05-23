@@ -1,7 +1,4 @@
-import type {
-  GenerateContentResponse as GeminiGenerateContentResponse,
-  Tool as GeminiTool,
-} from '@google/genai'
+import type { GenerateContentResponse as GeminiGenerateContentResponse } from '@google/genai'
 import { Platform } from 'obsidian'
 
 import { ChatModel } from '../../types/chat-model.types'
@@ -9,7 +6,6 @@ import {
   LLMOptions,
   LLMRequestNonStreaming,
   LLMRequestStreaming,
-  RequestTool,
 } from '../../types/llm/request'
 import {
   LLMResponseNonStreaming,
@@ -22,43 +18,64 @@ import {
 } from '../../types/reasoning'
 import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
-import { loadDesktopNodeModule } from '../../utils/platform/desktopNodeModule'
 import { getGeminiOAuthService } from '../auth/geminiOAuthRuntime'
 
 import { BaseLLMProvider } from './base'
-import {
-  LLMProviderNotConfiguredException,
-  LLMRateLimitExceededException,
-} from './exception'
+import { LLMProviderNotConfiguredException } from './exception'
 import { GeminiProvider } from './gemini'
-import { ModelRequestPolicy, runWithModelRequestPolicy } from './requestPolicy'
+import {
+  type GeminiFetchRequest,
+  type GeminiTransportContext,
+  type GeminiUnwrap,
+  geminiGenerateViaFetch,
+  geminiStreamViaBufferedFetch,
+  geminiStreamViaFetch,
+} from './geminiFetchTransport'
+import { ModelRequestPolicy } from './requestPolicy'
 import {
   createRequestTransportMemoryKey,
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
-
-type Readable = import('node:stream').Readable
+import { createBrowserFetch, createDesktopNodeFetch } from './sdkFetch'
 
 const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
+const PROVIDER_LABEL = 'Gemini OAuth'
 
-type GeminiApiBody = {
-  response?: GeminiGenerateContentResponse
+type CodeAssistResponseEnvelope = {
+  response?: GeminiGenerateContentResponse & { responseId?: string }
   traceId?: string
 }
 
-type GeminiStreamingChunk = GeminiGenerateContentResponse & {
-  responseId?: string
+// Code Assist wraps the native Gemini response as `{ response, traceId }` for
+// non-streaming calls and as bare chunks (sometimes with `responseId`) for SSE.
+// Surface either shape as the native response.
+const unwrapCodeAssistResponse: GeminiUnwrap = (raw) => {
+  const value = raw as
+    | CodeAssistResponseEnvelope
+    | GeminiGenerateContentResponse
+  if (
+    value &&
+    typeof value === 'object' &&
+    'response' in value &&
+    value.response
+  ) {
+    const responseId = value.response.responseId ?? value.traceId
+    return (
+      responseId ? { ...value.response, responseId } : value.response
+    ) as GeminiGenerateContentResponse & { responseId?: string }
+  }
+  return value as GeminiGenerateContentResponse & { responseId?: string }
 }
 
 export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
-  private readonly browserFetch = globalThis.fetch
-  private readonly requestTransportMemoryKey: string
+  private readonly browserFetch = createBrowserFetch()
   private readonly obsidianFetch = createObsidianFetch()
   private readonly nodeFetch = createDesktopNodeFetch()
+  private readonly requestTransportMemoryKey: string
   private readonly requestTransportMode: RequestTransportMode
   private readonly requestPolicy?: ModelRequestPolicy
+  private readonly transportContext: GeminiTransportContext
 
   constructor(
     provider: LLMProvider,
@@ -82,6 +99,11 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
         : Platform.isDesktop
           ? 'node'
           : 'obsidian'
+    this.transportContext = {
+      providerLabel: PROVIDER_LABEL,
+      requestPolicy: this.requestPolicy,
+      unwrap: unwrapCodeAssistResponse,
+    }
   }
 
   async getEmbedding(
@@ -100,31 +122,42 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
     options?: LLMOptions,
   ): Promise<LLMResponseNonStreaming> {
     const payload = await this.buildWrappedPayload(model, request, options)
+    const fetchRequest: GeminiFetchRequest = {
+      url: `${CODE_ASSIST_ENDPOINT}/v1internal:generateContent`,
+      headers: payload.headers,
+      body: payload.body,
+    }
 
     return runWithRequestTransport({
       mode: this.requestTransportMode,
       memoryKey: this.requestTransportMemoryKey,
-      runBrowser: async () =>
-        this.generateViaFetch(
-          this.browserFetch,
-          payload,
-          request.model,
-          options?.signal,
-        ),
-      runObsidian: async () =>
-        this.generateViaFetch(
-          this.obsidianFetch,
-          payload,
-          request.model,
-          options?.signal,
-        ),
-      runNode: async () =>
-        this.generateViaFetch(
-          this.nodeFetch,
-          payload,
-          request.model,
-          options?.signal,
-        ),
+      runBrowser: () =>
+        geminiGenerateViaFetch({
+          fetchImpl: this.browserFetch,
+          request: fetchRequest,
+          model: request.model,
+          signal: options?.signal,
+          parse: GeminiProvider.parseNonStreamingResponse,
+          context: this.transportContext,
+        }),
+      runObsidian: () =>
+        geminiGenerateViaFetch({
+          fetchImpl: this.obsidianFetch,
+          request: fetchRequest,
+          model: request.model,
+          signal: options?.signal,
+          parse: GeminiProvider.parseNonStreamingResponse,
+          context: this.transportContext,
+        }),
+      runNode: () =>
+        geminiGenerateViaFetch({
+          fetchImpl: this.nodeFetch,
+          request: fetchRequest,
+          model: request.model,
+          signal: options?.signal,
+          parse: GeminiProvider.parseNonStreamingResponse,
+          context: this.transportContext,
+        }),
     })
   }
 
@@ -134,22 +167,43 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
     options?: LLMOptions,
   ): Promise<AsyncIterable<LLMResponseStreaming>> {
     const payload = await this.buildWrappedPayload(model, request, options)
+    const fetchRequest: GeminiFetchRequest = {
+      url: `${CODE_ASSIST_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`,
+      headers: payload.headers,
+      body: payload.body,
+    }
 
     return runWithRequestTransportForStream({
       mode: this.requestTransportMode,
       memoryKey: this.requestTransportMemoryKey,
       signal: options?.signal,
-      createBrowserStream: async (signal) =>
-        this.streamViaFetch(this.browserFetch, payload, request.model, signal),
-      createObsidianStream: async (signal) =>
-        this.streamViaBufferedFetch(
-          this.obsidianFetch,
-          payload,
-          request.model,
+      createBrowserStream: (signal) =>
+        geminiStreamViaFetch({
+          fetchImpl: this.browserFetch,
+          request: fetchRequest,
+          model: request.model,
           signal,
-        ),
-      createNodeStream: async (signal) =>
-        this.streamViaFetch(this.nodeFetch, payload, request.model, signal),
+          parse: GeminiProvider.parseStreamingResponseChunk,
+          context: this.transportContext,
+        }),
+      createObsidianStream: (signal) =>
+        geminiStreamViaBufferedFetch({
+          fetchImpl: this.obsidianFetch,
+          request: fetchRequest,
+          model: request.model,
+          signal,
+          parse: GeminiProvider.parseStreamingResponseChunk,
+          context: this.transportContext,
+        }),
+      createNodeStream: (signal) =>
+        geminiStreamViaFetch({
+          fetchImpl: this.nodeFetch,
+          request: fetchRequest,
+          model: request.model,
+          signal,
+          parse: GeminiProvider.parseStreamingResponseChunk,
+          context: this.transportContext,
+        }),
     })
   }
 
@@ -160,7 +214,6 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
   ): Promise<{
     headers: Headers
     body: string
-    streaming: boolean
   }> {
     const service = getGeminiOAuthService(this.provider.id)
     if (!service) {
@@ -237,11 +290,12 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
       }
     }
 
-    const tools = this.prepareTools(request, options)
+    const prepared = GeminiProvider.prepareTools(request, model, options)
     const requestPayloadBase = {
       contents: GeminiProvider.buildRequestContents(request.messages),
       ...(Object.keys(config).length > 0 ? { generationConfig: config } : {}),
-      ...(tools ? { tools } : {}),
+      ...(prepared ? { tools: prepared.tools } : {}),
+      ...(prepared?.toolConfig ? { toolConfig: prepared.toolConfig } : {}),
       ...(systemInstruction
         ? {
             systemInstruction: {
@@ -271,315 +325,6 @@ export class GeminiOAuthProvider extends BaseLLMProvider<LLMProvider> {
       ...(toProviderHeadersRecord(this.provider.customHeaders) ?? {}),
     })
 
-    return {
-      headers,
-      body,
-      streaming: request.stream === true,
-    }
-  }
-
-  private async generateViaFetch(
-    customFetch: typeof fetch,
-    payload: {
-      headers: Headers
-      body: string
-    },
-    model: string,
-    signal?: AbortSignal,
-  ): Promise<LLMResponseNonStreaming> {
-    const response = await runWithModelRequestPolicy({
-      requestPolicy: this.requestPolicy,
-      signal,
-      run: (requestSignal) =>
-        customFetch(`${CODE_ASSIST_ENDPOINT}/v1internal:generateContent`, {
-          method: 'POST',
-          headers: payload.headers,
-          body: payload.body,
-          signal: requestSignal,
-        }),
-    })
-
-    if (!response.ok) {
-      await this.throwForBadResponse(response)
-    }
-
-    const parsed = (await response.json()) as
-      | GeminiApiBody
-      | GeminiGenerateContentResponse
-    const body = this.unwrapResponse(parsed)
-    return GeminiProvider.parseNonStreamingResponse(
-      body,
-      model,
-      body.responseId ?? crypto.randomUUID(),
-    )
-  }
-
-  private async streamViaFetch(
-    customFetch: typeof fetch,
-    payload: {
-      headers: Headers
-      body: string
-    },
-    model: string,
-    signal?: AbortSignal,
-  ): Promise<AsyncIterable<LLMResponseStreaming>> {
-    const headers = new Headers(payload.headers)
-    headers.set('Accept', 'text/event-stream')
-
-    const response = await runWithModelRequestPolicy({
-      requestPolicy: this.requestPolicy,
-      signal,
-      run: (requestSignal) =>
-        customFetch(
-          `${CODE_ASSIST_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`,
-          {
-            method: 'POST',
-            headers,
-            body: payload.body,
-            signal: requestSignal,
-          },
-        ),
-    })
-
-    if (!response.ok) {
-      await this.throwForBadResponse(response)
-    }
-
-    if (!response.body) {
-      throw new Error('Gemini OAuth streaming response body is missing.')
-    }
-
-    return this.streamFromSse(response.body, model, signal)
-  }
-
-  private async streamViaBufferedFetch(
-    customFetch: typeof fetch,
-    payload: {
-      headers: Headers
-      body: string
-    },
-    model: string,
-    signal?: AbortSignal,
-  ): Promise<AsyncIterable<LLMResponseStreaming>> {
-    const headers = new Headers(payload.headers)
-    headers.set('Accept', 'text/event-stream')
-
-    const response = await runWithModelRequestPolicy({
-      requestPolicy: this.requestPolicy,
-      signal,
-      run: (requestSignal) =>
-        customFetch(
-          `${CODE_ASSIST_ENDPOINT}/v1internal:streamGenerateContent?alt=sse`,
-          {
-            method: 'POST',
-            headers,
-            body: payload.body,
-            signal: requestSignal,
-          },
-        ),
-    })
-
-    if (!response.ok) {
-      await this.throwForBadResponse(response)
-    }
-
-    const text = await response.text()
-    return this.streamFromSseText(text, model)
-  }
-
-  private async throwForBadResponse(response: Response): Promise<never> {
-    const text = await response.text().catch(() => '')
-    if (response.status === 429) {
-      throw new LLMRateLimitExceededException(
-        `Gemini OAuth rate limit exceeded: ${text || response.statusText}`,
-      )
-    }
-    throw new Error(
-      `Gemini OAuth request failed (${response.status} ${response.statusText})${text ? `: ${text}` : ''}`,
-    )
-  }
-
-  private unwrapResponse(
-    value: GeminiApiBody | GeminiGenerateContentResponse,
-  ): GeminiGenerateContentResponse {
-    if ('response' in value && value.response) {
-      const responseId = value.response.responseId ?? value.traceId
-      return (
-        responseId ? { ...value.response, responseId } : value.response
-      ) as GeminiGenerateContentResponse
-    }
-    return value as GeminiGenerateContentResponse
-  }
-
-  private async *streamFromSse(
-    stream: ReadableStream<Uint8Array> | Readable,
-    model: string,
-    signal?: AbortSignal,
-  ): AsyncIterable<LLMResponseStreaming> {
-    const reader = (await this.toReadableStream(stream)).getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    try {
-      while (true) {
-        if (signal?.aborted) {
-          throw new DOMException('Aborted', 'AbortError')
-        }
-        const { value, done } = await reader.read()
-        if (done) {
-          break
-        }
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split(/\r?\n/)
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          const chunk = this.parseSseLine(line, model)
-          if (chunk) {
-            yield chunk
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        const chunk = this.parseSseLine(buffer, model)
-        if (chunk) {
-          yield chunk
-        }
-      }
-    } finally {
-      await reader.cancel().catch(() => undefined)
-    }
-  }
-
-  private async streamFromSseText(
-    text: string,
-    model: string,
-  ): Promise<AsyncIterable<LLMResponseStreaming>> {
-    const lines = text.split(/\r?\n/)
-    const chunks = lines
-      .map((line) => this.parseSseLine(line, model))
-      .filter((chunk): chunk is LLMResponseStreaming => Boolean(chunk))
-
-    return {
-      async *[Symbol.asyncIterator]() {
-        for (const chunk of chunks) {
-          yield chunk
-        }
-      },
-    }
-  }
-
-  private parseSseLine(
-    line: string,
-    model: string,
-  ): LLMResponseStreaming | null {
-    const trimmed = line.trim()
-    if (!trimmed.startsWith('data:')) {
-      return null
-    }
-
-    const data = trimmed.slice(5).trim()
-    if (!data || data === '[DONE]') {
-      return null
-    }
-
-    const parsed = JSON.parse(data) as GeminiApiBody | GeminiStreamingChunk
-    const body = this.unwrapResponse(parsed)
-    return GeminiProvider.parseStreamingResponseChunk(
-      body as never,
-      model,
-      body.responseId ?? crypto.randomUUID(),
-    )
-  }
-
-  private async toReadableStream(
-    stream: ReadableStream<Uint8Array> | Readable,
-  ): Promise<ReadableStream<Uint8Array>> {
-    if ('getReader' in stream) {
-      return stream
-    }
-
-    const { Readable } =
-      await loadDesktopNodeModule<typeof import('node:stream')>('node:stream')
-    const readableWithToWeb = Readable as typeof Readable & {
-      toWeb?: (stream: Readable) => ReadableStream<Uint8Array>
-    }
-    if (typeof readableWithToWeb.toWeb === 'function') {
-      return readableWithToWeb.toWeb(stream)
-    }
-
-    return new ReadableStream<Uint8Array>({
-      start(controller) {
-        stream.on('data', (chunk: Buffer | string) => {
-          const value =
-            typeof chunk === 'string'
-              ? new TextEncoder().encode(chunk)
-              : new Uint8Array(chunk)
-          controller.enqueue(value)
-        })
-        stream.once('end', () => controller.close())
-        stream.once('error', (error) => controller.error(error))
-      },
-      cancel() {
-        stream.destroy()
-      },
-    })
-  }
-
-  private prepareTools(
-    request: LLMRequestNonStreaming | LLMRequestStreaming,
-    options?: LLMOptions,
-  ): GeminiTool[] | undefined {
-    const tools: GeminiTool[] = []
-
-    if (options?.geminiTools?.useWebSearch) {
-      tools.push({ googleSearch: {} })
-    }
-
-    if (options?.geminiTools?.useUrlContext) {
-      tools.push({ urlContext: {} })
-    }
-
-    if (request.tools && request.tools.length > 0) {
-      tools.push(...request.tools.map((tool) => this.parseRequestTool(tool)))
-    }
-
-    return tools.length > 0 ? tools : undefined
-  }
-
-  private parseRequestTool(tool: RequestTool): GeminiTool {
-    const cleanedSchema = this.removeAdditionalProperties(
-      tool.function.parameters,
-    )
-
-    return {
-      functionDeclarations: [
-        {
-          name: tool.function.name,
-          description: tool.function.description,
-          parametersJsonSchema: cleanedSchema,
-        },
-      ],
-    }
-  }
-
-  private removeAdditionalProperties(schema: unknown): unknown {
-    if (typeof schema !== 'object' || schema === null) {
-      return schema
-    }
-
-    if (Array.isArray(schema)) {
-      return schema.map((item) => this.removeAdditionalProperties(item))
-    }
-
-    const rest = { ...(schema as Record<string, unknown>) }
-    delete rest.additionalProperties
-
-    return Object.fromEntries(
-      Object.entries(rest).map(([key, value]) => [
-        key,
-        this.removeAdditionalProperties(value),
-      ]),
-    )
+    return { headers, body }
   }
 }

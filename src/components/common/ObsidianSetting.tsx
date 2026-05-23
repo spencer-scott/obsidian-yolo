@@ -68,7 +68,7 @@ export function ObsidianSetting({
     setting.nameEl.setAttrs({
       class: classNames(
         defaultNameElClassName.current,
-        required ? 'smtcmp-settings-required' : '',
+        required ? 'yolo-settings-required' : '',
       ),
     })
   }, [name, desc, heading, className, setting, required])
@@ -78,15 +78,15 @@ export function ObsidianSetting({
       nameExtraContainerRef.current?.remove()
       nameExtraContainerRef.current = null
       setNameExtraContainer(null)
-      setting?.nameEl.removeClass('smtcmp-setting-name-row')
+      setting?.nameEl.removeClass('yolo-setting-name-row')
       return
     }
 
     nameExtraContainerRef.current?.remove()
     const container = document.createElement('span')
-    container.className = 'smtcmp-setting-name-extra'
+    container.className = 'yolo-setting-name-extra'
     container.dataset.settingName = name ?? ''
-    setting.nameEl.addClass('smtcmp-setting-name-row')
+    setting.nameEl.addClass('yolo-setting-name-row')
     setting.nameEl.appendChild(container)
     nameExtraContainerRef.current = container
     setNameExtraContainer(container)
@@ -97,8 +97,8 @@ export function ObsidianSetting({
         nameExtraContainerRef.current = null
         setNameExtraContainer(null)
       }
-      if (!setting.nameEl.querySelector('.smtcmp-setting-name-extra')) {
-        setting.nameEl.removeClass('smtcmp-setting-name-row')
+      if (!setting.nameEl.querySelector('.yolo-setting-name-extra')) {
+        setting.nameEl.removeClass('yolo-setting-name-row')
       }
     }
   }, [name, nameExtra, setting])

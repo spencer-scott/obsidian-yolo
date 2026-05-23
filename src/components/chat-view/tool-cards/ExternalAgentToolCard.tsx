@@ -418,7 +418,7 @@ function StatusBadge({
             'yolo-external-agent-card__badge--running',
           )}
         >
-          <Loader2 size={12} className="smtcmp-spinner" />
+          <Loader2 size={12} className="yolo-spinner" />
           <span>{t('chat.externalAgent.statusRunning', 'Running')}</span>
         </span>
       )

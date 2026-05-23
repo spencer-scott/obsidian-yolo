@@ -1,18 +1,16 @@
 import React from 'react'
 
-import SmartComposerPlugin from '../main'
+import YoloPlugin from '../main'
 
 // Plugin context
-const PluginContext = React.createContext<SmartComposerPlugin | undefined>(
-  undefined,
-)
+const PluginContext = React.createContext<YoloPlugin | undefined>(undefined)
 
 export const PluginProvider = ({
   children,
   plugin,
 }: {
   children: React.ReactNode
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }) => {
   return (
     <PluginContext.Provider value={plugin}>{children}</PluginContext.Provider>

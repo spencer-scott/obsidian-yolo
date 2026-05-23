@@ -10,7 +10,7 @@ import {
   type WebSearchProviderOptions,
   webSearchProviderOptionsSchema,
 } from '../../../core/web-search'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianDropdown } from '../../common/ObsidianDropdown'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
@@ -21,17 +21,13 @@ import { ReactModal } from '../../common/ReactModal'
 
 type FormProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   draft?: WebSearchProviderOptions // when adding a new provider
   editId?: string // when editing an existing provider
 }
 
 export class WebSearchProviderNewModal extends ReactModal<FormProps> {
-  constructor(
-    app: App,
-    plugin: SmartComposerPlugin,
-    draft: WebSearchProviderOptions,
-  ) {
+  constructor(app: App, plugin: YoloPlugin, draft: WebSearchProviderOptions) {
     super({
       app,
       Component: Wrapper,
@@ -45,7 +41,7 @@ export class WebSearchProviderNewModal extends ReactModal<FormProps> {
 }
 
 export class WebSearchProviderEditModal extends ReactModal<FormProps> {
-  constructor(app: App, plugin: SmartComposerPlugin, editId: string) {
+  constructor(app: App, plugin: YoloPlugin, editId: string) {
     super({
       app,
       Component: Wrapper,
@@ -139,7 +135,7 @@ function Form({ draft, editId, onClose }: FormProps & { onClose: () => void }) {
   }
 
   return (
-    <div className="smtcmp-ws-edit-form">
+    <div className="yolo-ws-edit-form">
       {form.type === 'tavily' && (
         <>
           <ApiKeyField
@@ -242,7 +238,7 @@ function Form({ draft, editId, onClose }: FormProps & { onClose: () => void }) {
       )}
 
       {form.type === 'bing' && (
-        <div className="smtcmp-settings-desc">
+        <div className="yolo-settings-desc">
           {t(
             'settings.webSearch.bingNote',
             'Bing requires no API key. The provider scrapes the public results page; reliability depends on Bing\u2019s anti-bot measures.',
@@ -413,15 +409,15 @@ function SystemPromptField({
     <>
       <ObsidianSetting
         name={t('settings.webSearch.fieldSystemPrompt', 'System prompt')}
-        className="smtcmp-settings-textarea-header"
+        className="yolo-settings-textarea-header"
       />
-      <ObsidianSetting className="smtcmp-settings-textarea">
+      <ObsidianSetting className="yolo-settings-textarea">
         <ObsidianTextArea
           value={value}
           onChange={onChange}
           autoResize
           maxAutoResizeHeight={360}
-          inputClassName="smtcmp-ws-system-prompt-textarea"
+          inputClassName="yolo-ws-system-prompt-textarea"
         />
       </ObsidianSetting>
     </>

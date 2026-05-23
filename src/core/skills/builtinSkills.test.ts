@@ -26,6 +26,6 @@ describe('builtin skills', () => {
     )
 
     expect(outputFormat).not.toBeUndefined()
-    expect(outputFormat?.content).toContain('<smtcmp_block>')
+    expect(outputFormat?.content).toContain('<yolo_block>')
   })
 })

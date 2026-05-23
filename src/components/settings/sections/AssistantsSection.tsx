@@ -64,12 +64,12 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
   ).replace('{count}', String(assistants.length))
 
   return (
-    <div className="smtcmp-settings-section smtcmp-settings-section--tight">
+    <div className="yolo-settings-section yolo-settings-section--tight">
       <ObsidianSetting
         name={t('settings.assistants.title')}
         desc={t('settings.assistants.desc')}
       >
-        <div className="smtcmp-settings-desc">{assistantsCountLabel}</div>
+        <div className="yolo-settings-desc">{assistantsCountLabel}</div>
         <ObsidianButton
           text={t('settings.agent.newAgent', 'New agent')}
           onClick={() => {
@@ -244,9 +244,9 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
         `div[data-assistant-id="${movedId}"]`,
       )
       if (movedItem) {
-        movedItem.classList.add('smtcmp-assistant-item-drop-success')
+        movedItem.classList.add('yolo-assistant-item-drop-success')
         window.setTimeout(() => {
-          movedItem.classList.remove('smtcmp-assistant-item-drop-success')
+          movedItem.classList.remove('yolo-assistant-item-drop-success')
         }, 700)
       } else if (attempt < 8) {
         window.setTimeout(() => tryFind(attempt + 1), 50)
@@ -281,7 +281,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
   }
 
   return (
-    <div className="smtcmp-settings-section">
+    <div className="yolo-settings-section">
       <ObsidianSetting
         name={t('settings.assistants.title')}
         desc={t('settings.assistants.desc')}
@@ -294,7 +294,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
 
       {/* Add new assistant form */}
       {isAddingAssistant && editingAssistant && (
-        <div className="smtcmp-assistant-editor smtcmp-assistant-editor-new">
+        <div className="yolo-assistant-editor yolo-assistant-editor-new">
           <ObsidianSetting
             name={t('settings.assistants.name', 'Name')}
             desc={t('settings.assistants.nameDesc', 'Assistant name')}
@@ -350,9 +350,9 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
               'settings.assistants.systemPromptDesc',
               'This prompt will be added to the beginning of every chat.',
             )}
-            className="smtcmp-settings-textarea-header smtcmp-settings-desc-copyable"
+            className="yolo-settings-textarea-header yolo-settings-desc-copyable"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={editingAssistant.systemPrompt || ''}
               onChange={(value) =>
@@ -368,7 +368,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-assistant-editor-buttons">
+          <div className="yolo-assistant-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAssistant()}
@@ -389,8 +389,8 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
       )}
 
       {assistants.length === 0 ? (
-        <div className="smtcmp-no-assistants">
-          <p className="smtcmp-no-assistants-text">
+        <div className="yolo-no-assistants">
+          <p className="yolo-no-assistants-text">
             {t('settings.assistants.noAssistants')}
           </p>
         </div>
@@ -404,7 +404,7 @@ export const AssistantsSectionContent: FC<AssistantsSectionProps> = ({
             items={assistantIds}
             strategy={verticalListSortingStrategy}
           >
-            <div className="smtcmp-assistants-list">
+            <div className="yolo-assistants-list">
               {assistants.map((assistant) => {
                 const isEditing =
                   !isAddingAssistant && editingAssistant?.id === assistant.id
@@ -469,12 +469,12 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
         ref={setNodeRef}
         style={style}
         data-assistant-id={assistant.id}
-        className={`smtcmp-assistant-item ${isEditing ? 'editing' : ''} ${isDragging ? 'smtcmp-assistant-item-dragging' : ''}`}
+        className={`yolo-assistant-item ${isEditing ? 'editing' : ''} ${isDragging ? 'yolo-assistant-item-dragging' : ''}`}
         {...attributes}
       >
-        <div className="smtcmp-assistant-drag-handle">
+        <div className="yolo-assistant-drag-handle">
           <span
-            className={`smtcmp-drag-handle ${isDragging ? 'smtcmp-drag-handle--active' : ''}`}
+            className={`yolo-drag-handle ${isDragging ? 'yolo-drag-handle--active' : ''}`}
             aria-label={t(
               'settings.assistants.dragHandleAria',
               'Drag to reorder',
@@ -484,22 +484,22 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
             <GripVertical size={16} />
           </span>
         </div>
-        <div className="smtcmp-assistant-content">
-          <div className="smtcmp-assistant-header">
-            <div className="smtcmp-assistant-icon">
+        <div className="yolo-assistant-content">
+          <div className="yolo-assistant-header">
+            <div className="yolo-assistant-icon">
               {renderAssistantIcon(assistant.icon, 16)}
             </div>
-            <div className="smtcmp-assistant-info">
-              <div className="smtcmp-assistant-name">{assistant.name}</div>
+            <div className="yolo-assistant-info">
+              <div className="yolo-assistant-name">{assistant.name}</div>
               {assistant.description && (
-                <div className="smtcmp-assistant-description">
+                <div className="yolo-assistant-description">
                   {assistant.description}
                 </div>
               )}
             </div>
           </div>
         </div>
-        <div className="smtcmp-assistant-controls">
+        <div className="yolo-assistant-controls">
           <ObsidianButton
             onClick={() => {
               if (isEditing) {
@@ -530,7 +530,7 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
       </div>
 
       {isEditing && currentEditing && (
-        <div className="smtcmp-assistant-editor smtcmp-assistant-editor-inline">
+        <div className="yolo-assistant-editor yolo-assistant-editor-inline">
           <ObsidianSetting
             name={t('settings.assistants.name', 'Name')}
             desc={t('settings.assistants.nameDesc', 'Assistant name')}
@@ -593,9 +593,9 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
               'settings.assistants.systemPromptDesc',
               'This prompt will be added to the beginning of every chat.',
             )}
-            className="smtcmp-settings-textarea-header smtcmp-settings-desc-copyable"
+            className="yolo-settings-textarea-header yolo-settings-desc-copyable"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={currentEditing.systemPrompt || ''}
               onChange={(value) =>
@@ -611,7 +611,7 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-assistant-editor-buttons">
+          <div className="yolo-assistant-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAssistant()}

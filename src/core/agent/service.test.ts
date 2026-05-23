@@ -1,17 +1,20 @@
-import { ChatMessage } from '../../types/chat'
+import { ChatMessage, ChatUserMessage } from '../../types/chat'
 import { ToolCallResponseStatus } from '../../types/tool-call.types'
 
 import { AgentService } from './service'
+import { AgentRuntimeRunInput } from './types'
 
 type MockRuntimeInstance = {
   abort: jest.Mock
-  run: jest.Mock<Promise<void>, []>
+  run: jest.Mock<Promise<void>, [AgentRuntimeRunInput]>
   subscribe: jest.Mock<
     () => void,
     [(snapshot: { messages: ChatMessage[] }) => void]
   >
   emitSnapshot: (messages: ChatMessage[]) => void
   resolveRun: () => void
+  rejectRun: (error: Error) => void
+  getRunInput: () => AgentRuntimeRunInput | null
 }
 
 const runtimeInstances: MockRuntimeInstance[] = []
@@ -26,13 +29,19 @@ jest.mock('./native-runtime', () => ({
         }) => void)
       | null = null
     let resolveRun: (() => void) | null = null
-    const runPromise = new Promise<void>((resolve) => {
+    let rejectRun: ((error: Error) => void) | null = null
+    let capturedInput: AgentRuntimeRunInput | null = null
+    const runPromise = new Promise<void>((resolve, reject) => {
       resolveRun = resolve
+      rejectRun = reject
     })
 
     const instance: MockRuntimeInstance = {
       abort: jest.fn(),
-      run: jest.fn(() => runPromise),
+      run: jest.fn((input: AgentRuntimeRunInput) => {
+        capturedInput = input
+        return runPromise
+      }),
       subscribe: jest.fn((callback) => {
         subscriber = callback
         return () => {
@@ -49,6 +58,10 @@ jest.mock('./native-runtime', () => ({
       resolveRun: () => {
         resolveRun?.()
       },
+      rejectRun: (error: Error) => {
+        rejectRun?.(error)
+      },
+      getRunInput: () => capturedInput,
     }
 
     runtimeInstances.push(instance)
@@ -302,5 +315,344 @@ describe('AgentService abort handling', () => {
 
     runtime.resolveRun()
     await runPromise
+  })
+
+  it('aborting a single tool call keeps the run alive (issue #338)', async () => {
+    const service = new AgentService()
+    const mcpAbortToolCall = jest.fn()
+
+    const runPromise = service.run({
+      conversationId: 'conversation-parallel',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: {
+        conversationId: 'conversation-parallel',
+        messages: [createStreamingMessages()[0]],
+        mcpManager: { abortToolCall: mcpAbortToolCall },
+      } as never,
+    })
+
+    const runtime = runtimeInstances[0]
+    runtime.emitSnapshot([
+      createStreamingMessages()[0],
+      {
+        role: 'assistant',
+        id: 'assistant-1',
+        content: '',
+        metadata: { generationState: 'streaming' },
+      },
+      {
+        role: 'tool',
+        id: 'tool-1',
+        toolCalls: [
+          {
+            request: { id: 'tool-call-1', name: 'local:fs_read' },
+            response: { status: ToolCallResponseStatus.Running },
+          },
+          {
+            request: { id: 'tool-call-2', name: 'local:fs_read' },
+            response: { status: ToolCallResponseStatus.Running },
+          },
+        ],
+      },
+    ])
+
+    expect(
+      service.abortToolCall({
+        conversationId: 'conversation-parallel',
+        toolCallId: 'tool-call-1',
+      }),
+    ).toBe(true)
+
+    expect(mcpAbortToolCall).toHaveBeenCalledWith('tool-call-1')
+    expect(runtime.abort).not.toHaveBeenCalled()
+
+    const state = service.getState('conversation-parallel')
+    expect(state.status).toBe('running')
+
+    const toolMessage = state.messages.find(
+      (message) => message.role === 'tool',
+    )
+    expect(toolMessage).toMatchObject({
+      role: 'tool',
+      toolCalls: [
+        { response: { status: ToolCallResponseStatus.Aborted } },
+        { response: { status: ToolCallResponseStatus.Running } },
+      ],
+    })
+
+    runtime.resolveRun()
+    await runPromise
+  })
+})
+
+const makeUserMessage = (id: string, text: string): ChatUserMessage => ({
+  role: 'user',
+  id,
+  content: null,
+  promptContent: text,
+  mentionables: [],
+})
+
+const buildBaseRunInput = (
+  conversationId: string,
+  messages: ChatMessage[],
+): AgentRuntimeRunInput =>
+  ({
+    conversationId,
+    messages,
+  }) as unknown as AgentRuntimeRunInput
+
+describe('AgentService mid-run user message queue', () => {
+  beforeEach(() => {
+    runtimeInstances.length = 0
+  })
+
+  it('returns idle when no run is active', () => {
+    const service = new AgentService()
+    const result = service.enqueueUserMessage(
+      'conv-idle',
+      makeUserMessage('u1', 'hello'),
+    )
+    expect(result).toBe('idle')
+    expect(service.peekPendingUserMessages('conv-idle')).toEqual([])
+  })
+
+  it('enqueues a message while a run is active', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-1',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-1', [makeUserMessage('u1', 'hello')]),
+    })
+    const runtime = runtimeInstances[0]
+
+    const queued = makeUserMessage('u2', 'follow-up')
+    const result = service.enqueueUserMessage('conv-1', queued)
+    expect(result).toBe('enqueued')
+    expect(service.peekPendingUserMessages('conv-1')).toEqual([queued])
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('refuses enqueue when a tool call is pending approval', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-approval',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-approval', [makeUserMessage('u1', 'hi')]),
+    })
+    const runtime = runtimeInstances[0]
+
+    runtime.emitSnapshot([
+      {
+        role: 'tool',
+        id: 'tool-1',
+        toolCalls: [
+          {
+            request: { id: 'call-1', name: 'local:fs_write' },
+            response: { status: ToolCallResponseStatus.PendingApproval },
+          },
+        ],
+      } as ChatMessage,
+    ])
+
+    const result = service.enqueueUserMessage(
+      'conv-approval',
+      makeUserMessage('u2', 'no go'),
+    )
+    expect(result).toBe('blocked_awaiting_approval')
+    expect(service.peekPendingUserMessages('conv-approval')).toEqual([])
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('drains the queue when the runtime hits an llm_request boundary', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-drain',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-drain', [makeUserMessage('u1', 'hi')]),
+    })
+    const runtime = runtimeInstances[0]
+
+    const queued = makeUserMessage('u2', 'queued')
+    expect(service.enqueueUserMessage('conv-drain', queued)).toBe('enqueued')
+
+    const captured = runtime.getRunInput()
+    expect(captured?.drainPendingUserMessages).toBeDefined()
+    const drained = captured?.drainPendingUserMessages?.() ?? []
+    expect(drained).toEqual([queued])
+    expect(service.peekPendingUserMessages('conv-drain')).toEqual([])
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('refuses enqueue for non-default branches', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-branch',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: {
+        conversationId: 'conv-branch',
+        branchId: 'branch-x',
+        sourceUserMessageId: 'u1',
+        messages: [makeUserMessage('u1', 'hi')],
+      } as unknown as AgentRuntimeRunInput,
+    })
+    const runtime = runtimeInstances[0]
+
+    const result = service.enqueueUserMessage(
+      'conv-branch',
+      makeUserMessage('u2', 'follow up'),
+      'branch-x',
+    )
+    expect(result).toBe('idle')
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('clears the queue and emits an abort event when aborted', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-abort',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-abort', [makeUserMessage('u1', 'hi')]),
+    })
+    const runtime = runtimeInstances[0]
+
+    const queued = makeUserMessage('u2', 'queued')
+    expect(service.enqueueUserMessage('conv-abort', queued)).toBe('enqueued')
+
+    const aborted: ChatUserMessage[] = []
+    service.subscribeToAbortedQueuedMessages((_, messages) => {
+      aborted.push(...messages)
+    })
+
+    expect(service.abortConversation('conv-abort')).toBe(true)
+    expect(aborted).toEqual([queued])
+    expect(service.peekPendingUserMessages('conv-abort')).toEqual([])
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('starts a continuation run when the queue still has messages after run completion', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-cont',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-cont', [makeUserMessage('u1', 'hi')]),
+    })
+    const firstRuntime = runtimeInstances[0]
+
+    // Enqueue a follow-up message without draining (simulating a run that
+    // finished — fast path or no llm_request boundary occurred after the
+    // enqueue).
+    const queued = makeUserMessage('u2', 'queued-followup')
+    expect(service.enqueueUserMessage('conv-cont', queued)).toBe('enqueued')
+
+    firstRuntime.resolveRun()
+    await runPromise
+
+    // Yield to the microtask + macrotask queue so the after-run continuation
+    // microtask can fire and the new run can begin (its synchronous prelude
+    // pushes a new runtime instance into `runtimeInstances`).
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(runtimeInstances.length).toBe(2)
+    const secondRuntime = runtimeInstances[1]
+    const secondInput = secondRuntime.getRunInput()
+    expect(secondInput?.drainPendingUserMessages).toBeDefined()
+    // The queue is preserved for the new run's drain to pick up.
+    expect(service.peekPendingUserMessages('conv-cont')).toEqual([queued])
+
+    secondRuntime.resolveRun()
+  })
+
+  it('refuses enqueue when the active run is on the single-turn fast path', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-fast',
+      loopConfig: {
+        enableTools: false,
+        maxAutoIterations: 1,
+        includeBuiltinTools: false,
+      },
+      input: buildBaseRunInput('conv-fast', [makeUserMessage('u1', 'hi')]),
+    })
+    const runtime = runtimeInstances[0]
+
+    const result = service.enqueueUserMessage(
+      'conv-fast',
+      makeUserMessage('u2', 'follow-up'),
+    )
+    expect(result).toBe('idle')
+    expect(service.peekPendingUserMessages('conv-fast')).toEqual([])
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('does not schedule continuation for fast-path runs even if the queue is non-empty', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-fast-cont',
+      loopConfig: {
+        enableTools: false,
+        maxAutoIterations: 1,
+        includeBuiltinTools: false,
+      },
+      input: buildBaseRunInput('conv-fast-cont', [makeUserMessage('u1', 'hi')]),
+    })
+    const firstRuntime = runtimeInstances[0]
+
+    // Bypass the enqueue API guard to simulate any path that could leave a
+    // message queued under a fast-path run. The continuation guard must keep
+    // us from looping forever even in that scenario.
+    const runKey = 'conv-fast-cont::__default__'
+
+    ;(service as any).pendingUserMessagesByKey.set(runKey, [
+      makeUserMessage('u2', 'orphan'),
+    ])
+
+    firstRuntime.resolveRun()
+    await runPromise
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    // No continuation run should have spawned.
+    expect(runtimeInstances.length).toBe(1)
   })
 })

@@ -1,6 +1,6 @@
 import { App } from 'obsidian'
 
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 import type { ApplyViewState } from '../../types/apply-view.types'
 import type { RAGEngine } from '../rag/ragEngine'
 
@@ -8,20 +8,20 @@ import { McpManager } from './mcpManager'
 
 type McpCoordinatorDeps = {
   app: App
-  getSettings: () => SmartComposerSettings
+  getSettings: () => YoloSettings
   openApplyReview: (state: ApplyViewState) => Promise<boolean>
   registerSettingsListener: (
-    listener: (settings: SmartComposerSettings) => void,
+    listener: (settings: YoloSettings) => void,
   ) => () => void
   getRagEngine?: () => Promise<RAGEngine>
 }
 
 export class McpCoordinator {
   private readonly app: App
-  private readonly getSettings: () => SmartComposerSettings
+  private readonly getSettings: () => YoloSettings
   private readonly openApplyReview: McpCoordinatorDeps['openApplyReview']
   private readonly registerSettingsListener: (
-    listener: (settings: SmartComposerSettings) => void,
+    listener: (settings: YoloSettings) => void,
   ) => () => void
   private readonly getRagEngine?: () => Promise<RAGEngine>
 

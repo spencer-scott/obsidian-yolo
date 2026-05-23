@@ -185,7 +185,7 @@ export const renderAssistantIcon = (
   const iconConfig = icon || DEFAULT_ASSISTANT_ICON
 
   const iconTypeClass =
-    iconConfig.type === 'emoji' ? 'smtcmp-icon-emoji' : 'smtcmp-icon-lucide'
+    iconConfig.type === 'emoji' ? 'yolo-icon-emoji' : 'yolo-icon-lucide'
   const combinedClassName = className
     ? `${className} ${iconTypeClass}`
     : iconTypeClass

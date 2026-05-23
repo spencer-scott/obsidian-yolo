@@ -4,14 +4,14 @@ import { Root, createRoot } from 'react-dom/client'
 import { AppProvider } from '../../contexts/app-context'
 import { LanguageProvider } from '../../contexts/language-context'
 import { PluginProvider } from '../../contexts/plugin-context'
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 import type { ApplyViewState } from '../../types/apply-view.types'
 
 import ApplyViewRoot from './ApplyViewRoot'
 import type { ApplyViewActions } from './types'
 
 type ApplyReviewOverlayOptions = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   view: EditorView
   state: ApplyViewState
   onClose: () => void
@@ -41,7 +41,7 @@ export class ApplyReviewOverlay {
     this.overlayContainer = null
 
     if (this.overlayHost) {
-      this.overlayHost.classList.remove('smtcmp-apply-overlay-host')
+      this.overlayHost.classList.remove('yolo-apply-overlay-host')
       this.overlayHost = null
     }
   }
@@ -49,15 +49,15 @@ export class ApplyReviewOverlay {
   private mountOverlay(): void {
     const overlayHost = this.options.view.dom ?? document.body
     this.overlayHost = overlayHost
-    overlayHost.classList.add('smtcmp-apply-overlay-host')
+    overlayHost.classList.add('yolo-apply-overlay-host')
 
     const overlayRoot = document.createElement('div')
-    overlayRoot.className = 'smtcmp-apply-overlay-root'
+    overlayRoot.className = 'yolo-apply-overlay-root'
     overlayHost.appendChild(overlayRoot)
     this.overlayRoot = overlayRoot
 
     const overlayContainer = document.createElement('div')
-    overlayContainer.className = 'smtcmp-apply-overlay'
+    overlayContainer.className = 'yolo-apply-overlay'
     overlayRoot.appendChild(overlayContainer)
     this.overlayContainer = overlayContainer
 

@@ -21,7 +21,7 @@ export function FileUploadButton({
 
   return (
     <label
-      className="smtcmp-chat-user-input-submit-button smtcmp-chat-user-input-upload-button"
+      className="yolo-chat-user-input-submit-button yolo-chat-user-input-upload-button"
       title={label}
       aria-label={label}
     >
@@ -32,7 +32,7 @@ export function FileUploadButton({
         onChange={handleFileChange}
         hidden
       />
-      <div className="smtcmp-chat-user-input-submit-button-icons">
+      <div className="yolo-chat-user-input-submit-button-icons">
         <Plus size={14} />
       </div>
     </label>

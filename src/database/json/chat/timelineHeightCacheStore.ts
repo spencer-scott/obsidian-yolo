@@ -23,13 +23,15 @@ type PersistedTimelineHeightScope = {
 }
 
 type PersistedTimelineHeightCacheStore = {
-  schemaVersion: 1
+  schemaVersion: 2
   updatedAt: number
   scopes: Record<string, PersistedTimelineHeightScope>
 }
 
 const TIMELINE_HEIGHT_CACHE_DIR = 'timeline_height_cache'
-const SCHEMA_VERSION = 1
+// v2: bumped to discard v1 caches that were poisoned by half-rendered
+// MathJax heights (rows persisted as ~68px before finishRenderMath).
+const SCHEMA_VERSION = 2
 const MAX_SCOPES_PER_CONVERSATION = 3
 const FLUSH_DEBOUNCE_MS = 1000
 const EMPTY_STORE: PersistedTimelineHeightCacheStore = {
@@ -87,6 +89,9 @@ const readTimelineHeightCacheStore = async (
     const content = await app.vault.adapter.read(filePath)
     const parsed = JSON.parse(content) as PersistedTimelineHeightCacheStore
     if (!parsed || typeof parsed !== 'object' || !parsed.scopes) {
+      return EMPTY_STORE
+    }
+    if (parsed.schemaVersion !== SCHEMA_VERSION) {
       return EMPTY_STORE
     }
 

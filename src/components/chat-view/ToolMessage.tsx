@@ -6,15 +6,19 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { usePlugin } from '../../contexts/plugin-context'
-import { getBuiltinToolUiMeta } from '../../core/agent/builtinToolUiMeta'
+import {
+  BUILTIN_TOOL_UI_META,
+  getBuiltinToolUiMeta,
+} from '../../core/agent/builtinToolUiMeta'
 import { ALWAYS_ALLOW_DISABLED_TOOL_NAMES } from '../../core/agent/tool-preferences'
 import { InvalidToolNameException } from '../../core/mcp/exception'
 import {
   getLocalFileToolServerName,
+  isAskUserQuestionToolName,
   parseLocalFsActionFromToolArgs,
 } from '../../core/mcp/localFileTools'
 import { parseToolName } from '../../core/mcp/tool-name-utils'
-import { ChatToolMessage } from '../../types/chat'
+import { ChatMessage, ChatToolMessage } from '../../types/chat'
 import {
   ToolCallRequest,
   ToolCallResponse,
@@ -24,6 +28,7 @@ import {
 } from '../../types/tool-call.types'
 import { SplitButton } from '../common/SplitButton'
 
+import { AskUserQuestionPanel } from './AskUserQuestionPanel'
 import { ObsidianCodeBlock } from './ObsidianMarkdown'
 import { ExternalAgentToolCard } from './tool-cards/ExternalAgentToolCard'
 import {
@@ -54,6 +59,10 @@ export type ToolLabels = {
   reject: string
   abort: string
   allowForThisChat: string
+  todoWriteCleared: string
+  todoWriteAllCompleted: (count: number) => string
+  todoWriteCreated: (count: number) => string
+  todoWriteProgress: (done: number, total: number) => string
 }
 
 const DEFAULT_STATUS_LABELS: Record<ToolCallResponseStatus, string> = {
@@ -63,6 +72,7 @@ const DEFAULT_STATUS_LABELS: Record<ToolCallResponseStatus, string> = {
   [ToolCallResponseStatus.Success]: '',
   [ToolCallResponseStatus.Error]: 'Failed',
   [ToolCallResponseStatus.Aborted]: 'Aborted',
+  [ToolCallResponseStatus.AwaitingUserInput]: 'Awaiting',
 }
 
 type ToolRequestLike = {
@@ -123,18 +133,23 @@ export const getToolLabels = (t?: TranslateFn): ToolLabels => {
         'chat.toolCall.status.aborted',
         DEFAULT_STATUS_LABELS[ToolCallResponseStatus.Aborted],
       ),
+      [ToolCallResponseStatus.AwaitingUserInput]: translate(
+        'chat.toolCall.status.awaitingUserInput',
+        DEFAULT_STATUS_LABELS[ToolCallResponseStatus.AwaitingUserInput],
+      ),
     },
     unknownStatus: translate('chat.toolCall.status.unknown', 'Unknown'),
+    // Every name registered in BUILTIN_TOOL_UI_META is wired here automatically
+    // so adding a new built-in tool only needs the meta entry (+ i18n keys),
+    // not a manual update of this map. fs_* write-action labels live in a
+    // separate translation namespace and stay as explicit overrides.
     displayNames: {
-      fs_list: translateBuiltinToolLabel('fs_list', translate),
-      fs_search: translateBuiltinToolLabel('fs_search', translate),
-      fs_read: translateBuiltinToolLabel('fs_read', translate),
-      context_prune_tool_results: translateBuiltinToolLabel(
-        'context_prune_tool_results',
-        translate,
+      ...Object.fromEntries(
+        Object.keys(BUILTIN_TOOL_UI_META).map((name) => [
+          name,
+          translateBuiltinToolLabel(name, translate),
+        ]),
       ),
-      context_compact: translateBuiltinToolLabel('context_compact', translate),
-      fs_edit: translateBuiltinToolLabel('fs_edit', translate),
       fs_create_file: translate(
         'chat.toolCall.writeAction.create_file',
         DEFAULT_LOCAL_FILE_TOOL_DISPLAY_NAMES.fs_create_file,
@@ -154,15 +169,6 @@ export const getToolLabels = (t?: TranslateFn): ToolLabels => {
       fs_move: translate(
         'chat.toolCall.writeAction.move',
         DEFAULT_LOCAL_FILE_TOOL_DISPLAY_NAMES.fs_move,
-      ),
-      memory_add: translateBuiltinToolLabel('memory_add', translate),
-      memory_update: translateBuiltinToolLabel('memory_update', translate),
-      memory_delete: translateBuiltinToolLabel('memory_delete', translate),
-      web_search: translateBuiltinToolLabel('web_search', translate),
-      web_scrape: translateBuiltinToolLabel('web_scrape', translate),
-      delegate_external_agent: translateBuiltinToolLabel(
-        'delegate_external_agent',
-        translate,
       ),
     },
     writeActionLabels: {
@@ -210,6 +216,27 @@ export const getToolLabels = (t?: TranslateFn): ToolLabels => {
       'chat.toolCall.allowForThisChat',
       'Allow for this chat',
     ),
+    todoWriteCleared: translate(
+      'chat.toolSummary.todoWrite.cleared',
+      'Cleared list',
+    ),
+    todoWriteAllCompleted: (count: number) =>
+      translate(
+        'chat.toolSummary.todoWrite.allCompleted',
+        'All completed ({count})',
+      ).replace('{count}', String(count)),
+    todoWriteCreated: (count: number) =>
+      translate(
+        'chat.toolSummary.todoWrite.created',
+        'Planned {count} tasks',
+      ).replace('{count}', String(count)),
+    todoWriteProgress: (done: number, total: number) =>
+      translate(
+        'chat.toolSummary.todoWrite.progress',
+        'Progress {done}/{total}',
+      )
+        .replace('{done}', String(done))
+        .replace('{total}', String(total)),
   }
 }
 
@@ -588,10 +615,51 @@ const getLocalToolSummaryText = ({
     return topic ? `${topic} | ${queryText}` : queryText
   }
 
+  if (toolName === 'todo_write') {
+    const rawTodos = Array.isArray(argumentsObject?.todos)
+      ? (argumentsObject.todos as unknown[])
+      : []
+    const todos = rawTodos.filter(
+      (
+        item,
+      ): item is {
+        content: string
+        status: 'pending' | 'in_progress' | 'completed'
+      } => {
+        if (!item || typeof item !== 'object') return false
+        const record = item as Record<string, unknown>
+        return (
+          typeof record.content === 'string' &&
+          (record.status === 'pending' ||
+            record.status === 'in_progress' ||
+            record.status === 'completed')
+        )
+      },
+    )
+    if (todos.length === 0) return labels.todoWriteCleared
+    const inProgress = todos.find((todo) => todo.status === 'in_progress')
+    if (inProgress) return truncateText(inProgress.content, 60)
+    const total = todos.length
+    const done = todos.filter((todo) => todo.status === 'completed').length
+    if (done === total) return labels.todoWriteAllCompleted(total)
+    if (done === 0) return labels.todoWriteCreated(total)
+    return labels.todoWriteProgress(done, total)
+  }
+
   if (toolName === 'web_scrape') {
     const url =
       typeof argumentsObject?.url === 'string' ? argumentsObject.url : ''
     return url ? truncateText(url, 80) : undefined
+  }
+
+  if (toolName === 'load_tool_schemas') {
+    const servers = asStringArray(argumentsObject?.servers)
+    if (!servers || servers.length === 0) {
+      return undefined
+    }
+    const head = servers.slice(0, 2).join(', ')
+    const rest = servers.length - 2
+    return rest > 0 ? `${head} +${rest}` : head
   }
 
   if (toolName === 'fs_read') {
@@ -768,6 +836,7 @@ const ToolMessage = memo(function ToolMessage({
   showRunningFooter = true,
   onMessageUpdate,
   onRecoverToolCall,
+  onRecoverAnswerUserQuestion,
 }: {
   message: ChatToolMessage
   conversationId: string
@@ -780,14 +849,18 @@ const ToolMessage = memo(function ToolMessage({
     request: ToolCallRequest
     allowForConversation?: boolean
   }) => Promise<boolean>
+  onRecoverAnswerUserQuestion?: (payload: {
+    resolvedMessages: ChatMessage[]
+    toolCallId: string
+  }) => void
 }) {
   return (
-    <div className="smtcmp-toolcall-container">
+    <div className="yolo-toolcall-container">
       <AnimatePresence initial={false}>
         {message.toolCalls.map((toolCall, index) => (
           <motion.div
             key={toolCall.request.id}
-            className={cx(index > 0 && 'smtcmp-toolcall-border-top')}
+            className={cx(index > 0 && 'yolo-toolcall-border-top')}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -803,6 +876,7 @@ const ToolMessage = memo(function ToolMessage({
               }
               showRunningFooter={showRunningFooter}
               onRecoverToolCall={onRecoverToolCall}
+              onRecoverAnswerUserQuestion={onRecoverAnswerUserQuestion}
               onResponseUpdate={(response) =>
                 onMessageUpdate({
                   ...message,
@@ -829,6 +903,7 @@ function ToolCallItem({
   showCompactionPendingHint = false,
   showRunningFooter = true,
   onRecoverToolCall,
+  onRecoverAnswerUserQuestion,
   onResponseUpdate,
 }: {
   request: ToolCallRequest
@@ -843,8 +918,45 @@ function ToolCallItem({
     request: ToolCallRequest
     allowForConversation?: boolean
   }) => Promise<boolean>
+  onRecoverAnswerUserQuestion?: (payload: {
+    resolvedMessages: ChatMessage[]
+    toolCallId: string
+  }) => void
   onResponseUpdate: (response: ToolCallResponse) => void
 }) {
+  const isAskUserQuestion = useMemo(
+    () => isAskUserQuestionToolName(request.name),
+    [request.name],
+  )
+  if (isAskUserQuestion) {
+    // The tool has no execute path: the gateway either parks it in
+    // AwaitingUserInput (interactive form), or short-circuits to Error /
+    // Rejected / Aborted / Success (recoveryless). Render the dedicated panel
+    // regardless and let it pick its sub-variant.
+    if (request.arguments?.kind === 'partial') {
+      return (
+        <div className="yolo-ask-user-question yolo-ask-user-question--pending">
+          <div className="yolo-ask-user-question-header">
+            <Loader2 size={14} className="yolo-spinner" />
+            <span>Generating question...</span>
+          </div>
+        </div>
+      )
+    }
+    if (!onRecoverAnswerUserQuestion) {
+      throw new Error(
+        'ask_user_question: hosting surface must pass onRecoverAnswerUserQuestion. The parent chat surface forgot to wire the recovery handler.',
+      )
+    }
+    return (
+      <AskUserQuestionPanel
+        request={request}
+        response={response}
+        conversationId={conversationId}
+        onRecoverAnswerUserQuestion={onRecoverAnswerUserQuestion}
+      />
+    )
+  }
   const COMPACTION_PENDING_EXIT_MS = 180
   const reduceMotion = useReducedMotion()
   const motionDuration = reduceMotion ? 0 : 0.16
@@ -977,15 +1089,15 @@ function ToolCallItem({
   }, [renderCompactionPendingHint, response.status, showCompactionPendingHint])
 
   return (
-    <div className="smtcmp-toolcall">
+    <div className="yolo-toolcall">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="smtcmp-toolcall-header"
+        className="yolo-toolcall-header"
         aria-expanded={isOpen}
-        aria-controls={`smtcmp-toolcall-content-${request.id}`}
+        aria-controls={`yolo-toolcall-content-${request.id}`}
       >
-        <div className="smtcmp-toolcall-header-icon smtcmp-toolcall-header-icon--status-inline">
+        <div className="yolo-toolcall-header-icon yolo-toolcall-header-icon--status-inline">
           <AnimatePresence mode="wait">
             <motion.span
               key={response.status}
@@ -999,18 +1111,18 @@ function ToolCallItem({
             </motion.span>
           </AnimatePresence>
         </div>
-        <div className="smtcmp-toolcall-header-content">
-          <span className="smtcmp-toolcall-header-tool-name">
-            <span className="smtcmp-toolcall-header-title">
+        <div className="yolo-toolcall-header-content">
+          <span className="yolo-toolcall-header-tool-name">
+            <span className="yolo-toolcall-header-title">
               {headlineParts.titleText}
             </span>
             {headlineParts.summaryText && (
               <>
-                <span className="smtcmp-toolcall-header-separator">: </span>
+                <span className="yolo-toolcall-header-separator">: </span>
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={response.status}
-                    className="smtcmp-toolcall-header-summary"
+                    className="yolo-toolcall-header-summary"
                     title={headlineParts.summaryText}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1026,14 +1138,14 @@ function ToolCallItem({
               typeof headlineParts.removedLines === 'number' &&
               (headlineParts.addedLines > 0 ||
                 headlineParts.removedLines > 0) && (
-                <span className="smtcmp-toolcall-header-edit-deltas">
+                <span className="yolo-toolcall-header-edit-deltas">
                   {headlineParts.addedLines > 0 && (
-                    <span className="smtcmp-toolcall-header-edit-added">
+                    <span className="yolo-toolcall-header-edit-added">
                       +{headlineParts.addedLines}
                     </span>
                   )}
                   {headlineParts.removedLines > 0 && (
-                    <span className="smtcmp-toolcall-header-edit-removed">
+                    <span className="yolo-toolcall-header-edit-removed">
                       -{headlineParts.removedLines}
                     </span>
                   )}
@@ -1041,16 +1153,16 @@ function ToolCallItem({
               )}
           </span>
         </div>
-        <div className="smtcmp-toolcall-header-icon smtcmp-toolcall-header-icon--expand">
+        <div className="yolo-toolcall-header-icon yolo-toolcall-header-icon--expand">
           {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
       </button>
       {isOpen && (
         <div
-          id={`smtcmp-toolcall-content-${request.id}`}
-          className="smtcmp-toolcall-content"
+          id={`yolo-toolcall-content-${request.id}`}
+          className="yolo-toolcall-content"
         >
-          <div className="smtcmp-toolcall-content-section">
+          <div className="yolo-toolcall-content-section">
             <div>{toolLabels.parameters}:</div>
             <ObsidianCodeBlock language="json" content={parameters} />
           </div>
@@ -1065,13 +1177,13 @@ function ToolCallItem({
           ) : (
             <>
               {response.status === ToolCallResponseStatus.Success && (
-                <div className="smtcmp-toolcall-content-section">
+                <div className="yolo-toolcall-content-section">
                   <div>{toolLabels.result}:</div>
                   <ObsidianCodeBlock content={response.data.text} />
                 </div>
               )}
               {response.status === ToolCallResponseStatus.Error && (
-                <div className="smtcmp-toolcall-content-section">
+                <div className="yolo-toolcall-content-section">
                   <div>{toolLabels.error}:</div>
                   <ObsidianCodeBlock content={response.error} />
                 </div>
@@ -1083,15 +1195,15 @@ function ToolCallItem({
       {renderCompactionPendingHint && (
         <div
           className={cx(
-            'smtcmp-toolcall-compaction-pending',
+            'yolo-toolcall-compaction-pending',
             isCompactionPendingHintExiting &&
-              'smtcmp-toolcall-compaction-pending--exiting',
+              'yolo-toolcall-compaction-pending--exiting',
           )}
           aria-live="polite"
         >
           <Loader2
             size={12}
-            className="smtcmp-toolcall-compaction-pending-icon"
+            className="yolo-toolcall-compaction-pending-icon"
           />
           <span>
             {t(
@@ -1105,7 +1217,7 @@ function ToolCallItem({
         {footerMode && (
           <motion.div
             key={footerMode}
-            className="smtcmp-toolcall-footer"
+            className="yolo-toolcall-footer"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -1116,7 +1228,7 @@ function ToolCallItem({
             style={{ overflow: 'hidden' }}
           >
             {footerMode === 'pending' && (
-              <div className="smtcmp-toolcall-footer-actions">
+              <div className="yolo-toolcall-footer-actions">
                 {isAlwaysAllowDisabled ? (
                   // Always-allow is disabled: render a plain button instead of a dropdown menu
                   <button
@@ -1158,7 +1270,7 @@ function ToolCallItem({
               </div>
             )}
             {footerMode === 'running' && (
-              <div className="smtcmp-toolcall-footer-actions">
+              <div className="yolo-toolcall-footer-actions">
                 <button
                   type="button"
                   onClick={() => {
@@ -1273,17 +1385,17 @@ function useToolCall(
 function StatusIcon({ status }: { status: ToolCallResponseStatus }) {
   switch (status) {
     case ToolCallResponseStatus.PendingApproval:
-      return <span className="smtcmp-toolcall-status-dot" />
+      return <span className="yolo-toolcall-status-dot" />
     case ToolCallResponseStatus.Rejected:
     case ToolCallResponseStatus.Aborted:
     case ToolCallResponseStatus.Error:
-      return <X size={16} className="smtcmp-icon-error" />
+      return <X size={16} className="yolo-icon-error" />
     case ToolCallResponseStatus.Running:
-      return <Loader2 size={16} className="smtcmp-spinner" />
+      return <Loader2 size={16} className="yolo-spinner" />
     case ToolCallResponseStatus.Success:
       return (
-        <span className="smtcmp-toolcall-status-success-ring">
-          <Check size={11} className="smtcmp-toolcall-status-success-check" />
+        <span className="yolo-toolcall-status-success-ring">
+          <Check size={11} className="yolo-toolcall-status-success-check" />
         </span>
       )
     default:

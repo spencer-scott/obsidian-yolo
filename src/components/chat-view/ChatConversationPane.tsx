@@ -1,4 +1,4 @@
-import { ArrowDown, Bot, CircleStop, MessageCircle } from 'lucide-react'
+import { ArrowDown, Bot, MessageCircle } from 'lucide-react'
 import type { ReactNode, RefObject } from 'react'
 import type { FollowOutput } from 'react-virtuoso'
 
@@ -21,8 +21,6 @@ type ChatConversationPaneProps = {
   followOutput: FollowOutput
   onAtBottomStateChange: (atBottom: boolean) => void
   editingAssistantMessageId: string | null
-  currentConversationRunSummaryIsRunning: boolean
-  onAbortConversationRun: () => void
   onForceScrollToBottom: () => void
   hasStreamingMessages: boolean
   scrollToBottomLabel: string
@@ -33,6 +31,7 @@ type ChatConversationPaneProps = {
   emptyStateAgentDescription: string
   footerContent: ReactNode
   onTimelineVirtualizationChange?: (isVirtualized: boolean) => void
+  bottomSpacerHeight?: number
 }
 
 export function ChatConversationPane({
@@ -47,8 +46,6 @@ export function ChatConversationPane({
   followOutput,
   onAtBottomStateChange,
   editingAssistantMessageId,
-  currentConversationRunSummaryIsRunning,
-  onAbortConversationRun,
   onForceScrollToBottom,
   hasStreamingMessages,
   scrollToBottomLabel,
@@ -59,6 +56,7 @@ export function ChatConversationPane({
   emptyStateAgentDescription,
   footerContent,
   onTimelineVirtualizationChange,
+  bottomSpacerHeight,
 }: ChatConversationPaneProps) {
   const showEmptyState =
     groupedChatMessagesLength === 0 && !isCurrentConversationRunActive
@@ -80,15 +78,15 @@ export function ChatConversationPane({
         virtualizationThreshold={
           editingAssistantMessageId ? chatTimelineItems.length : undefined
         }
-        containerClassName="smtcmp-chat-conversation-surface"
+        containerClassName="yolo-chat-conversation-surface"
         overlaySlot={
           showEmptyState ? (
-            <div className="smtcmp-chat-empty-state-overlay">
-              <div className="smtcmp-chat-empty-state-overlay-inner">
-                <div className="smtcmp-chat-empty-state">
+            <div className="yolo-chat-empty-state-overlay">
+              <div className="yolo-chat-empty-state-overlay-inner">
+                <div className="yolo-chat-empty-state">
                   <div
                     key={chatMode}
-                    className="smtcmp-chat-empty-state-icon"
+                    className="yolo-chat-empty-state-icon"
                     data-mode={chatMode}
                   >
                     {chatMode === 'agent' ? (
@@ -97,12 +95,12 @@ export function ChatConversationPane({
                       <MessageCircle size={18} strokeWidth={2} />
                     )}
                   </div>
-                  <div className="smtcmp-chat-empty-state-title">
+                  <div className="yolo-chat-empty-state-title">
                     {chatMode === 'agent'
                       ? emptyStateAgentTitle
                       : emptyStateChatTitle}
                   </div>
-                  <div className="smtcmp-chat-empty-state-description">
+                  <div className="yolo-chat-empty-state-description">
                     {chatMode === 'agent'
                       ? emptyStateAgentDescription
                       : emptyStateChatDescription}
@@ -112,45 +110,30 @@ export function ChatConversationPane({
             </div>
           ) : undefined
         }
-        scrollContainerClassName="smtcmp-chat-messages"
+        scrollContainerClassName="yolo-chat-messages"
         onVirtualizationChange={onTimelineVirtualizationChange}
+        bottomSpacerHeight={bottomSpacerHeight}
       />
-      <div
-        className={`smtcmp-chat-footer${
-          isCurrentConversationRunActive ? ' is-generating' : ''
-        }`}
-      >
-        {(isCurrentConversationRunActive || showScrollToBottomButton) && (
-          <div className="smtcmp-chat-floating-actions">
-            {currentConversationRunSummaryIsRunning && (
-              <button
-                type="button"
-                onClick={onAbortConversationRun}
-                className="smtcmp-stop-gen-btn"
-              >
-                <CircleStop size={16} />
-                <div>Stop generation</div>
-              </button>
-            )}
-            {showScrollToBottomButton && (
-              <button
-                type="button"
-                className="smtcmp-chat-scroll-to-bottom-button"
-                onClick={onForceScrollToBottom}
-                aria-label={
-                  hasStreamingMessages
-                    ? scrollToBottomWhileStreamingLabel
-                    : scrollToBottomLabel
-                }
-                title={
-                  hasStreamingMessages
-                    ? scrollToBottomWhileStreamingLabel
-                    : scrollToBottomLabel
-                }
-              >
-                <ArrowDown size={14} strokeWidth={2.25} />
-              </button>
-            )}
+      <div className="yolo-chat-footer">
+        {showScrollToBottomButton && (
+          <div className="yolo-chat-floating-actions">
+            <button
+              type="button"
+              className="yolo-chat-scroll-to-bottom-button"
+              onClick={onForceScrollToBottom}
+              aria-label={
+                hasStreamingMessages
+                  ? scrollToBottomWhileStreamingLabel
+                  : scrollToBottomLabel
+              }
+              title={
+                hasStreamingMessages
+                  ? scrollToBottomWhileStreamingLabel
+                  : scrollToBottomLabel
+              }
+            >
+              <ArrowDown size={14} strokeWidth={2.25} />
+            </button>
           </div>
         )}
         {footerContent}

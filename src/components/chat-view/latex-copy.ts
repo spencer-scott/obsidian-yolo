@@ -1,7 +1,7 @@
 import { htmlToMarkdown } from 'obsidian'
 
-const LATEX_SOURCE_ATTR = 'data-smtcmp-latex-source'
-const LATEX_SELECTED_CLASS = 'smtcmp-latex-selected'
+const LATEX_SOURCE_ATTR = 'data-yolo-latex-source'
+const LATEX_SELECTED_CLASS = 'yolo-latex-selected'
 
 type LatexSourceToken = {
   source: string

@@ -7,6 +7,8 @@ import {
 } from '../../database/json/chat/imageCacheStore'
 import type { YoloSettingsLike } from '../../database/json/chat/imageCacheStore'
 
+import { loadPdfjs } from './pdfjsLoader'
+
 /** Fixed render scale (2× = ~144 dpi at 72 dpi baseline). */
 const RENDER_SCALE = 2
 
@@ -41,9 +43,7 @@ export async function renderPdfPagesToImages(
   endPage: number | undefined,
   settings?: YoloSettingsLike | null,
 ): Promise<RenderPdfPagesResult> {
-  // Lazy-load pdfjs-dist (same pattern as loadPdfPages).
-  await import('pdfjs-dist/build/pdf.worker.mjs')
-  const pdfjs = await import('pdfjs-dist')
+  const pdfjs = await loadPdfjs()
 
   const buf = await app.vault.readBinary(file)
   const loadingTask = pdfjs.getDocument({

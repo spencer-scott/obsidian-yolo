@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { ComponentPropsWithoutRef, forwardRef } from 'react'
+import { ComponentPropsWithoutRef, RefObject, forwardRef } from 'react'
 
 import {
   YoloPopoverProps,
@@ -11,7 +11,14 @@ type RadixContentProps = ComponentPropsWithoutRef<typeof DropdownMenu.Content>
 
 export type YoloDropdownContentProps = Omit<RadixContentProps, 'className'> &
   YoloPopoverProps & {
-    /** Portal container. Forwarded to `DropdownMenu.Portal`. */
+    /**
+     * Trigger (or anchor) ref. Used to resolve the Portal container from the
+     * trigger's current `ownerDocument.body` — so the popover stays in the
+     * same document as its trigger, including after the panel is moved to an
+     * Obsidian popout window.
+     */
+    anchorRef?: RefObject<Node | null>
+    /** Explicit Portal container override. Takes precedence over `anchorRef`. */
     container?: HTMLElement
     /** Extra class on the inner Content (escape hatch for consumer-specific tweaks). */
     className?: string
@@ -31,6 +38,7 @@ export const YoloDropdownContent = forwardRef<
     minWidth,
     maxWidth,
     maxHeight,
+    anchorRef,
     container,
     className,
     style,
@@ -39,8 +47,10 @@ export const YoloDropdownContent = forwardRef<
   },
   ref,
 ) {
+  const portalContainer =
+    container ?? anchorRef?.current?.ownerDocument?.body ?? undefined
   return (
-    <DropdownMenu.Portal container={container}>
+    <DropdownMenu.Portal container={portalContainer}>
       <DropdownMenu.Content
         ref={ref}
         className={resolveYoloPopoverClassName(variant, className)}

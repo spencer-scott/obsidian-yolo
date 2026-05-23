@@ -1,4 +1,4 @@
-import { parseSmartComposerSettings } from '../../settings/schema/settings'
+import { parseYoloSettings } from '../../settings/schema/settings'
 
 import {
   DEFAULT_ASSISTANT_ID,
@@ -6,7 +6,7 @@ import {
 } from './default-assistant'
 
 const createBaseSettings = () =>
-  parseSmartComposerSettings({
+  parseYoloSettings({
     chatModelId: 'model-a',
     continuationOptions: {
       enableTabCompletion: false,

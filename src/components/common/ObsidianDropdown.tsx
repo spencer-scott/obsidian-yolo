@@ -80,12 +80,12 @@ export function ObsidianDropdown({
         if (!group || group.options.length === 0) return
         const optgroupEl = document.createElement('optgroup')
         optgroupEl.label = group.label
-        optgroupEl.classList.add('smtcmp-obsidian-dropdown-optgroup')
+        optgroupEl.classList.add('yolo-obsidian-dropdown-optgroup')
         group.options.forEach(({ value: optionValue, label: optionLabel }) => {
           const optionEl = document.createElement('option')
           optionEl.value = optionValue
           optionEl.textContent = optionLabel
-          optionEl.classList.add('smtcmp-obsidian-dropdown-option')
+          optionEl.classList.add('yolo-obsidian-dropdown-option')
           optgroupEl.appendChild(optionEl)
         })
         selectEl.appendChild(optgroupEl)

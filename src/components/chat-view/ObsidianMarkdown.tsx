@@ -1,4 +1,4 @@
-import { App, Keymap, MarkdownRenderer } from 'obsidian'
+import { App, Keymap, MarkdownRenderer, finishRenderMath } from 'obsidian'
 import { memo, useCallback, useEffect, useRef } from 'react'
 
 import { useApp } from '../../contexts/app-context'
@@ -14,6 +14,34 @@ type ObsidianMarkdownProps = {
   content: string
   scale?: 'xs' | 'sm' | 'base'
   animateIncrementalText?: boolean
+}
+
+// Detects LaTeX-bearing content so we can switch to two-phase rendering: a
+// fast Phase 1 with delimiters escaped (text visible immediately), followed
+// by a deferred Phase 2 that does the real MathJax-typesetting pass.
+const LATEX_DELIMITER_PATTERN =
+  /\$\$[\s\S]+?\$\$|\$[^\s$][^$\n]*\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/
+
+function escapeLatexDelimiters(content: string): string {
+  return content
+    .replace(/\$/g, '\\$')
+    .replace(/\\\[/g, '\\\\[')
+    .replace(/\\\]/g, '\\\\]')
+    .replace(/\\\(/g, '\\\\(')
+    .replace(/\\\)/g, '\\\\)')
+}
+
+function yieldToBrowser(): Promise<void> {
+  if (typeof window.requestIdleCallback === 'function') {
+    return new Promise((resolve) => {
+      window.requestIdleCallback(() => resolve(), { timeout: 1000 })
+    })
+  }
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => resolve()),
+    )
+  })
 }
 
 function getAppendedTextLength(
@@ -71,7 +99,7 @@ function highlightTrailingFreshText(
     }
 
     const freshTextSpan = document.createElement('span')
-    freshTextSpan.className = 'smtcmp-stream-fresh-text'
+    freshTextSpan.className = 'yolo-stream-fresh-text'
     trailingParent.replaceChild(freshTextSpan, trailingNode)
     freshTextSpan.appendChild(trailingNode)
     remainingLength -= wrapLength
@@ -102,12 +130,61 @@ const ObsidianMarkdown = memo(function ObsidianMarkdown({
       return
     }
 
+    const renderContent = content
     const appendedTextLength = animateIncrementalText
-      ? getAppendedTextLength(previousContentRef.current, content)
+      ? getAppendedTextLength(previousContentRef.current, renderContent)
       : 0
 
     const renderToken = ++renderTokenRef.current
+    const sourcePath = app.workspace.getActiveFile()?.path ?? ''
+    // Two-phase render kicks in for static messages with LaTeX. Streaming
+    // messages re-render very frequently and don't benefit from a fast first
+    // pass — they go straight to single-pass real rendering.
+    const useTwoPhase =
+      !animateIncrementalText && LATEX_DELIMITER_PATTERN.test(renderContent)
 
+    const swapInto = (
+      staging: HTMLDivElement,
+      includeLatexAnnotations: boolean,
+    ) => {
+      const liveContainer = containerRef.current
+      if (!liveContainer) return
+      // Atomic swap: scrollHeight transitions oldHeight → newHeight in one frame
+      // with no zero-height window, so the scroll position is preserved.
+      liveContainer.replaceChildren(...Array.from(staging.childNodes))
+      setupMarkdownLinks(app, liveContainer, sourcePath)
+      if (includeLatexAnnotations) {
+        annotateRenderedLatex(liveContainer, renderContent)
+        syncRenderedLatexSelection(liveContainer)
+      }
+    }
+
+    // Phase 1: render with LaTeX delimiters escaped — formulas show as raw
+    // source temporarily, but the text appears immediately without waiting
+    // for MathJax to typeset. Only runs for messages that actually contain
+    // LaTeX, so we don't pay an extra render for plain text.
+    if (useTwoPhase) {
+      const phase1Staging = document.createElement('div')
+      await MarkdownRenderer.render(
+        app,
+        escapeLatexDelimiters(renderContent),
+        phase1Staging,
+        sourcePath,
+        chatView,
+      )
+      if (renderToken !== renderTokenRef.current || !containerRef.current) {
+        return
+      }
+      swapInto(phase1Staging, false)
+      // Yield so Phase 1 actually paints (and other rows can do their Phase 1)
+      // before we kick off the expensive MathJax pass.
+      await yieldToBrowser()
+      if (renderToken !== renderTokenRef.current || !containerRef.current) {
+        return
+      }
+    }
+
+    // Single-pass (no LaTeX or streaming) or Phase 2: real render with MathJax.
     // Render into a detached staging element so the live container keeps its
     // current children (and therefore its scrollHeight) throughout the async
     // render. The previous "replaceChildren() then await render()" pattern
@@ -117,9 +194,9 @@ const ObsidianMarkdown = memo(function ObsidianMarkdown({
     const staging = document.createElement('div')
     await MarkdownRenderer.render(
       app,
-      content,
+      renderContent,
       staging,
-      app.workspace.getActiveFile()?.path ?? '',
+      sourcePath,
       chatView,
     )
 
@@ -129,20 +206,24 @@ const ObsidianMarkdown = memo(function ObsidianMarkdown({
       return
     }
 
-    // Atomic swap: scrollHeight transitions oldHeight → newHeight in one frame
-    // with no zero-height window, so the scroll position is preserved.
-    containerRef.current.replaceChildren(...Array.from(staging.childNodes))
-
-    setupMarkdownLinks(
-      app,
-      containerRef.current,
-      app.workspace.getActiveFile()?.path ?? '',
-    )
-    annotateRenderedLatex(containerRef.current, content)
-    syncRenderedLatexSelection(containerRef.current)
+    swapInto(staging, true)
     highlightTrailingFreshText(containerRef.current, appendedTextLength)
 
-    previousContentRef.current = content
+    previousContentRef.current = renderContent
+
+    // Flush MathJax stylesheet so queued LaTeX renders to its final size.
+    // Without this, math elements can stay collapsed and the row's first
+    // measured height (e.g. 68px for a long bubble) gets persisted into the
+    // height cache, poisoning future scroll-space estimates.
+    //
+    // Gated on `useTwoPhase`: messages without LaTeX have nothing of ours
+    // queued, so flushing is pointless — and Obsidian's `finishRenderMath`
+    // touches its MathJax bundle without checking whether it's been
+    // lazy-loaded yet, throwing `MathJax is not defined` when called before
+    // any math has rendered (common right after plugin/app startup).
+    if (useTwoPhase) {
+      await finishRenderMath()
+    }
   }, [animateIncrementalText, app, content, chatView])
 
   useEffect(() => {
@@ -169,7 +250,7 @@ const ObsidianMarkdown = memo(function ObsidianMarkdown({
   return (
     <div
       ref={containerRef}
-      className={`markdown-rendered smtcmp-markdown-rendered smtcmp-scale-${scale}`}
+      className={`markdown-rendered yolo-markdown-rendered yolo-scale-${scale}`}
     />
   )
 })
@@ -230,7 +311,7 @@ function ObsidianCodeBlock({
   animateIncrementalText?: boolean
 }) {
   return (
-    <div className="smtcmp-obsidian-code-block">
+    <div className="yolo-obsidian-code-block">
       <ObsidianMarkdown
         content={`\`\`\`${language ?? ''}\n${content}\n\`\`\``}
         scale={scale}

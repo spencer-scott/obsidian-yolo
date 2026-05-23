@@ -2,16 +2,16 @@ import { App } from 'obsidian'
 import React from 'react'
 
 import { SettingsProvider } from '../../../contexts/settings-context'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ReactModal } from '../../common/ReactModal'
 import { SmartSpaceQuickActionsSettingsContent } from '../SmartSpaceQuickActionsSettings'
 
 type SmartSpaceQuickActionsModalComponentProps = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class SmartSpaceQuickActionsModal extends ReactModal<SmartSpaceQuickActionsModalComponentProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app: app,
       Component: SmartSpaceQuickActionsModalComponentWrapper,
@@ -21,7 +21,7 @@ export class SmartSpaceQuickActionsModal extends ReactModal<SmartSpaceQuickActio
       },
       plugin: plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 

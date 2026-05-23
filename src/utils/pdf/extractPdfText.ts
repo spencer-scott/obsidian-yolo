@@ -2,9 +2,11 @@ import type { App, TFile } from 'obsidian'
 
 import {
   buildPdfTextCacheKey,
+  buildPdfTextCacheKeyFromContent,
   lookupPdfTextCache,
   writePdfTextCacheEntry,
 } from '../../database/json/chat/pdfTextCacheStore'
+import { base64ToUint8Array } from '../base64'
 import { createYieldController } from '../common/yield-to-main'
 
 import { loadPdfPages } from './pdfPages'
@@ -55,9 +57,16 @@ export async function extractPdfText(
       ? buildPdfTextCacheKey(file.path, file.stat.mtime, file.stat.size)
       : null
   if (cacheKey) {
-    const cached = await lookupPdfTextCache(app, cacheKey, options.settings)
-    if (cached) {
-      return { pages: cached }
+    try {
+      const cached = await lookupPdfTextCache(app, cacheKey, options.settings)
+      if (cached) {
+        return { pages: cached }
+      }
+    } catch (error) {
+      console.warn(
+        `[YOLO] PDF text cache lookup failed for ${file.path}; falling back to fresh extraction:`,
+        error instanceof Error ? error.message : error,
+      )
     }
   }
 
@@ -86,6 +95,97 @@ export async function extractPdfText(
     } catch (error) {
       console.warn(
         `[YOLO] Failed to persist PDF text cache for ${file.path}:`,
+        error instanceof Error ? error.message : error,
+      )
+    }
+  }
+
+  return { pages }
+}
+
+export type ExtractPdfTextFromBase64Options = {
+  signal?: AbortSignal
+  maxPages?: number
+  /**
+   * When provided, the cache is consulted (read-on-lookup, write-on-miss),
+   * keyed by content hash. Omit to force a fresh extraction without caching.
+   */
+  settings?: YoloSettingsLike | null
+  /**
+   * Optional precomputed content-hash cache key. Skip recomputing fnv1a over
+   * a multi-MB base64 string when the caller already has it (e.g. upload site).
+   */
+  precomputedCacheKey?: string
+  /**
+   * Diagnostic source label persisted into the cache entry (e.g. `upload:foo.pdf`).
+   * Has no effect on lookup; helps when inspecting the cache JSON manually.
+   */
+  sourceLabel?: string
+}
+
+/**
+ * Extract text from a PDF given its raw bytes as base64. Used by the chat
+ * upload path and the request-build path (non-pdf-capable models). Shares the
+ * same persistent cache as {@link extractPdfText}, keyed by content hash so
+ * the same PDF re-uploaded under any filename hits one entry.
+ */
+export async function extractPdfTextFromBase64(
+  app: App,
+  base64: string,
+  options: ExtractPdfTextFromBase64Options = {},
+): Promise<{ pages: { page: number; text: string }[] }> {
+  const maxPages = options.maxPages ?? PDF_INDEX_MAX_PAGES
+
+  const cacheKey =
+    options.settings !== undefined
+      ? (options.precomputedCacheKey ??
+        (await buildPdfTextCacheKeyFromContent(base64)))
+      : null
+  if (cacheKey) {
+    // Lookup is best-effort: a failed read (corrupt JSON, IO error) must not
+    // poison the whole call — fall through to fresh extraction.
+    try {
+      const cached = await lookupPdfTextCache(app, cacheKey, options.settings)
+      if (cached) {
+        return { pages: cached }
+      }
+    } catch (error) {
+      console.warn(
+        `[YOLO] PDF text cache lookup failed (${options.sourceLabel ?? 'upload'}); falling back to fresh extraction:`,
+        error instanceof Error ? error.message : error,
+      )
+    }
+  }
+
+  const bytes = base64ToUint8Array(base64)
+  const maybeYield = createYieldController(1)
+
+  const { totalPages, pages } = await loadPdfPages(bytes, {
+    maxPages,
+    maybeYield,
+    signal: options.signal,
+  })
+
+  if (totalPages > maxPages) {
+    console.warn(
+      `[YOLO] PDF (${options.sourceLabel ?? 'upload'}) has ${totalPages} pages; only first ${maxPages} were extracted.`,
+    )
+  }
+
+  if (cacheKey) {
+    try {
+      await writePdfTextCacheEntry(
+        app,
+        {
+          hash: cacheKey,
+          sourcePath: options.sourceLabel ?? 'upload:unknown',
+          pages,
+        },
+        options.settings,
+      )
+    } catch (error) {
+      console.warn(
+        `[YOLO] Failed to persist PDF text cache for ${options.sourceLabel ?? 'upload'}:`,
         error instanceof Error ? error.message : error,
       )
     }

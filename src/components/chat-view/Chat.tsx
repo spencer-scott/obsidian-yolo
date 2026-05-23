@@ -8,6 +8,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -33,8 +34,8 @@ import { materializeTextEditPlan } from '../../core/edits/textEditEngine'
 import { parseTextEditPlan } from '../../core/edits/textEditPlan'
 import { readEditReviewSnapshot } from '../../database/json/chat/editReviewSnapshotStore'
 import type { ChatLeafPlacement } from '../../features/chat/chatLeafSessionManager'
-import { pdfSelectionHighlightController } from '../../features/editor/selection-highlight/pdfSelectionHighlightController'
 import { selectionHighlightController } from '../../features/editor/selection-highlight/selectionHighlightController'
+import { useChatHighlightSession } from '../../features/editor/selection-highlight/useChatHighlightSession'
 import { useChatHistory } from '../../hooks/useChatHistory'
 import { useChatManager } from '../../hooks/useJsonManagers'
 import type { ApplyViewState } from '../../types/apply-view.types'
@@ -106,11 +107,11 @@ import {
   getSourceUserMessageIdForGroup,
 } from './chatRetry'
 import Composer from './Composer'
-import ContextUsageRing from './ContextUsageRing'
 import { useActiveViewState } from './hooks/useActiveViewState'
 import { syncRenderedLatexSelection } from './latex-copy'
 import QueryProgress from './QueryProgress'
 import type { QueryProgressState } from './QueryProgress'
+import { TodoListPanel } from './TodoListPanel'
 import { useAutoScroll } from './useAutoScroll'
 import { useChatStreamManager } from './useChatStreamManager'
 import UserMessageItem from './UserMessageItem'
@@ -449,6 +450,7 @@ export type ChatRef = {
     text: string,
     options?: {
       submit?: boolean
+      assistantId?: string
     },
   ) => void
   syncSelectionToChat: (selectedBlock: MentionableBlockData) => void
@@ -556,6 +558,25 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return newMessage
   })
   const inputMessageRef = useRef(inputMessage)
+  // Whether the main input is empty - the submit button uses this to toggle
+  // between faded/active state. The check mirrors the early return in onSubmit:
+  // plain text is empty after trim, no mentionables, and no skills. content is
+  // a SerializedEditorState whose reference changes on every keystroke, so
+  // useMemo is sufficient here.
+  const isInputEmpty = useMemo(() => {
+    const text = inputMessage.content
+      ? editorStateToPlainText(inputMessage.content).trim()
+      : ''
+    return (
+      text === '' &&
+      inputMessage.mentionables.length === 0 &&
+      (inputMessage.selectedSkills?.length ?? 0) === 0
+    )
+  }, [
+    inputMessage.content,
+    inputMessage.mentionables,
+    inputMessage.selectedSkills,
+  ])
   const chatMessagesStateRef = useRef<ChatMessage[]>([])
   const activeBranchByUserMessageIdRef = useRef<Map<string, string>>(new Map())
   const [addedBlockKey, setAddedBlockKey] = useState<string | null>(null)
@@ -763,20 +784,20 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
   }, [isSidebarPlacement, isWorkspaceWideHeader])
 
-  const containerClassName = `smtcmp-chat-container${
+  const containerClassName = `yolo-chat-container${
     isSidebarPlacement
-      ? ' smtcmp-chat-container--sidebar'
-      : ' smtcmp-chat-container--centered'
+      ? ' yolo-chat-container--sidebar'
+      : ' yolo-chat-container--centered'
   }${
     !isSidebarPlacement && isWorkspaceWideHeader
-      ? ' smtcmp-chat-container--workspace-wide-header'
+      ? ' yolo-chat-container--workspace-wide-header'
       : ''
   }`
   const fontScale = settings.chatOptions.chatFontScale
   const containerStyle = {
     ...(!isSidebarPlacement && isWorkspaceWideHeader
       ? {
-          '--smtcmp-chat-workspace-header-height': `${workspaceWideHeaderHeight}px`,
+          '--yolo-chat-workspace-header-height': `${workspaceWideHeaderHeight}px`,
         }
       : {}),
     ...(fontScale != null ? { zoom: fontScale } : {}),
@@ -789,7 +810,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const [conversationOverrides, setConversationOverrides] =
     useState<ConversationOverrideSettings | null>(null)
   const [chatMode, setChatMode] = useState<ChatMode>(() => {
-    const defaultMode = settings.chatOptions.chatMode ?? 'chat'
+    const defaultMode = settings.chatOptions.chatMode ?? 'agent'
     return defaultMode
   })
 
@@ -804,7 +825,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   // Per-conversation model id (do NOT write back to global settings)
   const conversationModelIdRef = useRef<Map<string, string>>(new Map())
   const [conversationModelId, setConversationModelId] = useState<string>(
-    settings.chatModelId,
+    () => {
+      const initialAssistantId =
+        settings.currentAssistantId ?? DEFAULT_ASSISTANT_ID
+      const initialAssistant = settings.assistants.find(
+        (assistant) => assistant.id === initialAssistantId,
+      )
+      return initialAssistant?.modelId ?? settings.chatModelId
+    },
   )
 
   const currentConversationModel = useMemo(() => {
@@ -1040,46 +1068,28 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     chatMessagesStateRef.current = chatMessages
   }, [chatMessages])
 
-  // Reconcile visual highlights with the current mention list.
-  // The chat mention list is the single source of truth: when a mention with a
-  // highlightId is removed (× button, mention text deletion, input clear), the
-  // matching highlight is dropped here.
-  // We scan both the input message and all user messages in chatMessages, since
-  // syncSelectionMentionable can attach selection mentions to either depending
-  // on which message currently has focus.
-  useEffect(() => {
-    const activeIds = new Set<string>()
-    const collectFrom = (mentionables: Mentionable[]) => {
-      for (const m of mentionables) {
-        if (
-          m.type === 'block' &&
-          (m.source === 'selection-sync' ||
-            m.source === 'selection-pinned' ||
-            m.source === 'selection') &&
-          m.highlightId
-        ) {
-          activeIds.add(m.highlightId)
-        }
-      }
-    }
-    collectFrom(inputMessage.mentionables)
-    for (const message of chatMessages) {
-      if (message.role === 'user') {
-        collectFrom(message.mentionables)
-      }
-    }
-    selectionHighlightController.reconcileActiveIds(activeIds)
-    pdfSelectionHighlightController.reconcileActiveIds(activeIds)
-  }, [inputMessage.mentionables, chatMessages])
+  // Selection-highlight lifecycle.
+  //
+  // The hook owns the "sticky" cycle: highlights for selection-style mentions
+  // survive sending the user message and stay visible while the user keeps
+  // working in the chat panel.  They drop only when the user (a) interacts
+  // with any real editor leaf outside the chat container, or (b) switches /
+  // closes the conversation.  See useChatHighlightSession for the full
+  // contract.
+  const focusedHistoricalMentionables = useMemo<Mentionable[] | null>(() => {
+    if (!focusedMessageId || focusedMessageId === inputMessage.id) return null
+    const focused = chatMessages.find(
+      (message) => message.role === 'user' && message.id === focusedMessageId,
+    )
+    return focused?.role === 'user' ? focused.mentionables : null
+  }, [chatMessages, focusedMessageId, inputMessage.id])
 
-  // Clear chat-owned highlights when the chat view unmounts (tab closed).
-  // Lives in its own effect so it only fires on unmount, not on every mention change.
-  useEffect(() => {
-    return () => {
-      selectionHighlightController.reconcileActiveIds(new Set())
-      pdfSelectionHighlightController.reconcileActiveIds(new Set())
-    }
-  }, [])
+  useChatHighlightSession({
+    conversationId: currentConversationId,
+    containerRef,
+    inputMentionables: inputMessage.mentionables,
+    focusedHistoricalMentionables,
+  })
 
   const compactionDividerAnchorMessageIds = useMemo(
     () => effectiveCompactionState.map((entry) => entry.anchorMessageId),
@@ -1171,6 +1181,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const chatUserInputRefs = useRef<Map<string, ChatUserInputRef>>(new Map())
   const chatMessagesRef = useRef<HTMLDivElement>(null)
   const bottomAnchorRef = useRef<HTMLDivElement>(null)
+  // Callback-ref + state for the overlay element. A plain useRef with a
+  // mount-once effect would lose its observation when the chat view unmounts
+  // (e.g. switching to the composer view and back), since the new overlay
+  // element never re-binds. Driving the measurement effect off element state
+  // ensures attach/detach cleanly drive observer setup/teardown.
+  const [inputOverlayElement, setInputOverlayElement] =
+    useState<HTMLDivElement | null>(null)
+  const [inputOverlayHeight, setInputOverlayHeight] = useState(0)
   const [timelineIsVirtualized, setTimelineIsVirtualized] = useState(false)
   const latexSelectionSyncFrameRef = useRef<number | null>(null)
   const chatSurfacePreset = getChatSurfacePreset('chat')
@@ -1186,6 +1204,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const {
     autoScrollToBottom,
+    notifyContentFlushed,
     forceScrollToBottom,
     isAutoFollowEnabled,
     followOutput,
@@ -1197,11 +1216,84 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     contentFollowMode: timelineIsVirtualized ? 'explicit' : 'observer',
   })
 
+  // Measure the overlay above the input box so the timeline can reserve
+  // equivalent scrollable space at its bottom — keeps the last assistant
+  // message's metadata bar reachable instead of hidden behind the overlay.
+  // The overlay element is always rendered; height collapses to 0 when no
+  // todo/queued content is present. The gap between overlay bottom and the
+  // input top (CSS `bottom: calc(100% + var(--size-2-1))`) is included.
+  useLayoutEffect(() => {
+    if (!inputOverlayElement) {
+      // Element detached (e.g. switched to composer view). Reset budget so
+      // the timeline doesn't keep reserving phantom space.
+      setInputOverlayHeight(0)
+      return
+    }
+
+    let animationFrameId: number | null = null
+
+    const computeOverlayBudget = (): number => {
+      // offsetHeight already snaps to the integer pixel; 0 when empty.
+      const height = inputOverlayElement.offsetHeight
+      if (height <= 0) {
+        return 0
+      }
+      const gap = parseFloat(
+        getComputedStyle(inputOverlayElement).getPropertyValue('--size-2-1'),
+      )
+      const gapPx = Number.isFinite(gap) && gap > 0 ? gap : 4
+      return Math.ceil(height + gapPx)
+    }
+
+    const publishHeight = () => {
+      const nextHeight = computeOverlayBudget()
+      setInputOverlayHeight((previous) =>
+        previous === nextHeight ? previous : nextHeight,
+      )
+    }
+
+    publishHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+      }
+      animationFrameId = requestAnimationFrame(() => {
+        animationFrameId = null
+        publishHeight()
+      })
+    })
+    observer.observe(inputOverlayElement)
+
+    return () => {
+      observer.disconnect()
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [inputOverlayElement])
+
+  // When the overlay height changes (todo expand/collapse, queued bubbles
+  // appear/disappear), the scroll geometry shifts. If we are in auto-follow,
+  // re-anchor to the new bottom so the metadata bar stays visible above the
+  // overlay; otherwise leave the user's reading position alone.
+  useEffect(() => {
+    if (!isAutoFollowEnabled) {
+      return
+    }
+    notifyContentFlushed()
+  }, [inputOverlayHeight, isAutoFollowEnabled, notifyContentFlushed])
+
   const {
     abortConversationRun,
     compactConversation,
     currentConversationRunSummary,
     submitChatMutation,
+    buildContextBreakdownInputs,
   } = useChatStreamManager({
     setChatMessages,
     setCompactionState,
@@ -1219,6 +1311,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   })
   const [runSummariesByConversationId, setRunSummariesByConversationId] =
     useState<Map<string, AgentConversationRunSummary>>(new Map())
+  const [queuedUserMessages, setQueuedUserMessages] = useState<
+    ChatUserMessage[]
+  >(() => agentService.peekPendingUserMessages(currentConversationId))
   const isCurrentConversationRunActive =
     currentConversationRunSummary.isRunning ||
     currentConversationRunSummary.isWaitingApproval
@@ -1320,7 +1415,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       didSelectionTouchChat = selectionTouchesChat
 
       chatMessagesElement
-        .querySelectorAll<HTMLElement>('.smtcmp-markdown-rendered')
+        .querySelectorAll<HTMLElement>('.yolo-markdown-rendered')
         .forEach((containerEl) => {
           syncRenderedLatexSelection(containerEl)
         })
@@ -1363,6 +1458,67 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       unsubscribe()
     }
   }, [agentService])
+
+  // Re-peek the mid-run user message queue on every conversation state push
+  // so the queued bubble stays in sync with enqueue / drain / abort events.
+  useEffect(() => {
+    const refreshQueued = () => {
+      setQueuedUserMessages(
+        agentService.peekPendingUserMessages(currentConversationId),
+      )
+    }
+    refreshQueued()
+    const unsubscribe = agentService.subscribe(
+      currentConversationId,
+      refreshQueued,
+      { emitCurrent: false },
+    )
+    return () => {
+      unsubscribe()
+    }
+  }, [agentService, currentConversationId])
+
+  // When the user aborts a run, restore the most recently queued message into
+  // the input box so its content is not silently lost. If multiple messages
+  // were queued, only the latest is restored (it best reflects the user's
+  // current intent); a notice surfaces the count of dropped earlier entries.
+  useEffect(() => {
+    const unsubscribe = agentService.subscribeToAbortedQueuedMessages(
+      (conversationId, messages) => {
+        if (conversationId !== currentConversationId) return
+        if (messages.length === 0) return
+        const latest = messages[messages.length - 1]
+        setInputMessage((prev) => ({
+          ...prev,
+          content: latest.content,
+          promptContent: latest.promptContent,
+          snapshotRef: latest.snapshotRef,
+          mentionables: latest.mentionables,
+          selectedSkills: latest.selectedSkills,
+          selectedModelIds: latest.selectedModelIds,
+          reasoningLevel: latest.reasoningLevel ?? prev.reasoningLevel,
+        }))
+        if (messages.length > 1) {
+          new Notice(
+            t(
+              'chat.queueMessage.abortedRestoredMany',
+              'Restored the latest queued message to the input ({{count}} total cancelled)',
+            ).replace('{{count}}', String(messages.length)),
+          )
+        } else {
+          new Notice(
+            t(
+              'chat.queueMessage.abortedRestoredOne',
+              'Queued message restored to input',
+            ),
+          )
+        }
+      },
+    )
+    return () => {
+      unsubscribe()
+    }
+  }, [agentService, currentConversationId, t])
 
   // Auto-run when external agent results arrive for the current conversation
   useEffect(() => {
@@ -1898,7 +2054,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         const loadedChatMode: ChatMode =
           loadedChatModeRaw === 'agent' || loadedChatModeRaw === 'chat'
             ? loadedChatModeRaw
-            : (settings.chatOptions.chatMode ?? 'chat')
+            : (settings.chatOptions.chatMode ?? 'agent')
         setChatMode(loadedChatMode)
         if (conversation.overrides) {
           conversationOverridesRef.current.set(
@@ -2478,6 +2634,16 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           conversationId,
           conversationMessages: runningMessages,
           roundId: toolMessageId,
+          // Pass the model that produced this tool call (recorded as
+          // branchModelId on the tool message when the LLM turn ran), not the
+          // current conversation model — the user may have switched models
+          // after the call was generated but before approving it, and we
+          // need capability-gated resolution (e.g. fs_read modality) to
+          // match the model whose schema the call was emitted under.
+          // Falls back to the conversation model for legacy tool messages
+          // without branchModelId metadata.
+          chatModelId:
+            toolMessage.metadata?.branchModelId ?? conversationModelId,
           workspaceScope:
             chatMode === 'agent'
               ? selectedAssistant?.workspaceScope
@@ -2544,6 +2710,51 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       persistConversationImmediately,
       plugin,
       resolveReasoningLevelForMessages,
+      submitChatMutation,
+    ],
+  )
+
+  /**
+   * Recovery path for ask_user_question: the service has already committed
+   * the user's answers to the persisted tool message but no live run remains
+   * (the conversation finalized before the user answered). Mirror the tail
+   * of handleRecoverPendingToolCall — persist immediately and kick off a
+   * fresh submit so the agent loop resumes from the resolved messages.
+   */
+  const handleRecoverAnswerUserQuestion = useCallback(
+    ({
+      resolvedMessages,
+      toolCallId: _toolCallId,
+    }: {
+      resolvedMessages: ChatMessage[]
+      toolCallId: string
+    }) => {
+      const conversationId = currentConversationId
+      setChatMessages(resolvedMessages)
+      chatMessagesStateRef.current = resolvedMessages
+      plugin
+        .getAgentService()
+        .replaceConversationMessages(
+          conversationId,
+          resolvedMessages,
+          effectiveCompactionState,
+          { persistState: true },
+        )
+      void persistConversationImmediately(resolvedMessages)
+      submitChatMutation.mutate({
+        chatMessages: resolvedMessages,
+        conversationId,
+        reasoningLevel: resolveReasoningLevelForMessages(resolvedMessages),
+        modelIds: getLatestUserSelectedModelIds(resolvedMessages),
+      })
+    },
+    [
+      currentConversationId,
+      effectiveCompactionState,
+      persistConversationImmediately,
+      plugin,
+      resolveReasoningLevelForMessages,
+      setChatMessages,
       submitChatMutation,
     ],
   )
@@ -3790,6 +4001,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       text: string,
       options?: {
         submit?: boolean
+        assistantId?: string
       },
     ) => {
       const mentionable = createSelectionBlockMentionable({
@@ -3798,7 +4010,28 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
 
       setAddedBlockKey(null)
+      // Override the conversation's assistant/model inside the same flushSync
+      // as the mentionable update so the subsequent submit() reads the new
+      // state. The override is scoped to this conversation: we do NOT persist
+      // it to settings.currentAssistantId, so the user's global default is
+      // preserved.
+      const overrideAssistantId = options?.assistantId
+      const overrideAssistant = overrideAssistantId
+        ? (settings.assistants.find(
+            (assistant) => assistant.id === overrideAssistantId,
+          ) ?? null)
+        : null
       flushSync(() => {
+        if (overrideAssistant) {
+          setConversationAssistantId(overrideAssistant.id)
+          conversationAssistantIdRef.current.set(
+            currentConversationId,
+            overrideAssistant.id,
+          )
+          if (overrideAssistant.modelId) {
+            applyAssistantDefaultModel(overrideAssistant.modelId)
+          }
+        }
         upsertSelectionMentionableInMainInput(mentionable)
       })
 
@@ -4085,8 +4318,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const header = (
     <div
       ref={headerRef}
-      className={`smtcmp-chat-header${
-        isSidebarPlacement ? '' : ' smtcmp-chat-header--workspace'
+      className={`yolo-chat-header${
+        isSidebarPlacement ? '' : ' yolo-chat-header--workspace'
       }`}
     >
       {onChangeView ? (
@@ -4099,36 +4332,29 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           disabled={false}
         />
       ) : (
-        <h1 className="smtcmp-chat-header-title">
+        <h1 className="yolo-chat-header-title">
           {t('sidebar.tabs.chat', 'Chat')}
         </h1>
       )}
       {activeView === 'chat' && (
-        <div className="smtcmp-chat-header-right">
-          {headerContextUsage && (
-            <ContextUsageRing
-              promptTokens={headerContextUsage.promptTokens}
-              maxContextTokens={headerContextUsage.maxContextTokens}
-              label={t('chat.contextUsage', 'Context window usage')}
-            />
-          )}
+        <div className="yolo-chat-header-right">
           <AssistantSelector
             currentAssistantId={conversationAssistantId}
             triggerClassName={
               !isSidebarPlacement && isWorkspaceWideHeader
-                ? 'smtcmp-assistant-selector-button--workspace-floating'
+                ? 'yolo-assistant-selector-button--workspace-floating'
                 : undefined
             }
             contentClassName={
               !isSidebarPlacement && isWorkspaceWideHeader
-                ? 'smtcmp-assistant-selector-content--workspace-floating'
+                ? 'yolo-assistant-selector-content--workspace-floating'
                 : undefined
             }
             onAssistantChange={(assistant) => {
               handleConversationAssistantSelect(assistant.id)
             }}
           />
-          <div className="smtcmp-chat-header-buttons">
+          <div className="yolo-chat-header-buttons">
             <button
               type="button"
               onClick={() => handleNewChat()}
@@ -4251,13 +4477,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       if (timelineItem.kind === 'compaction-pending') {
         return (
           <div
-            className="smtcmp-chat-compaction-pending"
+            className="yolo-chat-compaction-pending"
             data-anchor-message-id={timelineItem.anchorMessageId}
           >
-            <div className="smtcmp-chat-compaction-pending__loader">
+            <div className="yolo-chat-compaction-pending__loader">
               <DotLoader text={compactionPendingTitle} />
             </div>
-            <div className="smtcmp-chat-compaction-pending__description">
+            <div className="yolo-chat-compaction-pending__description">
               {compactionPendingDescription}
             </div>
           </div>
@@ -4268,18 +4494,18 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         return (
           <div
             className={cx(
-              'smtcmp-chat-compaction-divider',
+              'yolo-chat-compaction-divider',
               timelineItem.renderKey ===
                 `${enteringCompactionDividerAnchorMessageId}-compact-divider` &&
                 'is-entering',
             )}
           >
-            <div className="smtcmp-chat-compaction-divider__title">
+            <div className="yolo-chat-compaction-divider__title">
               {compactionDividerTitle}
             </div>
-            <div className="smtcmp-chat-compaction-divider__line" />
-            <div className="smtcmp-chat-compaction-divider__content">
-              <div className="smtcmp-chat-compaction-divider__description">
+            <div className="yolo-chat-compaction-divider__line" />
+            <div className="yolo-chat-compaction-divider__content">
+              <div className="yolo-chat-compaction-divider__description">
                 {compactionDividerDescription}
               </div>
             </div>
@@ -4334,6 +4560,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             onApply={handleApply}
             onToolMessageUpdate={handleToolMessageUpdate}
             onRecoverToolCall={handleRecoverPendingToolCall}
+            onRecoverAnswerUserQuestion={handleRecoverAnswerUserQuestion}
             editingAssistantMessageId={editingAssistantMessageId}
             onEditStart={(messageId) => {
               setEditingAssistantMessageId(messageId)
@@ -4571,10 +4798,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
       if (timelineItem.kind === 'continue-response') {
         return (
-          <div className="smtcmp-continue-response-button-container">
+          <div className="yolo-continue-response-button-container">
             <button
               type="button"
-              className="smtcmp-continue-response-button"
+              className="yolo-continue-response-button"
               onClick={handleContinueResponse}
             >
               <div>Continue response</div>
@@ -4586,7 +4813,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       return (
         <div
           ref={bottomAnchorRef}
-          className="smtcmp-chat-bottom-anchor"
+          className="yolo-chat-bottom-anchor"
           aria-hidden="true"
         />
       )
@@ -4647,7 +4874,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     >
       {header}
       {activeView === 'composer' ? (
-        <div className="smtcmp-chat-composer-wrapper">
+        <div className="yolo-chat-composer-wrapper">
           <Composer onNavigateChat={() => onChangeView?.('chat')} />
         </div>
       ) : (
@@ -4663,12 +4890,6 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           followOutput={followOutput}
           onAtBottomStateChange={onAtBottomStateChange}
           editingAssistantMessageId={editingAssistantMessageId}
-          currentConversationRunSummaryIsRunning={
-            currentConversationRunSummary.isRunning
-          }
-          onAbortConversationRun={() =>
-            abortConversationRun(currentConversationId)
-          }
           onForceScrollToBottom={forceScrollToBottom}
           hasStreamingMessages={hasStreamingMessages}
           scrollToBottomLabel={t('chat.scrollToBottom', 'Scroll to bottom')}
@@ -4690,12 +4911,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             'Enable tool chain for search, read/write, and multi-step tasks',
           )}
           onTimelineVirtualizationChange={setTimelineIsVirtualized}
+          bottomSpacerHeight={inputOverlayHeight}
           footerContent={
             <>
               {(settings.chatOptions.mentionDisplayMode ?? 'inline') ===
                 'badge' &&
                 displayMentionablesForInput.length > 0 && (
-                  <div className="smtcmp-chat-user-input-files">
+                  <div className="yolo-chat-user-input-files">
                     {displayMentionablesForInput.map((mentionable) => {
                       const mentionableKey = getMentionableKey(
                         serializeMentionable(mentionable),
@@ -4713,7 +4935,41 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                     })}
                   </div>
                 )}
-              <div className="smtcmp-chat-input-wrapper">
+              <div className="yolo-chat-input-wrapper">
+                <div
+                  ref={setInputOverlayElement}
+                  className="yolo-chat-input-overlay"
+                >
+                  {queuedUserMessages.length > 0 && (
+                    <div className="yolo-chat-queued-messages">
+                      <div className="yolo-chat-queued-messages__hint">
+                        {t(
+                          'chat.queueMessage.hint',
+                          'Waiting for Agent to finish the current step...',
+                        )}
+                      </div>
+                      {queuedUserMessages.map((queued) => {
+                        const preview = queued.content
+                          ? editorStateToPlainText(queued.content).trim()
+                          : ''
+                        return (
+                          <div
+                            key={queued.id}
+                            className="yolo-chat-queued-messages__item"
+                            title={preview}
+                          >
+                            {preview || ' '}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <TodoListPanel
+                    key={currentConversationId}
+                    messages={displayedChatMessages}
+                    queuedMessageCount={queuedUserMessages.length}
+                  />
+                </div>
                 <ChatUserInput
                   key={inputMessage.id}
                   ref={(ref) => registerChatUserInputRef(inputMessage.id, ref)}
@@ -4733,6 +4989,54 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       return
                     }
                     const messageForSubmit = buildInputMessageForSubmit(content)
+
+                    // ask_user_question parks the agent in a paused state that
+                    // may outlive the run itself (run can finalize while the
+                    // panel is still awaiting answers). Intercept the submit
+                    // here so a new message can't bypass the awaiting panel —
+                    // the user must answer the panel first.
+                    if (currentConversationRunSummary.isWaitingUserInput) {
+                      new Notice(
+                        t(
+                          'chat.queueMessage.blockedAwaitingInput',
+                          'Please answer the model\'s question in the conversation before sending a new message.',
+                        ),
+                      )
+                      return
+                    }
+
+                    // While a run is active on the default branch, route the
+                    // message through enqueue so the service decides whether
+                    // to queue (mid-run injection), reject (pending approval),
+                    // or fall through (fast-path / idle). Without this, a
+                    // submit during a pending-approval state would abort the
+                    // current run.
+                    if (currentConversationRunSummary.status === 'running') {
+                      const enqueueResult = agentService.enqueueUserMessage(
+                        currentConversationId,
+                        messageForSubmit,
+                      )
+                      if (enqueueResult === 'enqueued') {
+                        setMessageReasoningMap((prev) => {
+                          const next = new Map(prev)
+                          next.set(inputMessage.id, reasoningLevel)
+                          return next
+                        })
+                        setInputMessage(getNewInputMessage(reasoningLevel))
+                        return
+                      }
+                      if (enqueueResult === 'blocked_awaiting_approval') {
+                        new Notice(
+                          t(
+                            'chat.queueMessage.blockedApproval',
+                            'Please approve or reject the pending tool call before sending a new message.',
+                          ),
+                        )
+                        return
+                      }
+                      // 'idle' → fall through to the normal submit path below.
+                    }
+
                     const nextMessageModelMap = new Map(messageModelMap)
                     nextMessageModelMap.set(
                       inputMessage.id,
@@ -4827,6 +5131,20 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       void handleManualContextCompaction()
                     }
                   }}
+                  isGenerating={currentConversationRunSummary.isRunning}
+                  onAbort={() => abortConversationRun(currentConversationId)}
+                  submitDisabled={isInputEmpty}
+                  contextUsage={
+                    headerContextUsage
+                      ? {
+                          promptTokens: headerContextUsage.promptTokens,
+                          maxContextTokens: headerContextUsage.maxContextTokens,
+                          label: t('chat.contextUsage', 'Context window usage'),
+                          buildBreakdownInputs: () =>
+                            buildContextBreakdownInputs(chatMessages),
+                        }
+                      : undefined
+                  }
                 />
               </div>
             </>

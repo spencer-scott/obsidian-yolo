@@ -104,4 +104,42 @@ describe('OpenAIMessageAdapter', () => {
       },
     ])
   })
+
+  it('translates document content parts into OpenAI file content (OpenRouter-style PDF passthrough)', () => {
+    const params = adapter.buildParams({
+      model: 'gemini-2.5-flash',
+      stream: false,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Take a look at this PDF' },
+            {
+              type: 'document',
+              mediaType: 'application/pdf',
+              name: 'resume.pdf',
+              data: 'JVBERi0xLjQK', // %PDF-1.4 base64 prefix
+              pageCount: 3,
+            },
+          ],
+        },
+      ],
+    }) as unknown as {
+      messages: Array<{
+        role: string
+        content: Array<Record<string, unknown>>
+      }>
+    }
+
+    expect(params.messages[0]?.content).toEqual([
+      { type: 'text', text: 'Take a look at this PDF' },
+      {
+        type: 'file',
+        file: {
+          filename: 'resume.pdf',
+          file_data: 'data:application/pdf;base64,JVBERi0xLjQK',
+        },
+      },
+    ])
+  })
 })

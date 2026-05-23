@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { usePlugin } from '../../contexts/plugin-context'
@@ -35,7 +35,12 @@ type SelectionChatAction = {
   enabled: boolean
   mode?: SelectionChatActionMode
   rewriteBehavior?: SelectionChatActionRewriteBehavior
+  assistantId?: string
 }
+
+// Sentinel for the "follow current selection" option in the assistant dropdown.
+// Maps to `assistantId === undefined` when persisted.
+const FOLLOW_CURRENT_ASSISTANT_VALUE = '__follow_current__'
 
 type SelectionChatActionMode = 'ask' | 'rewrite' | 'chat-input' | 'chat-send'
 type SelectionChatActionRewriteBehavior = 'custom' | 'preset'
@@ -162,9 +167,9 @@ export function SelectionChatActionsSettings({
 
   if (variant === 'composer') {
     return (
-      <div className="smtcmp-smart-space-settings">
-        <div className="smtcmp-smart-space-settings-row">
-          <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
+      <div className="yolo-smart-space-settings">
+        <div className="yolo-smart-space-settings-row">
+          <div className="yolo-settings-desc">{actionsCountLabel}</div>
           <ObsidianButton
             text={t('settings.selectionChat.configureActions', 'Configure quick commands')}
             onClick={handleOpenModal}
@@ -175,7 +180,7 @@ export function SelectionChatActionsSettings({
   }
 
   return (
-    <div className="smtcmp-smart-space-settings">
+    <div className="yolo-smart-space-settings">
       <ObsidianSetting
         name={t(
           'settings.selectionChat.quickActionsTitle',
@@ -185,9 +190,9 @@ export function SelectionChatActionsSettings({
           'settings.selectionChat.quickActionsDesc',
           'Customize quick commands and prompts shown after selecting text',
         )}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
-        <div className="smtcmp-settings-desc">{actionsCountLabel}</div>
+        <div className="yolo-settings-desc">{actionsCountLabel}</div>
         <ObsidianButton
           text={t('settings.selectionChat.configureActions', 'Configure quick commands')}
           onClick={handleOpenModal}
@@ -229,6 +234,23 @@ export function SelectionChatActionsSettingsContent() {
       'Preset instruction (generate directly)',
     ),
   }
+  const assistantOptions = useMemo<Record<string, string>>(() => {
+    const followCurrentLabel = t(
+      'settings.selectionChat.actionAssistantFollowCurrent',
+      'Follow current selection',
+    )
+    const options: Record<string, string> = {
+      [FOLLOW_CURRENT_ASSISTANT_VALUE]: followCurrentLabel,
+    }
+    for (const assistant of settings.assistants ?? []) {
+      options[assistant.id] = assistant.name || assistant.id
+    }
+    return options
+  }, [settings.assistants, t])
+  const resolveAssistantDropdownValue = (value?: string) =>
+    value && assistantOptions[value] ? value : FOLLOW_CURRENT_ASSISTANT_VALUE
+  const normalizeAssistantDropdownValue = (value: string) =>
+    value === FOLLOW_CURRENT_ASSISTANT_VALUE ? undefined : value
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -404,9 +426,9 @@ export function SelectionChatActionsSettingsContent() {
         `div[data-action-id="${movedId}"]`,
       )
       if (movedItem) {
-        movedItem.classList.add('smtcmp-quick-action-drop-success')
+        movedItem.classList.add('yolo-quick-action-drop-success')
         window.setTimeout(() => {
-          movedItem.classList.remove('smtcmp-quick-action-drop-success')
+          movedItem.classList.remove('yolo-quick-action-drop-success')
         }, 700)
       } else if (attempt < 8) {
         window.setTimeout(() => tryFind(attempt + 1), 50)
@@ -477,7 +499,7 @@ export function SelectionChatActionsSettingsContent() {
   }
 
   return (
-    <div className="smtcmp-smart-space-settings">
+    <div className="yolo-smart-space-settings">
       <ObsidianSetting
         name={t(
           'settings.selectionChat.quickActionsTitle',
@@ -499,7 +521,7 @@ export function SelectionChatActionsSettingsContent() {
       </ObsidianSetting>
 
       {isAddingAction && editingAction && (
-        <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-new">
+        <div className="yolo-quick-action-editor yolo-quick-action-editor-new">
           <ObsidianSetting
             name={t('settings.selectionChat.actionLabel', 'Action name')}
             desc={t(
@@ -580,11 +602,34 @@ export function SelectionChatActionsSettingsContent() {
           )}
 
           <ObsidianSetting
+            name={t('settings.selectionChat.actionAssistant', 'Assistant')}
+            desc={t(
+              'settings.selectionChat.actionAssistantDesc',
+              'Assistant to use when running this command; leave empty to follow the current selection.',
+            )}
+          >
+            <ObsidianDropdown
+              value={resolveAssistantDropdownValue(editingAction.assistantId)}
+              options={assistantOptions}
+              onChange={(value) =>
+                setEditingAction((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        assistantId: normalizeAssistantDropdownValue(value),
+                      }
+                    : prev,
+                )
+              }
+            />
+          </ObsidianSetting>
+
+          <ObsidianSetting
             name={t('settings.selectionChat.actionInstruction', 'Prompt')}
             desc={getInstructionDesc(editingAction.mode ?? 'ask')}
-            className="smtcmp-settings-textarea-header"
+            className="yolo-settings-textarea-header"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={editingAction.instruction}
               placeholder={getInstructionPlaceholder(
@@ -603,7 +648,7 @@ export function SelectionChatActionsSettingsContent() {
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-quick-action-editor-buttons">
+          <div className="yolo-quick-action-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}
@@ -630,7 +675,7 @@ export function SelectionChatActionsSettingsContent() {
           items={actionIds}
           strategy={verticalListSortingStrategy}
         >
-          <div className="smtcmp-quick-actions-list">
+          <div className="yolo-quick-actions-list">
             {editableActions.map((action) => {
               const isEditing =
                 !isAddingAction && editingAction?.id === action.id
@@ -647,6 +692,11 @@ export function SelectionChatActionsSettingsContent() {
                   handleSaveAction={handleSaveAction}
                   actionModeOptions={actionModeOptions}
                   actionRewriteTypeOptions={actionRewriteTypeOptions}
+                  assistantOptions={assistantOptions}
+                  resolveAssistantDropdownValue={resolveAssistantDropdownValue}
+                  normalizeAssistantDropdownValue={
+                    normalizeAssistantDropdownValue
+                  }
                   getInstructionDesc={getInstructionDesc}
                   getInstructionPlaceholder={getInstructionPlaceholder}
                   canSaveAction={canSaveAction}
@@ -674,6 +724,9 @@ type QuickActionItemProps = {
   handleSaveAction: () => void | Promise<void>
   actionModeOptions: Record<SelectionChatActionMode, string>
   actionRewriteTypeOptions: Record<SelectionChatActionRewriteBehavior, string>
+  assistantOptions: Record<string, string>
+  resolveAssistantDropdownValue: (value?: string) => string
+  normalizeAssistantDropdownValue: (value: string) => string | undefined
   getInstructionDesc: (mode: SelectionChatActionMode) => string
   getInstructionPlaceholder: (mode: SelectionChatActionMode) => string
   canSaveAction: (action: SelectionChatAction | null) => boolean
@@ -691,6 +744,9 @@ function QuickActionItem({
   handleSaveAction,
   actionModeOptions,
   actionRewriteTypeOptions,
+  assistantOptions,
+  resolveAssistantDropdownValue,
+  normalizeAssistantDropdownValue,
   getInstructionDesc,
   getInstructionPlaceholder,
   canSaveAction,
@@ -718,24 +774,24 @@ function QuickActionItem({
         ref={setNodeRef}
         style={style}
         data-action-id={action.id}
-        className={`smtcmp-quick-action-item ${isEditing ? 'editing' : ''} ${isDragging ? 'smtcmp-quick-action-dragging' : ''}`}
+        className={`yolo-quick-action-item ${isEditing ? 'editing' : ''} ${isDragging ? 'yolo-quick-action-dragging' : ''}`}
         {...attributes}
       >
-        <div className="smtcmp-quick-action-drag-handle">
+        <div className="yolo-quick-action-drag-handle">
           <span
-            className={`smtcmp-drag-handle ${isDragging ? 'smtcmp-drag-handle--active' : ''}`}
+            className={`yolo-drag-handle ${isDragging ? 'yolo-drag-handle--active' : ''}`}
             aria-label={t('settings.selectionChat.dragHandleAria', 'Drag to reorder')}
             {...listeners}
           >
             <GripVertical size={16} />
           </span>
         </div>
-        <div className="smtcmp-quick-action-content">
-          <div className="smtcmp-quick-action-header">
-            <span className="smtcmp-quick-action-label">{action.label}</span>
+        <div className="yolo-quick-action-content">
+          <div className="yolo-quick-action-header">
+            <span className="yolo-quick-action-label">{action.label}</span>
           </div>
         </div>
-        <div className="smtcmp-quick-action-controls">
+        <div className="yolo-quick-action-controls">
           <ObsidianButton
             onClick={() => {
               if (isEditing) {
@@ -764,7 +820,7 @@ function QuickActionItem({
       </div>
 
       {isEditing && currentEditing && (
-        <div className="smtcmp-quick-action-editor smtcmp-quick-action-editor-inline">
+        <div className="yolo-quick-action-editor yolo-quick-action-editor-inline">
           <ObsidianSetting
             name={t('settings.selectionChat.actionLabel', 'Action name')}
             desc={t(
@@ -845,11 +901,34 @@ function QuickActionItem({
           )}
 
           <ObsidianSetting
+            name={t('settings.selectionChat.actionAssistant', 'Assistant')}
+            desc={t(
+              'settings.selectionChat.actionAssistantDesc',
+              'Assistant to use when running this command; leave empty to follow the current selection.',
+            )}
+          >
+            <ObsidianDropdown
+              value={resolveAssistantDropdownValue(currentEditing.assistantId)}
+              options={assistantOptions}
+              onChange={(value) =>
+                setEditingAction((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        assistantId: normalizeAssistantDropdownValue(value),
+                      }
+                    : prev,
+                )
+              }
+            />
+          </ObsidianSetting>
+
+          <ObsidianSetting
             name={t('settings.selectionChat.actionInstruction', 'Prompt')}
             desc={getInstructionDesc(currentEditing.mode ?? 'ask')}
-            className="smtcmp-settings-textarea-header"
+            className="yolo-settings-textarea-header"
           />
-          <ObsidianSetting className="smtcmp-settings-textarea">
+          <ObsidianSetting className="yolo-settings-textarea">
             <ObsidianTextArea
               value={currentEditing.instruction}
               placeholder={getInstructionPlaceholder(
@@ -868,7 +947,7 @@ function QuickActionItem({
             />
           </ObsidianSetting>
 
-          <div className="smtcmp-quick-action-editor-buttons">
+          <div className="yolo-quick-action-editor-buttons">
             <ObsidianButton
               text={t('common.save', 'Save')}
               onClick={() => void handleSaveAction()}

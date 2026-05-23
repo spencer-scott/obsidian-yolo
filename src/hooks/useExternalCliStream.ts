@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ExternalCliSnapshot } from '../core/agent/external-cli/streamBus'
 import { externalCliStreamBus } from '../core/agent/external-cli/streamBus'
 import { loadExternalAgentProgress } from '../database/json/chat/externalAgentProgressStore'
-import type { SmartComposerSettings } from '../settings/schema/setting.types'
+import type { YoloSettings } from '../settings/schema/setting.types'
 
 const THROTTLE_MS = 50
 
@@ -31,7 +31,7 @@ export type ExternalCliViewSnapshot =
  */
 export function useExternalCliStream(
   toolCallId: string,
-  opts: { app: App; settings?: SmartComposerSettings },
+  opts: { app: App; settings?: YoloSettings },
 ): ExternalCliViewSnapshot | null {
   const { app, settings } = opts
 

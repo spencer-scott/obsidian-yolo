@@ -24,12 +24,16 @@ import {
 } from '../../../core/agent/builtinToolUiMeta'
 import {
   getAssistantToolApprovalMode,
+  getAssistantToolDisclosureMode,
   getAssistantToolPreferences,
   getDefaultApprovalModeForTool,
   getEnabledAssistantToolNames,
+  getExplicitlyEnabledAssistantToolNames,
   isAssistantToolEnabled,
 } from '../../../core/agent/tool-preferences'
+import { isLoadToolSchemasToolName } from '../../../core/agent/tool-selection'
 import {
+  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileToolServerName,
@@ -45,12 +49,13 @@ import {
   getDisabledSkillIdSet,
   resolveAssistantSkillPolicy,
 } from '../../../core/skills/skillPolicy'
-import { SmartComposerSettings } from '../../../settings/schema/setting.types'
+import { YoloSettings } from '../../../settings/schema/setting.types'
 import {
   AgentPersona,
   Assistant,
   AssistantSkillLoadMode,
   AssistantToolApprovalMode,
+  AssistantToolDisclosureMode,
   AssistantToolPreference,
   AssistantWorkspaceScope,
 } from '../../../types/assistant.types'
@@ -160,6 +165,26 @@ function buildToolTokenPayload(tool: McpTool): Record<string, unknown> {
   }
 }
 
+/**
+ * Token estimate payload for an on-demand tool stub. Mirrors the stable
+ * stub registration: name + truncated description + permissive schema.
+ * Kept conservative so the estimate is unaffected by which provider is
+ * actually used at request time.
+ */
+function buildDeferredToolStubTokenPayload(tool: McpTool): unknown {
+  const description = (tool.description ?? '').trim()
+  const truncatedDescription =
+    description.length > 200 ? `${description.slice(0, 197)}...` : description
+  return {
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: truncatedDescription,
+      parameters: { type: 'object', properties: {} },
+    },
+  }
+}
+
 function estimateToolDefaultContextTokens(tool: McpTool): Promise<number> {
   const payload = buildToolTokenPayload(tool)
   const cacheKey = `${tool.name}:${fnv1aHash(stableStringify(payload))}`
@@ -197,7 +222,7 @@ async function estimateSkillDefaultContextTokens({
   skill,
 }: {
   app: App
-  settings: SmartComposerSettings
+  settings: YoloSettings
   skill: SkillRowView
 }): Promise<number> {
   if (skill.loadMode === 'lazy') {
@@ -252,21 +277,6 @@ function createNewAgent(defaultModelId: string): Assistant {
   }
 }
 
-const DEFAULT_DISABLED_NEW_AGENT_BUILTIN_TOOL_NAMES = new Set([
-  'context_prune_tool_results',
-  'context_compact',
-])
-
-function isDefaultDisabledNewAgentBuiltinTool(toolName: string): boolean {
-  try {
-    return DEFAULT_DISABLED_NEW_AGENT_BUILTIN_TOOL_NAMES.has(
-      parseToolName(toolName).toolName,
-    )
-  } catch {
-    return DEFAULT_DISABLED_NEW_AGENT_BUILTIN_TOOL_NAMES.has(toolName)
-  }
-}
-
 function toDraftAgent(
   assistant: Assistant,
   fallbackModelId: string,
@@ -275,7 +285,7 @@ function toDraftAgent(
     ...assistant,
     persona: assistant.persona ?? DEFAULT_PERSONA,
     modelId: assistant.modelId ?? fallbackModelId,
-    enabledToolNames: getEnabledAssistantToolNames(assistant),
+    enabledToolNames: getExplicitlyEnabledAssistantToolNames(assistant),
     toolPreferences: getAssistantToolPreferences(assistant),
     enabledSkills: assistant.enabledSkills ?? [],
     skillPreferences: assistant.skillPreferences ?? {},
@@ -294,7 +304,7 @@ function updateDraftToolPreferences(
     ...getAssistantToolPreferences(assistant),
   }
   const nextToolPreferences = updater(current)
-  const nextEnabledToolNames = getEnabledAssistantToolNames({
+  const nextEnabledToolNames = getExplicitlyEnabledAssistantToolNames({
     ...assistant,
     toolPreferences: nextToolPreferences,
   })
@@ -317,6 +327,7 @@ export function AgentsSectionContent({
   const { t } = useLanguage()
 
   const assistants = settings.assistants || []
+  const enableToolDisclosure = settings.mcp.enableToolDisclosure
   const isDirectEditEntry = Boolean(initialAssistantId)
   const isDirectCreateEntry = Boolean(initialCreate)
   const isDirectEntry = isDirectEditEntry || isDirectCreateEntry
@@ -343,7 +354,6 @@ export function AgentsSectionContent({
   const activeTabIndexRef = useRef(activeTabIndex)
   const tabsNavRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const initializedNewAgentBuiltinToolsRef = useRef(false)
   const localFsServerName = getLocalFileToolServerName()
 
   const updateTabsGlider = useCallback(() => {
@@ -356,11 +366,11 @@ export function AgentsSectionContent({
     }
 
     nav.style.setProperty(
-      '--smtcmp-agent-tab-glider-left',
+      '--yolo-agent-tab-glider-left',
       `${activeButton.offsetLeft}px`,
     )
     nav.style.setProperty(
-      '--smtcmp-agent-tab-glider-width',
+      '--yolo-agent-tab-glider-width',
       `${activeButton.offsetWidth}px`,
     )
   }, [])
@@ -412,79 +422,6 @@ export function AgentsSectionContent({
       mounted = false
     }
   }, [plugin])
-
-  useEffect(() => {
-    if (!isDirectCreateEntry || initializedNewAgentBuiltinToolsRef.current) {
-      return
-    }
-
-    if (!draftAgent || availableTools.length === 0) {
-      return
-    }
-
-    const existingPreferences = getAssistantToolPreferences(draftAgent)
-    const hasCustomToolSelection =
-      (draftAgent.enabledToolNames?.length ?? 0) > 0 ||
-      Object.keys(existingPreferences).length > 0
-    if (
-      hasCustomToolSelection ||
-      !draftAgent.enableTools ||
-      draftAgent.includeBuiltinTools === false
-    ) {
-      initializedNewAgentBuiltinToolsRef.current = true
-      return
-    }
-
-    const builtinToolNames = availableTools
-      .filter((tool) => {
-        try {
-          return parseToolName(tool.name).serverName === localFsServerName
-        } catch {
-          return true
-        }
-      })
-      .map((tool) => tool.name)
-
-    if (builtinToolNames.length === 0) {
-      return
-    }
-
-    initializedNewAgentBuiltinToolsRef.current = true
-    setDraftAgent((prev) => {
-      if (!prev) {
-        return prev
-      }
-
-      const nextToolPreferences = {
-        ...getAssistantToolPreferences(prev),
-      }
-      const nextEnabledToolNames = new Set(getEnabledAssistantToolNames(prev))
-
-      for (const toolName of builtinToolNames) {
-        const existingPreference = nextToolPreferences[toolName]
-        const shouldDefaultDisabled =
-          isDefaultDisabledNewAgentBuiltinTool(toolName) &&
-          existingPreference === undefined
-
-        if (!shouldDefaultDisabled) {
-          nextEnabledToolNames.add(toolName)
-        }
-        nextToolPreferences[toolName] = {
-          ...existingPreference,
-          enabled: existingPreference?.enabled ?? !shouldDefaultDisabled,
-          approvalMode:
-            existingPreference?.approvalMode ??
-            getDefaultApprovalModeForTool(toolName),
-        }
-      }
-
-      return {
-        ...prev,
-        toolPreferences: nextToolPreferences,
-        enabledToolNames: [...nextEnabledToolNames],
-      }
-    })
-  }, [availableTools, draftAgent, isDirectCreateEntry, localFsServerName])
 
   const agentModelOptionGroups = useMemo(() => {
     const providerOrder = settings.providers.map((provider) => provider.id)
@@ -552,7 +489,7 @@ export function AgentsSectionContent({
         availableTools,
       ),
       enabledToolNames: normalizeToolSelectionForPersistence(
-        getEnabledAssistantToolNames(draftAgent),
+        getExplicitlyEnabledAssistantToolNames(draftAgent),
         availableTools,
       ),
       updatedAt: Date.now(),
@@ -625,6 +562,36 @@ export function AgentsSectionContent({
     })
   }
 
+  const setToolDisclosureMode = (
+    toolNames: string[],
+    disclosureMode: AssistantToolDisclosureMode,
+  ) => {
+    setDraftAgent((prev) => {
+      if (!prev) {
+        return prev
+      }
+
+      return updateDraftToolPreferences(prev, (current) => {
+        const next = { ...current }
+        for (const toolName of toolNames) {
+          // Preserve the tool's effective enabled state. Without this, batch
+          // server-level disclosure changes would flip default-off MCP tools
+          // on, which violates the "enable stays per-tool" decision.
+          const effectiveEnabled = isAssistantToolEnabled(prev, toolName)
+          next[toolName] = {
+            ...next[toolName],
+            enabled: next[toolName]?.enabled ?? effectiveEnabled,
+            approvalMode:
+              next[toolName]?.approvalMode ??
+              getDefaultApprovalModeForTool(toolName),
+            disclosureMode,
+          }
+        }
+        return next
+      })
+    })
+  }
+
   const setWorkspaceScope = (next: AssistantWorkspaceScope) => {
     setDraftAgent((prev) => {
       if (!prev) return prev
@@ -686,7 +653,10 @@ export function AgentsSectionContent({
   }
 
   const visibleToolGroups = useMemo(() => {
-    const groups = new Map<string, { title: string; tools: AgentToolView[] }>()
+    const groups = new Map<
+      string,
+      { title: string; tools: AgentToolView[]; isBuiltin: boolean }
+    >()
     const localSplitToolTargets = new Set<string>()
     const localMemorySplitToolTargets = new Set<string>()
     const localWebSplitToolTargets = new Set<string>()
@@ -705,6 +675,13 @@ export function AgentsSectionContent({
       }
 
       const isBuiltin = serverName === localFsServerName
+      if (
+        isBuiltin &&
+        !enableToolDisclosure &&
+        toolName === LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME
+      ) {
+        return
+      }
       if (isBuiltin && draftAgent?.includeBuiltinTools === false) {
         return
       }
@@ -738,7 +715,7 @@ export function AgentsSectionContent({
       const description = builtinMeta
         ? t(builtinMeta.descKey ?? '', builtinMeta.descFallback)
         : tool.description || t('common.none', 'None')
-      const group = groups.get(key) ?? { title, tools: [] }
+      const group = groups.get(key) ?? { title, tools: [], isBuiltin }
       group.tools.push({
         fullName: tool.name,
         toggleTargets: [tool.name],
@@ -755,7 +732,7 @@ export function AgentsSectionContent({
         BUILTIN_TOOL_CATEGORY_I18N[category].key,
         BUILTIN_TOOL_CATEGORY_I18N[category].fallback,
       )
-      const group = groups.get(key) ?? { title, tools: [] }
+      const group = groups.get(key) ?? { title, tools: [], isBuiltin: true }
       group.tools.push(tool)
       groups.set(key, group)
     }
@@ -823,7 +800,13 @@ export function AgentsSectionContent({
         return a.localeCompare(b)
       })
       .map(([key, value]) => ({ key, ...value }))
-  }, [availableTools, draftAgent?.includeBuiltinTools, localFsServerName, t])
+  }, [
+    availableTools,
+    draftAgent?.includeBuiltinTools,
+    enableToolDisclosure,
+    localFsServerName,
+    t,
+  ])
 
   const visibleToolsCount = useMemo(
     () => visibleToolGroups.reduce((sum, group) => sum + group.tools.length, 0),
@@ -892,6 +875,9 @@ export function AgentsSectionContent({
       ) {
         return false
       }
+      if (!enableToolDisclosure && isLoadToolSchemasToolName(tool.name)) {
+        return false
+      }
       return isAssistantToolEnabled(draftAgent, tool.name)
     })
 
@@ -914,9 +900,20 @@ export function AgentsSectionContent({
 
     void Promise.all(
       eligibleTools.map((tool) =>
-        estimateToolDefaultContextTokens(tool).then(
-          (count) => [tool.name, count] as const,
-        ),
+        estimateToolDefaultContextTokens(tool).then(async (count) => {
+          const disclosureMode = getAssistantToolDisclosureMode(
+            draftAgent,
+            tool.name,
+            { enableToolDisclosure },
+          )
+          if (disclosureMode !== 'on_demand') {
+            return [tool.name, count] as const
+          }
+          const stubCount = await estimateJsonTokens(
+            buildDeferredToolStubTokenPayload(tool),
+          )
+          return [tool.name, stubCount] as const
+        }),
       ),
     ).then((entries) => {
       if (cancelled) return
@@ -937,6 +934,7 @@ export function AgentsSectionContent({
     draftAgent?.enableTools,
     draftAgent?.includeBuiltinTools,
     localFsServerName,
+    enableToolDisclosure,
   ])
 
   const groupEnabledTokens = useMemo(() => {
@@ -1077,23 +1075,22 @@ export function AgentsSectionContent({
     ],
     [t],
   )
-
   return (
     <div
-      className={`smtcmp-settings-section smtcmp-agent-editor-panel${
-        isDirectEntry ? ' smtcmp-agent-editor-panel--direct' : ''
+      className={`yolo-settings-section yolo-agent-editor-panel${
+        isDirectEntry ? ' yolo-agent-editor-panel--direct' : ''
       }`}
     >
       {draftAgent && (
-        <div className="smtcmp-agent-editor-sheet">
-          <div className="smtcmp-agent-editor-sheet-top">
-            <div className="smtcmp-agent-editor-sheet-header">
+        <div className="yolo-agent-editor-sheet">
+          <div className="yolo-agent-editor-sheet-top">
+            <div className="yolo-agent-editor-sheet-header">
               <div>
-                <div className="smtcmp-settings-sub-header">
+                <div className="yolo-settings-sub-header">
                   {draftAgent.name ||
                     t('settings.agent.editorDefaultName', 'New agent')}
                 </div>
-                <div className="smtcmp-settings-desc">
+                <div className="yolo-settings-desc">
                   {t(
                     'settings.agent.editorIntro',
                     "Configure this agent's capabilities, model, and behavior.",
@@ -1101,7 +1098,7 @@ export function AgentsSectionContent({
                 </div>
               </div>
               {!isDirectEntry && (
-                <div className="smtcmp-agent-editor-sheet-actions">
+                <div className="yolo-agent-editor-sheet-actions">
                   <ObsidianButton
                     text={t('common.cancel', 'Cancel')}
                     onClick={() => setDraftAgent(null)}
@@ -1116,18 +1113,18 @@ export function AgentsSectionContent({
             </div>
 
             <div
-              className="smtcmp-agent-editor-tabs smtcmp-agent-editor-tabs--glider"
+              className="yolo-agent-editor-tabs yolo-agent-editor-tabs--glider"
               role="tablist"
               ref={tabsNavRef}
               style={
                 {
-                  '--smtcmp-agent-tab-count': AGENT_EDITOR_TABS.length,
-                  '--smtcmp-agent-tab-index': activeTabIndex,
+                  '--yolo-agent-tab-count': AGENT_EDITOR_TABS.length,
+                  '--yolo-agent-tab-index': activeTabIndex,
                 } as React.CSSProperties
               }
             >
               <div
-                className="smtcmp-agent-editor-tabs-glider"
+                className="yolo-agent-editor-tabs-glider"
                 aria-hidden="true"
               />
               {AGENT_EDITOR_TABS.map((tab, index) => {
@@ -1136,7 +1133,7 @@ export function AgentsSectionContent({
                   <button
                     key={tab}
                     type="button"
-                    className={`smtcmp-agent-editor-tab ${activeTab === tab ? 'is-active' : ''}`}
+                    className={`yolo-agent-editor-tab ${activeTab === tab ? 'is-active' : ''}`}
                     onClick={() => setActiveTab(tab)}
                     role="tab"
                     aria-selected={activeTab === tab}
@@ -1145,12 +1142,12 @@ export function AgentsSectionContent({
                     }}
                   >
                     <span
-                      className="smtcmp-agent-editor-tab-icon"
+                      className="yolo-agent-editor-tab-icon"
                       aria-hidden="true"
                     >
                       <TabIcon size={14} />
                     </span>
-                    <span className="smtcmp-agent-editor-tab-label">
+                    <span className="yolo-agent-editor-tab-label">
                       {
                         {
                           profile: t(
@@ -1173,7 +1170,7 @@ export function AgentsSectionContent({
           </div>
 
           {activeTab === 'profile' && (
-            <div className="smtcmp-agent-editor-body">
+            <div className="yolo-agent-editor-body">
               <ObsidianSetting
                 name={t('settings.agent.editorName', 'Name')}
                 desc={t('settings.agent.editorNameDesc', 'Agent display name')}
@@ -1215,19 +1212,19 @@ export function AgentsSectionContent({
                   }}
                 />
               </ObsidianSetting>
-              <div className="smtcmp-agent-model-setting-row">
-                <div className="smtcmp-agent-model-setting-info">
-                  <div className="smtcmp-agent-model-setting-title">
+              <div className="yolo-agent-model-setting-row">
+                <div className="yolo-agent-model-setting-info">
+                  <div className="yolo-agent-model-setting-title">
                     {t('settings.agent.editorModel', 'Model')}
                   </div>
-                  <div className="smtcmp-agent-model-setting-desc">
+                  <div className="yolo-agent-model-setting-desc">
                     {t(
                       'settings.agent.editorModelDesc',
                       'Select the model used by this agent',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-agent-model-select-wrap">
+                <div className="yolo-agent-model-select-wrap">
                   <SimpleSelect
                     value={draftAgent.modelId || settings.chatModelId}
                     groupedOptions={agentModelOptionGroups}
@@ -1235,7 +1232,7 @@ export function AgentsSectionContent({
                     side="bottom"
                     sideOffset={6}
                     placeholder={t('common.select', 'Select')}
-                    contentClassName="smtcmp-agent-model-select-content"
+                    contentClassName="yolo-agent-model-select-content"
                     onChange={(value: string) =>
                       setDraftAgent({
                         ...draftAgent,
@@ -1251,9 +1248,9 @@ export function AgentsSectionContent({
                   'settings.agent.editorSystemPromptDesc',
                   'Primary behavior instruction for this agent',
                 )}
-                className="smtcmp-settings-textarea-header smtcmp-settings-desc-copyable"
+                className="yolo-settings-textarea-header yolo-settings-desc-copyable"
               />
-              <ObsidianSetting className="smtcmp-settings-textarea">
+              <ObsidianSetting className="yolo-settings-textarea">
                 <ObsidianTextArea
                   value={draftAgent.systemPrompt}
                   onChange={(value) =>
@@ -1261,14 +1258,34 @@ export function AgentsSectionContent({
                   }
                   autoResize
                   maxAutoResizeHeight={360}
-                  inputClassName="smtcmp-agent-system-prompt-textarea"
+                  inputClassName="yolo-agent-system-prompt-textarea"
+                />
+              </ObsidianSetting>
+              <ObsidianSetting
+                name={t(
+                  'settings.agent.editorEnableProjectInstructions',
+                  'Load project instruction files',
+                )}
+                desc={t(
+                  'settings.agent.editorEnableProjectInstructionsDesc',
+                  'Auto-load AGENTS.md and CLAUDE.md from the vault root for this agent.',
+                )}
+              >
+                <ObsidianToggle
+                  value={draftAgent.enableProjectInstructions === true}
+                  onChange={(value) => {
+                    setDraftAgent({
+                      ...draftAgent,
+                      enableProjectInstructions: value,
+                    })
+                  }}
                 />
               </ObsidianSetting>
             </div>
           )}
 
           {activeTab === 'tools' && (
-            <div className="smtcmp-agent-editor-body">
+            <div className="yolo-agent-editor-body">
               <ObsidianSetting
                 name={t('settings.agent.editorEnableTools', 'Enable tools')}
                 desc={t(
@@ -1299,72 +1316,24 @@ export function AgentsSectionContent({
                 <ObsidianToggle
                   value={Boolean(draftAgent.includeBuiltinTools)}
                   onChange={(value) => {
-                    setDraftAgent((prev) => {
-                      if (!prev) {
-                        return prev
-                      }
-
-                      const nextEnabledToolNames = new Set(
-                        getEnabledAssistantToolNames(prev),
-                      )
-                      const nextToolPreferences = {
-                        ...getAssistantToolPreferences(prev),
-                      }
-
-                      if (value && !prev.includeBuiltinTools) {
-                        availableTools.forEach((tool) => {
-                          let serverName = localFsServerName
-                          try {
-                            serverName = parseToolName(tool.name).serverName
-                          } catch {
-                            serverName = localFsServerName
-                          }
-
-                          if (serverName === localFsServerName) {
-                            const existingPreference =
-                              nextToolPreferences[tool.name]
-                            const shouldDefaultDisabled =
-                              isDefaultDisabledNewAgentBuiltinTool(tool.name) &&
-                              existingPreference === undefined
-
-                            if (!shouldDefaultDisabled) {
-                              nextEnabledToolNames.add(tool.name)
-                            }
-                            nextToolPreferences[tool.name] = {
-                              ...existingPreference,
-                              enabled:
-                                existingPreference?.enabled ??
-                                !shouldDefaultDisabled,
-                              approvalMode:
-                                existingPreference?.approvalMode ??
-                                getDefaultApprovalModeForTool(tool.name),
-                            }
-                          }
-                        })
-                      }
-
-                      return {
-                        ...prev,
-                        includeBuiltinTools: value,
-                        toolPreferences: nextToolPreferences,
-                        enabledToolNames: [...nextEnabledToolNames],
-                      }
-                    })
+                    setDraftAgent((prev) =>
+                      prev ? { ...prev, includeBuiltinTools: value } : prev,
+                    )
                   }}
                 />
               </ObsidianSetting>
               <div
-                className={`smtcmp-agent-tools-panel${
+                className={`yolo-agent-tools-panel${
                   draftAgent.enableTools ? '' : ' is-disabled'
                 }`}
               >
-                <div className="smtcmp-agent-tools-panel-head">
-                  <div className="smtcmp-agent-tools-panel-title-row">
-                    <div className="smtcmp-agent-tools-panel-title">
+                <div className="yolo-agent-tools-panel-head">
+                  <div className="yolo-agent-tools-panel-title-row">
+                    <div className="yolo-agent-tools-panel-title">
                       {t('settings.agent.tools', 'Tools')}
                     </div>
                     {estimatedToolContextTokens.value !== null && (
-                      <div className="smtcmp-agent-tools-panel-estimate">
+                      <div className="yolo-agent-tools-panel-estimate">
                         {t(
                           'settings.agent.editorEstimatedContextTokens',
                           '~{count} tokens',
@@ -1375,7 +1344,7 @@ export function AgentsSectionContent({
                       </div>
                     )}
                   </div>
-                  <div className="smtcmp-agent-tools-panel-count">
+                  <div className="yolo-agent-tools-panel-count">
                     {`${enabledVisibleToolsCount} / ${visibleToolsCount} ${t(
                       'settings.agent.toolsActive',
                       'active',
@@ -1392,13 +1361,37 @@ export function AgentsSectionContent({
                   const groupToggleTargets = group.tools.flatMap(
                     (tool) => tool.toggleTargets,
                   )
+                  const showServerDisclosure =
+                    !group.isBuiltin &&
+                    enableToolDisclosure &&
+                    group.tools.length > 0
+                  const serverDisclosureMode = showServerDisclosure
+                    ? groupToggleTargets.every(
+                        (target) =>
+                          getAssistantToolDisclosureMode(draftAgent, target, {
+                            enableToolDisclosure,
+                          }) === 'on_demand',
+                      )
+                      ? 'on_demand'
+                      : 'always'
+                    : 'on_demand'
+                  const groupFullyDisabled =
+                    !group.isBuiltin &&
+                    group.tools.length > 0 &&
+                    groupEnabledCount === 0
+                  const groupClassName = [
+                    'yolo-agent-tool-group',
+                    !group.isBuiltin ? 'yolo-agent-tool-group--mcp' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
                   return (
-                    <div key={group.key} className="smtcmp-agent-tool-group">
-                      <div className="smtcmp-agent-tool-group-title">
-                        <span className="smtcmp-agent-tool-group-title-main">
+                    <div key={group.key} className={groupClassName}>
+                      <div className="yolo-agent-tool-group-title">
+                        <span className="yolo-agent-tool-group-title-main">
                           <span>{group.title}</span>
                           {estimatedToolContextTokens.perTool.size > 0 && (
-                            <span className="smtcmp-agent-tool-group-tokens">
+                            <span className="yolo-agent-tool-group-tokens">
                               {t(
                                 'settings.agent.editorEstimatedContextTokens',
                                 '~{count} tokens',
@@ -1410,9 +1403,33 @@ export function AgentsSectionContent({
                               )}
                             </span>
                           )}
+                          {showServerDisclosure && (
+                            <button
+                              type="button"
+                              className="yolo-agent-tool-group-disclosure"
+                              onClick={() =>
+                                setToolDisclosureMode(
+                                  groupToggleTargets,
+                                  serverDisclosureMode === 'on_demand'
+                                    ? 'always'
+                                    : 'on_demand',
+                                )
+                              }
+                            >
+                              {serverDisclosureMode === 'on_demand'
+                                ? t(
+                                    'settings.agent.toolDisclosureOnDemand',
+                                    'On demand',
+                                  )
+                                : t(
+                                    'settings.agent.toolDisclosureAlways',
+                                    'Always loaded',
+                                  )}
+                            </button>
+                          )}
                         </span>
-                        <span className="smtcmp-agent-tool-group-meta">
-                          <span className="smtcmp-agent-tool-group-count">
+                        <span className="yolo-agent-tool-group-meta">
+                          <span className="yolo-agent-tool-group-count">
                             {`${groupEnabledCount} / ${group.tools.length} ${t(
                               'settings.agent.toolsActive',
                               'active',
@@ -1421,7 +1438,7 @@ export function AgentsSectionContent({
                           {group.tools.length > 0 && (
                             <button
                               type="button"
-                              className="smtcmp-agent-tool-group-bulk-toggle"
+                              className="yolo-agent-tool-group-bulk-toggle"
                               onClick={() =>
                                 toggleTool(
                                   groupToggleTargets,
@@ -1442,68 +1459,73 @@ export function AgentsSectionContent({
                           )}
                         </span>
                       </div>
-                      <div className="smtcmp-agent-tool-list">
-                        {group.tools.map((tool) => {
-                          const selected = tool.toggleTargets.every((target) =>
-                            isAssistantToolEnabled(draftAgent, target),
-                          )
-                          const approvalMode = tool.toggleTargets.every(
-                            (target) =>
-                              getAssistantToolApprovalMode(
-                                draftAgent,
-                                target,
-                              ) === 'full_access',
-                          )
-                            ? 'full_access'
-                            : 'require_approval'
+                      {!groupFullyDisabled && (
+                        <div className="yolo-agent-tool-list">
+                          {group.tools.map((tool) => {
+                            const selected = tool.toggleTargets.every(
+                              (target) =>
+                                isAssistantToolEnabled(draftAgent, target),
+                            )
+                            const approvalMode = tool.toggleTargets.every(
+                              (target) =>
+                                getAssistantToolApprovalMode(
+                                  draftAgent,
+                                  target,
+                                ) === 'full_access',
+                            )
+                              ? 'full_access'
+                              : 'require_approval'
 
-                          return (
-                            <div
-                              key={tool.fullName}
-                              className="smtcmp-agent-tool-row"
-                            >
-                              <div className="smtcmp-agent-tool-main">
-                                <div className="smtcmp-agent-tool-name smtcmp-agent-tool-name--mono">
-                                  {tool.displayName}
-                                </div>
-                                <div className="smtcmp-agent-tool-source smtcmp-agent-tool-source--preview">
-                                  {tool.description}
-                                </div>
-                              </div>
-                              <div className="smtcmp-agent-tool-controls">
-                                {selected && (
-                                  <div className="smtcmp-agent-tool-approval">
-                                    <SimpleSelect
-                                      value={approvalMode}
-                                      options={toolApprovalOptions}
-                                      onChange={(value) =>
-                                        setToolApprovalMode(
-                                          tool.toggleTargets,
-                                          value as AssistantToolApprovalMode,
-                                        )
-                                      }
-                                      align="end"
-                                      contentClassName="smtcmp-agent-tool-approval-menu"
-                                    />
+                            return (
+                              <div
+                                key={tool.fullName}
+                                className="yolo-agent-tool-row"
+                              >
+                                <div className="yolo-agent-tool-main">
+                                  <div className="yolo-agent-tool-name yolo-agent-tool-name--mono">
+                                    {tool.displayName}
                                   </div>
-                                )}
-                                <ObsidianToggle
-                                  value={Boolean(selected)}
-                                  onChange={(value) =>
-                                    toggleTool(tool.toggleTargets, value)
-                                  }
-                                />
+                                  <div className="yolo-agent-tool-source yolo-agent-tool-source--preview">
+                                    {tool.description}
+                                  </div>
+                                </div>
+                                <div className="yolo-agent-tool-controls">
+                                  {selected && (
+                                    <>
+                                      <div className="yolo-agent-tool-select">
+                                        <SimpleSelect
+                                          value={approvalMode}
+                                          options={toolApprovalOptions}
+                                          onChange={(value) =>
+                                            setToolApprovalMode(
+                                              tool.toggleTargets,
+                                              value as AssistantToolApprovalMode,
+                                            )
+                                          }
+                                          align="end"
+                                          contentClassName="yolo-agent-tool-select-menu"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                  <ObsidianToggle
+                                    value={Boolean(selected)}
+                                    onChange={(value) =>
+                                      toggleTool(tool.toggleTargets, value)
+                                    }
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
 
                 {visibleToolsCount === 0 && (
-                  <div className="smtcmp-agent-tools-empty">
+                  <div className="yolo-agent-tools-empty">
                     {t('settings.agent.noTools', 'No tools available')}
                   </div>
                 )}
@@ -1512,15 +1534,15 @@ export function AgentsSectionContent({
           )}
 
           {activeTab === 'skills' && (
-            <div className="smtcmp-agent-editor-body">
-              <div className="smtcmp-agent-tools-panel">
-                <div className="smtcmp-agent-tools-panel-head">
-                  <div className="smtcmp-agent-tools-panel-title-row">
-                    <div className="smtcmp-agent-tools-panel-title">
+            <div className="yolo-agent-editor-body">
+              <div className="yolo-agent-tools-panel">
+                <div className="yolo-agent-tools-panel-head">
+                  <div className="yolo-agent-tools-panel-title-row">
+                    <div className="yolo-agent-tools-panel-title">
                       {t('settings.agent.skills', 'Skills')}
                     </div>
                     {estimatedSkillContextTokens.value !== null && (
-                      <div className="smtcmp-agent-tools-panel-estimate">
+                      <div className="yolo-agent-tools-panel-estimate">
                         {t(
                           'settings.agent.editorEstimatedContextTokens',
                           '~{count} tokens',
@@ -1531,7 +1553,7 @@ export function AgentsSectionContent({
                       </div>
                     )}
                   </div>
-                  <div className="smtcmp-agent-tools-panel-count">
+                  <div className="yolo-agent-tools-panel-count">
                     {t(
                       'settings.agent.editorSkillsCountWithEnabled',
                       '{count} skills (enabled {enabled})',
@@ -1546,31 +1568,31 @@ export function AgentsSectionContent({
                   </div>
                 </div>
 
-                <div className="smtcmp-agent-skill-summary-row">
-                  <span className="smtcmp-agent-chip">
+                <div className="yolo-agent-skill-summary-row">
+                  <span className="yolo-agent-chip">
                     {t('settings.agent.skillLoadAlways', 'Full inject')}:{' '}
                     {alwaysSkillRows.length}
                   </span>
-                  <span className="smtcmp-agent-chip">
+                  <span className="yolo-agent-chip">
                     {t('settings.agent.skillLoadLazy', 'On demand')}:{' '}
                     {lazySkillRows.length}
                   </span>
                 </div>
 
                 {skillRows.length > 0 ? (
-                  <div className="smtcmp-agent-tool-list">
+                  <div className="yolo-agent-tool-list">
                     {skillRows.map((skill) => {
                       const disabledByGlobal = skill.globallyDisabled
                       return (
-                        <div key={skill.id} className="smtcmp-agent-tool-row">
-                          <div className="smtcmp-agent-tool-main">
-                            <div className="smtcmp-agent-tool-name">
+                        <div key={skill.id} className="yolo-agent-tool-row">
+                          <div className="yolo-agent-tool-main">
+                            <div className="yolo-agent-tool-name">
                               <span>{skill.name}</span>
                               {skill.enabled &&
                                 estimatedSkillContextTokens.perSkill.has(
                                   skill.id,
                                 ) && (
-                                  <span className="smtcmp-agent-skill-tokens">
+                                  <span className="yolo-agent-skill-tokens">
                                     {t(
                                       'settings.agent.editorEstimatedContextTokens',
                                       '~{count} tokens',
@@ -1585,18 +1607,18 @@ export function AgentsSectionContent({
                                   </span>
                                 )}
                             </div>
-                            <div className="smtcmp-agent-tool-source smtcmp-agent-tool-source--preview">
+                            <div className="yolo-agent-tool-source yolo-agent-tool-source--preview">
                               {skill.description}
                             </div>
-                            <div className="smtcmp-agent-skill-meta">
-                              <span className="smtcmp-agent-chip">
+                            <div className="yolo-agent-skill-meta">
+                              <span className="yolo-agent-chip">
                                 id: {skill.id}
                               </span>
-                              <span className="smtcmp-agent-chip">
+                              <span className="yolo-agent-chip">
                                 {skill.path}
                               </span>
                               {disabledByGlobal && (
-                                <span className="smtcmp-agent-chip">
+                                <span className="yolo-agent-chip">
                                   {t(
                                     'settings.agent.skillDisabledGlobally',
                                     'Disabled globally',
@@ -1605,7 +1627,7 @@ export function AgentsSectionContent({
                               )}
                             </div>
                           </div>
-                          <div className="smtcmp-agent-skill-controls">
+                          <div className="yolo-agent-skill-controls">
                             <ObsidianToggle
                               value={skill.enabled}
                               onChange={(value) => {
@@ -1641,7 +1663,7 @@ export function AgentsSectionContent({
                     })}
                   </div>
                 ) : (
-                  <div className="smtcmp-agent-tools-empty">
+                  <div className="yolo-agent-tools-empty">
                     {t(
                       'settings.agent.skillsEmptyHint',
                       'No skills found. Create skill markdown files under {path}.',
@@ -1653,7 +1675,7 @@ export function AgentsSectionContent({
           )}
 
           {activeTab === 'workspace' && (
-            <div className="smtcmp-agent-editor-body">
+            <div className="yolo-agent-editor-body">
               <AgentWorkspaceScopeEditor
                 app={app}
                 vault={app.vault}
@@ -1664,8 +1686,8 @@ export function AgentsSectionContent({
           )}
 
           {isDirectEntry && (
-            <div className="smtcmp-agent-editor-direct-footer">
-              <div className="smtcmp-agent-editor-direct-footer-actions">
+            <div className="yolo-agent-editor-direct-footer">
+              <div className="yolo-agent-editor-direct-footer-actions">
                 <ObsidianButton
                   text={t('common.cancel', 'Cancel')}
                   onClick={onClose}

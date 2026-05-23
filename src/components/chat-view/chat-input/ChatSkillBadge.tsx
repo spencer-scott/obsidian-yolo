@@ -17,19 +17,19 @@ export default function ChatSkillBadge({
 }: ChatSkillBadgeProps) {
   return (
     <div
-      className={`smtcmp-chat-user-input-file-badge ${isFocused ? 'smtcmp-chat-user-input-file-badge-focused' : ''}`}
+      className={`yolo-chat-user-input-file-badge ${isFocused ? 'yolo-chat-user-input-file-badge-focused' : ''}`}
     >
-      <div className="smtcmp-chat-user-input-file-badge-name">
+      <div className="yolo-chat-user-input-file-badge-name">
         <Sparkles
           size={12}
-          className="smtcmp-chat-user-input-file-badge-name-icon"
+          className="yolo-chat-user-input-file-badge-name-icon"
         />
         <span>{skill.name}</span>
       </div>
       {showDeleteButton && (
         <button
           type="button"
-          className="smtcmp-chat-user-input-file-badge-delete"
+          className="yolo-chat-user-input-file-badge-delete"
           onClick={(event) => {
             event.stopPropagation()
             onDelete()

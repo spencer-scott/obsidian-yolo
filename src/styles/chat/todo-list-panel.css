@@ -1,0 +1,161 @@
+/* Todo list panel: a child of .yolo-chat-input-overlay, floating above
+ * the input box, collapsible. Positioning and z-index are handled by
+ * .yolo-chat-input-overlay; this component only manages its own styles.
+ * Layout: header (summary + collapse button) -> body (list)
+ * Collapse animation: grid-template-rows 0fr <-> 1fr, no height
+ * measurement needed.
+ */
+
+.yolo-todo-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  font-size: var(--font-ui-small);
+  overflow: hidden;
+  /* Entry animation: "bubbles up" from the top edge of the input box.
+   * Replays every time the component transitions from null to rendered
+   * (first appearance, reappearance after clearing, switching
+   * conversations/branches, etc.) without needing React coordination. */
+  animation: yolo-todo-panel-appear 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes yolo-todo-panel-appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The selector `button.yolo-todo-panel__header` is used to override
+ * Obsidian `app.css`'s
+ * `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }`
+ * - equal or higher specificity is required, otherwise a shadow line
+ * appears along the bottom of the header. */
+button.yolo-todo-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  width: 100%;
+  padding: var(--size-2-2) var(--size-4-2);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: left;
+}
+
+.yolo-todo-panel__header-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.yolo-todo-panel__summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yolo-todo-panel__caret {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 220ms ease;
+}
+
+.yolo-todo-panel--collapsed .yolo-todo-panel__caret {
+  transform: rotate(-90deg);
+}
+
+.yolo-todo-panel__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.yolo-todo-panel--collapsed .yolo-todo-panel__body {
+  grid-template-rows: 0fr;
+}
+
+.yolo-todo-panel__body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yolo-todo-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--size-2-2) var(--size-4-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+}
+
+.yolo-todo-panel__item {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  padding: var(--size-2-1) 0;
+  color: var(--text-normal);
+  line-height: 1.4;
+}
+
+.yolo-todo-panel__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+
+.yolo-todo-panel__item--in_progress .yolo-todo-panel__icon {
+  color: var(--interactive-accent);
+}
+
+.yolo-todo-panel__item--completed .yolo-todo-panel__icon {
+  color: var(--text-faint);
+}
+
+.yolo-todo-panel__index {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.yolo-todo-panel__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.yolo-todo-panel__item--in_progress .yolo-todo-panel__text {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+
+.yolo-todo-panel__item--completed .yolo-todo-panel__text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.yolo-todo-panel__icon-spin {
+  animation: yolo-todo-panel-spin 1.4s linear infinite;
+}
+
+@keyframes yolo-todo-panel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

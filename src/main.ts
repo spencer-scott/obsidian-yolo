@@ -39,6 +39,7 @@ import {
   BackgroundActivityAction,
   BackgroundActivityRegistry,
 } from './core/background/backgroundActivityRegistry'
+import { setLLMDebugCaptureEnabled } from './core/llm/debugCapture'
 import { clearRequestTransportMemory } from './core/llm/requestTransport'
 import { McpCoordinator } from './core/mcp/mcpCoordinator'
 import type { McpManager } from './core/mcp/mcpManager'
@@ -78,6 +79,8 @@ import {
 } from './features/chat/chatLeafSessionManager'
 import { ChatViewNavigator } from './features/chat/chatViewNavigator'
 import { NewTabEmptyStateEnhancer } from './features/chat/newTabEmptyStateEnhancer'
+import { ExportConfigModal } from './features/config-transfer/components/ExportConfigModal'
+import { ImportConfigModal } from './features/config-transfer/components/ImportConfigModal'
 import { DiffReviewController } from './features/editor/diff-review/diffReviewController'
 import {
   buildFullReviewBlocks,
@@ -88,6 +91,7 @@ import { InlineSuggestionController } from './features/editor/inline-suggestion/
 import type { QuickAskSelectionScope } from './features/editor/quick-ask/quickAsk.types'
 import type { QuickAskLaunchMode } from './features/editor/quick-ask/quickAsk.types'
 import { QuickAskController } from './features/editor/quick-ask/quickAskController'
+import { resolveSelectionChatActions } from './features/editor/selection-chat/resolveSelectionChatActions'
 import { SelectionChatController } from './features/editor/selection-chat/selectionChatController'
 import { selectionHighlightController } from './features/editor/selection-highlight/selectionHighlightController'
 import {
@@ -99,14 +103,14 @@ import { WriteAssistController } from './features/editor/write-assist/writeAssis
 import { enablePdfScreenshotFeature } from './features/pdf-screenshot'
 import { Language, createTranslationFunction } from './i18n'
 import {
-  SmartComposerSettings,
-  smartComposerSettingsSchema,
+  YoloSettings,
+  yoloSettingsSchema,
 } from './settings/schema/setting.types'
 import {
-  normalizeSmartComposerSettingsReferences,
-  parseSmartComposerSettings,
+  normalizeYoloSettingsReferences,
+  parseYoloSettings,
 } from './settings/schema/settings'
-import { SmartComposerSettingTab } from './settings/SettingTab'
+import { YoloSettingTab } from './settings/SettingTab'
 import type { ApplyViewState } from './types/apply-view.types'
 import { ConversationOverrideSettings } from './types/conversation-settings.types'
 import type {
@@ -121,9 +125,9 @@ import { ensureBufferByteLengthCompat } from './utils/runtime/ensureBufferByteLe
 
 const STARTUP_GRACE_MS = 30 * 1000
 
-export default class SmartComposerPlugin extends Plugin {
-  settings: SmartComposerSettings
-  settingsChangeListeners: ((newSettings: SmartComposerSettings) => void)[] = []
+export default class YoloPlugin extends Plugin {
+  settings: YoloSettings
+  settingsChangeListeners: ((newSettings: YoloSettings) => void)[] = []
   private deviceId: string | null = null
   private currentSettingsMeta: YoloDataMeta | null = null
   updateCheckResult: UpdateCheckResult | null = null
@@ -150,6 +154,10 @@ export default class SmartComposerPlugin extends Plugin {
   private smartSpaceController: SmartSpaceController | null = null
   // Selection chat state
   private selectionChatController: SelectionChatController | null = null
+  // Obsidian command IDs (un-namespaced) registered for selection-chat shortcuts.
+  // Tracked so we can drop stale commands when the user edits the action list.
+  private registeredSelectionChatCommandIds: string[] = []
+  private selectionChatCommandsFingerprint: string | null = null
   private chatViewNavigator: ChatViewNavigator | null = null
   private chatLeafSessionManager: ChatLeafSessionManager | null = null
   private newTabEmptyStateEnhancer: NewTabEmptyStateEnhancer | null = null
@@ -348,7 +356,7 @@ export default class SmartComposerPlugin extends Plugin {
   }
 
   private syncOAuthRuntimesFromSettings(
-    settings: Pick<SmartComposerSettings, 'providers'> = this.settings,
+    settings: Pick<YoloSettings, 'providers'> = this.settings,
   ): void {
     for (const provider of settings.providers) {
       if (provider.presetType === 'chatgpt-oauth') {
@@ -478,6 +486,7 @@ export default class SmartComposerPlugin extends Plugin {
       prompt: string
       mentionables: Mentionable[]
       selectionScope?: QuickAskSelectionScope
+      initialAssistantId?: string
     },
   ) {
     this.getQuickAskController().showWithAutoSend(editor, view, options)
@@ -495,6 +504,7 @@ export default class SmartComposerPlugin extends Plugin {
       editSelectionFrom?: { line: number; ch: number }
       selectionScope?: QuickAskSelectionScope
       autoSend?: boolean
+      initialAssistantId?: string
     },
   ) {
     this.getQuickAskController().showWithOptions(editor, view, options)
@@ -523,10 +533,15 @@ export default class SmartComposerPlugin extends Plugin {
           this.getQuickAskController().pruneOrphanedPdfInstance(
             activePdfLeaves,
           ),
-        openChatWithSelectionAndPrefill: async (selectedBlock, text) => {
+        openChatWithSelectionAndPrefill: async (
+          selectedBlock,
+          text,
+          assistantId,
+        ) => {
           await this.getChatViewNavigator().openChatWithSelectionAndPrefill(
             selectedBlock,
             text,
+            assistantId,
           )
         },
         addSelectionToSidebarChat: async (selectedBlock) => {
@@ -534,10 +549,15 @@ export default class SmartComposerPlugin extends Plugin {
             selectedBlock,
           )
         },
-        openChatWithSelectionAndSend: async (selectedBlock, text) => {
+        openChatWithSelectionAndSend: async (
+          selectedBlock,
+          text,
+          assistantId,
+        ) => {
           await this.getChatViewNavigator().openChatWithSelectionAndSend(
             selectedBlock,
             text,
+            assistantId,
           )
         },
         isSmartSpaceOpen: () => this.smartSpaceController?.isOpen() ?? false,
@@ -548,6 +568,71 @@ export default class SmartComposerPlugin extends Plugin {
 
   private initializeSelectionChat() {
     this.getSelectionChatController().initialize()
+  }
+
+  /**
+   * Mirror the user's Cursor Chat shortcut action list into Obsidian commands so they
+   * can be assigned hotkeys or surfaced by third-party menu/launcher plugins.
+   * Each call fully rebuilds the set: previously-registered command IDs are
+   * removed first, then the current resolved list is re-registered. Action IDs
+   * are uuid-stable, so user-bound hotkeys persist across label/instruction
+   * edits.
+   */
+  private syncSelectionChatCommands() {
+    const actions = resolveSelectionChatActions(
+      this.settings,
+      (key, fallback) => this.t(key, fallback),
+    )
+    const fingerprint = JSON.stringify(
+      actions.map((a) => [
+        a.id,
+        a.label,
+        a.instruction,
+        a.mode,
+        a.rewriteBehavior,
+        a.assistantId,
+      ]),
+    )
+    if (fingerprint === this.selectionChatCommandsFingerprint) {
+      return
+    }
+    this.selectionChatCommandsFingerprint = fingerprint
+
+    const commandsApi = (
+      this.app as unknown as {
+        commands: { removeCommand: (id: string) => void }
+      }
+    ).commands
+    const pluginId = this.manifest.id
+
+    for (const id of this.registeredSelectionChatCommandIds) {
+      commandsApi.removeCommand(`${pluginId}:${id}`)
+    }
+    this.registeredSelectionChatCommandIds = []
+
+    for (const action of actions) {
+      const commandId = `selection-chat-action:${action.id}`
+      this.addCommand({
+        id: commandId,
+        name: `[Cursor Chat] ${action.label}`,
+        editorCallback: (editor: Editor) => {
+          const selected = editor.getSelection()
+          if (!selected || selected.trim().length === 0) {
+            new Notice('Please select text first')
+            return
+          }
+          void this.getSelectionChatController().executeAction(
+            action.id,
+            editor,
+            action.instruction,
+            action.mode,
+            action.rewriteBehavior,
+            action.assistantId,
+          )
+        },
+      })
+      this.registeredSelectionChatCommandIds.push(commandId)
+    }
   }
 
   private getChatViewNavigator(): ChatViewNavigator {
@@ -621,7 +706,7 @@ export default class SmartComposerPlugin extends Plugin {
         getSettings: () => this.settings,
         openApplyReview: (state) => this.openApplyReview(state),
         registerSettingsListener: (
-          listener: (settings: SmartComposerSettings) => void,
+          listener: (settings: YoloSettings) => void,
         ) => this.addSettingsChangeListener(listener),
         getRagEngine: () => this.getRAGEngine(),
       })
@@ -691,7 +776,7 @@ export default class SmartComposerPlugin extends Plugin {
     const runtime = this.manifest.version
     if (baked && runtime && baked !== runtime) {
       console.error(
-        `[Smart Composer] Version mismatch: main.js=${baked}, manifest=${runtime}. ` +
+        `[YOLO] Version mismatch: main.js=${baked}, manifest=${runtime}. ` +
           `Likely an incomplete update download.`,
       )
       this.installationIncompleteDetail = {
@@ -782,31 +867,31 @@ export default class SmartComposerPlugin extends Plugin {
   private setupBackgroundActivityStatusBar(): void {
     const statusBarItem = this.addStatusBarItem()
     statusBarItem.addClass('mod-clickable')
-    statusBarItem.addClass('smtcmp-background-activity-status-bar')
+    statusBarItem.addClass('yolo-background-activity-status-bar')
     statusBarItem.hide()
 
     const ring = document.createElement('span')
-    ring.className = 'smtcmp-background-activity-status-bar-ring'
+    ring.className = 'yolo-background-activity-status-bar-ring'
 
     const label = document.createElement('span')
-    label.className = 'smtcmp-background-activity-status-bar-label'
+    label.className = 'yolo-background-activity-status-bar-label'
 
     const panel = document.createElement('div')
-    panel.className = 'smtcmp-background-activity-status-panel'
+    panel.className = 'yolo-background-activity-status-panel'
     panel.setAttribute('aria-hidden', 'true')
     panel.hidden = true
 
     const panelHeader = document.createElement('div')
-    panelHeader.className = 'smtcmp-background-activity-status-panel-header'
+    panelHeader.className = 'yolo-background-activity-status-panel-header'
     panelHeader.setText(
       this.t('statusBar.backgroundStatusPanelTitle', 'Background Tasks'),
     )
 
     const panelList = document.createElement('div')
-    panelList.className = 'smtcmp-background-activity-status-panel-list'
+    panelList.className = 'yolo-background-activity-status-panel-list'
 
     const panelEmpty = document.createElement('div')
-    panelEmpty.className = 'smtcmp-background-activity-status-panel-empty'
+    panelEmpty.className = 'yolo-background-activity-status-panel-empty'
     panelEmpty.setText(
       this.t(
         'statusBar.backgroundStatusPanelEmpty',
@@ -1240,25 +1325,25 @@ export default class SmartComposerPlugin extends Plugin {
     indicator: HTMLElement
   } {
     const item = createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item',
+      cls: 'yolo-background-activity-status-panel-item',
     })
     item.setAttribute('role', 'button')
     item.setAttribute('tabindex', '0')
 
     const row = item.createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item-row',
+      cls: 'yolo-background-activity-status-panel-item-row',
     })
     const copy = row.createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item-copy',
+      cls: 'yolo-background-activity-status-panel-item-copy',
     })
     const title = copy.createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item-title',
+      cls: 'yolo-background-activity-status-panel-item-title',
     })
     const detail = copy.createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item-detail',
+      cls: 'yolo-background-activity-status-panel-item-detail',
     })
     const indicator = row.createDiv({
-      cls: 'smtcmp-background-activity-status-panel-item-indicator',
+      cls: 'yolo-background-activity-status-panel-item-indicator',
     })
 
     const openAction = () => {
@@ -1409,6 +1494,10 @@ export default class SmartComposerPlugin extends Plugin {
           this.app.workspace.getActiveFile()?.basename?.trim() ?? '',
         setInlineSuggestionGhost: (view, payload) =>
           inlineSuggestionController.setInlineSuggestionGhost(view, payload),
+        showTabLoadingDots: (view, from) =>
+          inlineSuggestionController.showTabLoadingDots(view, from),
+        hideTabLoadingDots: (view) =>
+          inlineSuggestionController.hideTabLoadingDots(view),
         clearInlineSuggestion: () =>
           inlineSuggestionController.clearInlineSuggestion(),
         setActiveInlineSuggestion: (suggestion) =>
@@ -1618,7 +1707,7 @@ export default class SmartComposerPlugin extends Plugin {
 
     // This creates an icon in the left ribbon.
     this.addRibbonIcon('wand-sparkles', this.t('commands.openChat'), () => {
-      void this.openChatView({ placement: 'sidebar' })
+      void this.openChatView({ placement: this.resolveRibbonPlacement() })
     })
 
     this.setupBackgroundActivityStatusBar()
@@ -1871,8 +1960,25 @@ export default class SmartComposerPlugin extends Plugin {
         }
       },
     })
+
+    this.addCommand({
+      id: 'export-settings',
+      name: this.t('commands.exportSettings', 'Export Plugin Configuration'),
+      callback: () => {
+        new ExportConfigModal(this.app, this).open()
+      },
+    })
+
+    this.addCommand({
+      id: 'import-settings',
+      name: this.t('commands.importSettings', 'Import Plugin Configuration'),
+      callback: () => {
+        new ImportConfigModal(this.app, this).open()
+      },
+    })
+
     // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new SmartComposerSettingTab(this.app, this))
+    this.addSettingTab(new YoloSettingTab(this.app, this))
 
     // removed templates JSON migration
 
@@ -1899,6 +2005,7 @@ export default class SmartComposerPlugin extends Plugin {
 
     // Initialize selection chat
     this.initializeSelectionChat()
+    this.syncSelectionChatCommands()
 
     // Listen for settings changes to reinitialize Selection Chat
     this.addSettingsChangeListener((newSettings) => {
@@ -1910,6 +2017,7 @@ export default class SmartComposerPlugin extends Plugin {
         // Re-initialize when the setting changes
         this.initializeSelectionChat()
       }
+      this.syncSelectionChatCommands()
     })
   }
 
@@ -1971,6 +2079,13 @@ export default class SmartComposerPlugin extends Plugin {
     this.clearTabCompletionTimer()
     this.cancelTabCompletionRequest()
     this.clearInlineSuggestion()
+
+    // Release the pdfjs worker Blob URL we may have created during this
+    // session. Outstanding workers already spawned keep running; this only
+    // prevents future fetches and lets the GC collect the source string.
+    void import('./utils/pdf/pdfjsLoader').then(({ disposePdfjsWorker }) =>
+      disposePdfjsWorker(),
+    )
   }
 
   async loadSettings() {
@@ -1988,7 +2103,7 @@ export default class SmartComposerPlugin extends Plugin {
     const sourceRaw = pluginExtract?.raw ?? null
     const sourceMeta = pluginExtract?.meta ?? null
 
-    const parsedSettings = parseSmartComposerSettings(sourceRaw)
+    const parsedSettings = parseYoloSettings(sourceRaw)
     const settingsWithDefaultAssistant =
       ensureDefaultAssistantInSettings(parsedSettings)
     const { chatModels, changed } = applyKnownMaxContextTokensToChatModels(
@@ -2000,6 +2115,9 @@ export default class SmartComposerPlugin extends Plugin {
 
     this.settings = normalizedSettings
     this.currentSettingsMeta = sourceMeta
+    setLLMDebugCaptureEnabled(
+      this.settings.debug?.captureRawRequestDebug ?? false,
+    )
   }
 
   private getDeviceId(): string {
@@ -2061,7 +2179,7 @@ export default class SmartComposerPlugin extends Plugin {
   }
 
   private async persistPluginDirSettings(
-    settings: SmartComposerSettings,
+    settings: YoloSettings,
     meta: YoloDataMeta = this.buildSettingsMeta(),
   ): Promise<YoloDataMeta> {
     await this.saveData(stampYoloDataMeta(settings, meta))
@@ -2122,7 +2240,7 @@ export default class SmartComposerPlugin extends Plugin {
       return
     }
 
-    const parsedSettings = parseSmartComposerSettings(raw)
+    const parsedSettings = parseYoloSettings(raw)
     const settingsWithDefaultAssistant =
       ensureDefaultAssistantInSettings(parsedSettings)
     const { chatModels, changed } = applyKnownMaxContextTokensToChatModels(
@@ -2327,12 +2445,11 @@ export default class SmartComposerPlugin extends Plugin {
     )
   }
 
-  async setSettings(newSettings: SmartComposerSettings) {
+  async setSettings(newSettings: YoloSettings) {
     const normalizedSettings = ensureDefaultAssistantInSettings(
-      normalizeSmartComposerSettingsReferences(newSettings),
+      normalizeYoloSettingsReferences(newSettings),
     )
-    const validationResult =
-      smartComposerSettingsSchema.safeParse(normalizedSettings)
+    const validationResult = yoloSettingsSchema.safeParse(normalizedSettings)
 
     if (!validationResult.success) {
       new Notice(`Invalid settings:
@@ -2387,6 +2504,9 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
 
     this.settings = normalizedSettings
     await this.persistPluginDirSettings(normalizedSettings)
+    setLLMDebugCaptureEnabled(
+      this.settings.debug?.captureRawRequestDebug ?? false,
+    )
 
     this.syncOAuthRuntimesFromSettings(normalizedSettings)
     this.ragCoordinator?.updateSettings(normalizedSettings)
@@ -2404,9 +2524,7 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     })
   }
 
-  addSettingsChangeListener(
-    listener: (newSettings: SmartComposerSettings) => void,
-  ) {
+  addSettingsChangeListener(listener: (newSettings: YoloSettings) => void) {
     this.settingsChangeListeners.push(listener)
     return () => {
       this.settingsChangeListeners = this.settingsChangeListeners.filter(
@@ -2462,6 +2580,15 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     forceNewLeaf?: boolean
   }) {
     await this.getChatViewNavigator().openChatView(options)
+  }
+
+  resolveRibbonPlacement(): ChatLeafPlacement {
+    const action = this.settings.chatOptions.ribbonClickAction ?? 'sidebar'
+    if (action === 'last') {
+      const last = this.settings.chatOptions.lastChatPlacement
+      return last ?? 'sidebar'
+    }
+    return action
   }
 
   async openCurrentOrSidebarNewChat() {

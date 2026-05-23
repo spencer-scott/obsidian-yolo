@@ -37,6 +37,7 @@ type SharedConversationSurfaceProps<TItem extends ChatTimelineItem> = {
   overlaySlot?: ReactNode
   extraSlot?: ReactNode
   extraSlotPosition?: 'before' | 'after'
+  bottomSpacerHeight?: number
 }
 
 export function SharedConversationSurface<TItem extends ChatTimelineItem>({
@@ -60,6 +61,7 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
   overlaySlot,
   extraSlot,
   extraSlotPosition = 'after',
+  bottomSpacerHeight,
 }: SharedConversationSurfaceProps<TItem>) {
   const timeline = (
     <ChatTimelineList
@@ -78,6 +80,7 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
       onRenderStateChange={onRenderStateChange}
       scrollContainerClassName={scrollContainerClassName}
       scrollContainerStyle={scrollContainerStyle}
+      bottomSpacerHeight={bottomSpacerHeight}
     />
   )
 

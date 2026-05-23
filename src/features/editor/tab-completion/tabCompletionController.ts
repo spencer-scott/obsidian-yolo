@@ -9,10 +9,10 @@ import {
   DEFAULT_TAB_COMPLETION_OPTIONS,
   DEFAULT_TAB_COMPLETION_SYSTEM_PROMPT,
   DEFAULT_TAB_COMPLETION_TRIGGERS,
-  type SmartComposerSettings,
   TAB_COMPLETION_CONSTRAINTS_PLACEHOLDER,
   type TabCompletionLengthPreset,
   type TabCompletionTrigger,
+  type YoloSettings,
   computeMaxTokens,
   splitContextRange,
 } from '../../../settings/schema/setting.types'
@@ -42,8 +42,8 @@ type ActiveInlineSuggestion = {
 } | null
 
 type TabCompletionDeps = {
-  getSettings: () => SmartComposerSettings
-  setSettings: (newSettings: SmartComposerSettings) => Promise<void>
+  getSettings: () => YoloSettings
+  setSettings: (newSettings: YoloSettings) => Promise<void>
   getEditorView: (editor: Editor) => EditorView | null
   getActiveMarkdownView: () => MarkdownView | null
   getActiveConversationOverrides: () => ConversationOverrideSettings | undefined
@@ -57,6 +57,8 @@ type TabCompletionDeps = {
     view: EditorView,
     payload: InlineSuggestionGhostPayload,
   ) => void
+  showTabLoadingDots: (view: EditorView, from: number) => void
+  hideTabLoadingDots: (view: EditorView) => void
   clearInlineSuggestion: () => void
   setActiveInlineSuggestion: (suggestion: ActiveInlineSuggestion) => void
   addAbortController: (controller: AbortController) => void
@@ -147,6 +149,7 @@ export class TabCompletionController {
     editor: Editor
     cursorOffset: number
   } | null = null
+  private tabLoadingView: EditorView | null = null
   private lastAutoTriggerAt = 0
 
   constructor(private readonly deps: TabCompletionDeps) {}
@@ -241,6 +244,17 @@ export class TabCompletionController {
     return false
   }
 
+  private showLoadingDots(view: EditorView, from: number) {
+    this.tabLoadingView = view
+    this.deps.showTabLoadingDots(view, from)
+  }
+
+  private hideLoadingDots() {
+    if (!this.tabLoadingView) return
+    this.deps.hideTabLoadingDots(this.tabLoadingView)
+    this.tabLoadingView = null
+  }
+
   clearTimer() {
     if (this.tabCompletionTimer) {
       clearTimeout(this.tabCompletionTimer)
@@ -250,6 +264,7 @@ export class TabCompletionController {
   }
 
   cancelRequest() {
+    this.hideLoadingDots()
     if (!this.tabCompletionAbortController) return
     try {
       this.tabCompletionAbortController.abort()
@@ -261,6 +276,7 @@ export class TabCompletionController {
   }
 
   clearSuggestion() {
+    this.hideLoadingDots()
     if (this.tabCompletionSuggestion) {
       const { view } = this.tabCompletionSuggestion
       if (view) {
@@ -330,6 +346,7 @@ export class TabCompletionController {
   }
 
   async run(editor: Editor, scheduledCursorOffset: number) {
+    let hasShownValidSuggestion = false
     try {
       const settings = this.deps.getSettings()
       if (!settings.continuationOptions?.enableTabCompletion) return
@@ -423,6 +440,8 @@ export class TabCompletionController {
         messages: requestMessages,
         stream: false,
         max_tokens: Math.max(16, Math.min(options.maxTokens, 2000)),
+        // Tab completion is latency-sensitive; default is 'off'. Users can change to 'low'/'auto' in settings to support models that require reasoning
+        reasoningLevel: options.reasoningLevel,
       }
       if (typeof options.temperature === 'number') {
         baseRequest.temperature = Math.min(Math.max(options.temperature, 0), 2)
@@ -449,6 +468,9 @@ export class TabCompletionController {
           cleaned = cleaned.slice(0, options.maxSuggestionLength)
         }
 
+        this.hideLoadingDots()
+        hasShownValidSuggestion = true
+
         this.deps.setInlineSuggestionGhost(currentView, {
           from: scheduledCursorOffset,
           text: cleaned,
@@ -472,6 +494,17 @@ export class TabCompletionController {
         const controller = new AbortController()
         this.tabCompletionAbortController = controller
         this.deps.addAbortController(controller)
+
+        if (!hasShownValidSuggestion) {
+          const loadingView = this.deps.getEditorView(editor)
+          if (
+            loadingView &&
+            loadingView.state.selection.main.head === scheduledCursorOffset &&
+            !editor.getSelection()?.length
+          ) {
+            this.showLoadingDots(loadingView, scheduledCursorOffset)
+          }
+        }
 
         let timeoutHandle: ReturnType<typeof setTimeout> | null = null
         if (requestTimeout > 0) {
@@ -571,6 +604,7 @@ export class TabCompletionController {
       if (error?.name === 'AbortError') return
       console.error('Tab completion failed:', error)
     } finally {
+      this.hideLoadingDots()
       if (this.tabCompletionAbortController) {
         this.deps.removeAbortController(this.tabCompletionAbortController)
         this.tabCompletionAbortController = null

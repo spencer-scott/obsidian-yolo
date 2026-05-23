@@ -1,4 +1,4 @@
-import type { SettingMigration, SmartComposerSettings } from '../setting.types'
+import type { SettingMigration, YoloSettings } from '../setting.types'
 
 const DEFAULT_QUICK_ASK_CONTEXT_BEFORE_CHARS = 5000
 const DEFAULT_QUICK_ASK_CONTEXT_AFTER_CHARS = 2000
@@ -9,7 +9,7 @@ export const migrateFrom26To27: SettingMigration['migrate'] = (data) => {
 
   const continuationOptionsRaw = newData.continuationOptions
   const continuationOptions:
-    | SmartComposerSettings['continuationOptions']
+    | YoloSettings['continuationOptions']
     | Record<string, unknown>
     | undefined =
     continuationOptionsRaw && typeof continuationOptionsRaw === 'object'

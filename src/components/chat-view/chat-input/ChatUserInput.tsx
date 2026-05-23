@@ -29,8 +29,10 @@ import {
 import { useApp } from '../../../contexts/app-context'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
+import { getYoloSnippetsPath } from '../../../core/paths/yoloPaths'
 import { listLiteSkillEntries } from '../../../core/skills/liteSkills'
 import { isSkillEnabledForAssistant } from '../../../core/skills/skillPolicy'
+import { openSnippetsFileInVault } from '../../../core/snippets/snippetsFile'
 import { ChatSelectedSkill } from '../../../types/chat'
 import { ChatModel } from '../../../types/chat-model.types'
 import {
@@ -52,6 +54,10 @@ import {
 import { fileToMentionableImage } from '../../../utils/llm/image'
 import { chatModelSupportsVision } from '../../../utils/llm/model-modalities'
 import { fileToMentionablePDF } from '../../../utils/llm/pdf'
+import ContextUsagePopover from '../ContextUsagePopover'
+import ContextUsageRing from '../ContextUsageRing'
+import { useSnippetEntries } from '../hooks/useSnippetEntries'
+import type { ContextBreakdownInputs } from '../useContextBreakdown'
 
 import ChatSkillBadge from './ChatSkillBadge'
 import { FileUploadButton } from './FileUploadButton'
@@ -115,6 +121,25 @@ export type ChatUserInputProps = {
   allowAgentModeOption?: boolean
   enableResize?: boolean
   onRunSlashCommand?: (command: SlashCommand) => void
+  // When the parent is running a conversation, the submit button switches to a stop button (circle + square)
+  isGenerating?: boolean
+  onAbort?: () => void
+  // When the input is empty with no mentionables and no skills, the submit button appears faded and is not clickable
+  submitDisabled?: boolean
+  // Context window usage ring, displayed to the left of the submit button when provided
+  contextUsage?: {
+    promptTokens: number
+    maxContextTokens: number
+    label: string
+    /** When provided, the ring becomes a popover trigger that opens the
+     * per-bucket context breakdown. Builder is called lazily on open and may
+     * be async; resolution to null surfaces as a non-blocking error inside
+     * the popover (the ring still works for hover hint). */
+    buildBreakdownInputs?: () =>
+      | ContextBreakdownInputs
+      | null
+      | Promise<ContextBreakdownInputs | null>
+  }
 }
 
 const INLINE_MENTIONABLE_TYPES = [
@@ -160,6 +185,10 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       allowAgentModeOption = true,
       enableResize = false,
       onRunSlashCommand,
+      isGenerating = false,
+      onAbort,
+      submitDisabled = false,
+      contextUsage,
     },
     ref,
   ) => {
@@ -260,6 +289,20 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       )
     }, [app, currentAssistantId, settings])
 
+    const availableSnippets = useSnippetEntries()
+
+    const handleCreateSnippetsFile = useCallback(() => {
+      void (async () => {
+        const snippetsPath = getYoloSnippetsPath(settings)
+        try {
+          await openSnippetsFileInVault(app, settings)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          new Notice(`Failed to open ${snippetsPath}: ${message}`)
+        }
+      })()
+    }, [app, settings])
+
     const resolvedReasoningLevel = useMemo(() => {
       if (reasoningLevel) return reasoningLevel
       return getDefaultReasoningLevel(currentModel)
@@ -329,8 +372,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     useEffect(() => {
       return () => {
         document.body.setCssProps({
-          '--smtcmp-chat-input-resize-cursor': '',
-          '--smtcmp-chat-input-resize-user-select': '',
+          '--yolo-chat-input-resize-cursor': '',
+          '--yolo-chat-input-resize-user-select': '',
         })
       }
     }, [])
@@ -934,7 +977,9 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         }
         if (pdfFiles.length > 0) {
           void Promise.allSettled(
-            pdfFiles.map((file) => fileToMentionablePDF(file)),
+            pdfFiles.map((file) =>
+              fileToMentionablePDF(app, file, { settings }),
+            ),
           ).then((results) => {
             const successes: MentionablePDF[] = []
             results.forEach((result, idx) => {
@@ -954,14 +999,6 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             })
             if (successes.length > 0) {
               handleCreatePdfMentionables(successes)
-              const truncated = successes.filter((p) => p.truncated)
-              if (truncated.length > 0) {
-                new Notice(
-                  `Some PDFs were truncated to the first pages: ${truncated
-                    .map((p) => p.name)
-                    .join(', ')}`,
-                )
-              }
             }
           })
         }
@@ -1096,8 +1133,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
     const clearResizeBodyStyles = useCallback(() => {
       document.body.setCssProps({
-        '--smtcmp-chat-input-resize-cursor': '',
-        '--smtcmp-chat-input-resize-user-select': '',
+        '--yolo-chat-input-resize-cursor': '',
+        '--yolo-chat-input-resize-user-select': '',
       })
     }, [])
 
@@ -1135,8 +1172,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           DEFAULT_INPUT_HEIGHT
 
         document.body.setCssProps({
-          '--smtcmp-chat-input-resize-cursor': 'ns-resize',
-          '--smtcmp-chat-input-resize-user-select': 'none',
+          '--yolo-chat-input-resize-cursor': 'ns-resize',
+          '--yolo-chat-input-resize-user-select': 'none',
         })
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -1200,7 +1237,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         }
 
         if (
-          target.closest('.smtcmp-chat-user-input-controls') ||
+          target.closest('.yolo-chat-user-input-controls') ||
           target.closest('button') ||
           target.closest('[role="button"]')
         ) {
@@ -1224,19 +1261,19 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       }
 
       return {
-        ['--smtcmp-chat-user-input-height' as string]: `${resizedHeight}px`,
+        ['--yolo-chat-user-input-height' as string]: `${resizedHeight}px`,
       }
     }, [compact, enableResize, resizedHeight])
 
     return (
       <div
-        className={`smtcmp-chat-user-input-wrapper${compact ? ' smtcmp-chat-user-input-wrapper--compact' : ''}`}
+        className={`yolo-chat-user-input-wrapper${compact ? ' yolo-chat-user-input-wrapper--compact' : ''}`}
         onBlur={handleBlur}
         role="presentation"
       >
         {enableResize && !compact && (
           <div
-            className="smtcmp-chat-user-input-resize-hitbox"
+            className="yolo-chat-user-input-resize-hitbox"
             onMouseDown={handleResizeHitboxMouseDown}
             onDoubleClick={handleResizeHitboxDoubleClick}
             role="presentation"
@@ -1244,7 +1281,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         )}
         {mentionDisplayMode === 'badge' &&
           effectiveSelectedSkills.length > 0 && (
-            <div className="smtcmp-chat-user-input-files">
+            <div className="yolo-chat-user-input-files">
               {effectiveSelectedSkills.map((skill) => (
                 <ChatSkillBadge
                   key={skill.id}
@@ -1257,7 +1294,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         {!hideBadgeMentionables &&
           mentionDisplayMode === 'badge' &&
           effectiveMentionables.length > 0 && (
-            <div className="smtcmp-chat-user-input-files">
+            <div className="yolo-chat-user-input-files">
               {effectiveMentionables.map((mentionable) => {
                 const mentionableKey = getMentionableKey(
                   serializeMentionable(mentionable),
@@ -1276,7 +1313,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             </div>
           )}
         <div
-          className="smtcmp-chat-user-input-container"
+          className="yolo-chat-user-input-container"
           ref={containerRef}
           data-resizable={enableResize && !compact ? 'true' : 'false'}
           onClick={compact ? onToggleCompact : undefined}
@@ -1296,7 +1333,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           style={containerStyle}
         >
           <div
-            className="smtcmp-chat-user-input-editor"
+            className="yolo-chat-user-input-editor"
             onMouseDown={handleEditorBackgroundMouseDown}
             role="presentation"
           >
@@ -1304,7 +1341,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               effectiveMentionables.length === 0 &&
               effectiveSelectedSkills.length === 0 &&
               compact && (
-                <div className="smtcmp-chat-user-input-placeholder">
+                <div className="yolo-chat-user-input-placeholder">
                   {t('chat.placeholderCompact', 'Click to expand and edit...')}
                 </div>
               )}
@@ -1313,10 +1350,10 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               inputText.trim().length === 0 &&
               effectiveMentionables.length === 0 &&
               effectiveSelectedSkills.length === 0 && (
-                <div className="smtcmp-chat-user-input-placeholder">
+                <div className="yolo-chat-user-input-placeholder">
                   {t('chat.placeholderPrefix', 'Type a message...')}{' '}
                   <span
-                    className="smtcmp-placeholder-trigger"
+                    className="yolo-placeholder-trigger"
                     role="button"
                     onMouseDown={(e) => {
                       e.preventDefault()
@@ -1328,7 +1365,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                   {t('chat.placeholderMention', ' to add references or models')}
                   {', '}
                   <span
-                    className="smtcmp-placeholder-trigger"
+                    className="yolo-placeholder-trigger"
                     role="button"
                     onMouseDown={(e) => {
                       e.preventDefault()
@@ -1341,13 +1378,32 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                 </div>
               )}
             <LexicalContentEditable
-              initialEditorState={(editor) => {
-                if (initialSerializedEditorState) {
-                  editor.setEditorState(
-                    editor.parseEditorState(initialSerializedEditorState),
-                  )
-                }
-              }}
+              // Pass `undefined` (not a no-op function) when there's no draft
+              // to restore: Lexical only auto-creates the initial empty
+              // paragraph in the `undefined` branch. With a function — even
+              // one that does nothing — `root` stays `children: []`, which
+              // violates Lexical's "root must never be empty" invariant and
+              // produces a flood of `setEditorState` errors as soon as
+              // selection / OnChangePlugin / mutations touch the editor.
+              initialEditorState={
+                initialSerializedEditorState
+                  ? (editor) => {
+                      try {
+                        editor.setEditorState(
+                          editor.parseEditorState(initialSerializedEditorState),
+                        )
+                      } catch (error) {
+                        // Defensive: a malformed serialized state shouldn't
+                        // break the input box. Fall back to Lexical's default
+                        // empty paragraph by leaving the editor untouched.
+                        console.warn(
+                          '[YOLO] Failed to restore chat input editor state',
+                          error,
+                        )
+                      }
+                    }
+                  : undefined
+              }
               editorRef={editorRef}
               contentEditableRef={contentEditableRef}
               onChange={onChange}
@@ -1379,6 +1435,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               )}
               onSelectSkill={handleSelectSkill}
               onRunSlashCommand={onRunSlashCommand}
+              snippets={availableSnippets}
+              onCreateSnippetsFile={handleCreateSnippetsFile}
               autoFocus={autoFocus}
               plugins={{
                 onEnter: {
@@ -1391,8 +1449,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           </div>
 
           {!compact && (
-            <div className="smtcmp-chat-user-input-controls">
-              <div className="smtcmp-chat-user-input-controls__left">
+            <div className="yolo-chat-user-input-controls">
+              <div className="yolo-chat-user-input-controls__left">
                 <FileUploadButton onUpload={handleUploadFiles} />
                 <ModelSelect
                   modelId={modelId}
@@ -1401,9 +1459,9 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                   sideOffset={8}
                   popover={{
                     variant: 'default',
-                    minWidth: 260,
+                    minWidth: 240,
                     maxWidth: 320,
-                    maxHeight: 400,
+                    maxHeight: 560,
                   }}
                 />
                 {showReasoningSelect && supportsReasoning(currentModel) && (
@@ -1416,8 +1474,29 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                   />
                 )}
               </div>
-              <div className="smtcmp-chat-user-input-controls__right">
-                <SubmitButton onClick={() => handleSubmit()} />
+              <div className="yolo-chat-user-input-controls__right">
+                {contextUsage &&
+                  (contextUsage.buildBreakdownInputs ? (
+                    <ContextUsagePopover
+                      promptTokens={contextUsage.promptTokens}
+                      maxContextTokens={contextUsage.maxContextTokens}
+                      label={contextUsage.label}
+                      anchorRef={containerRef}
+                      buildInputs={contextUsage.buildBreakdownInputs}
+                    />
+                  ) : (
+                    <ContextUsageRing
+                      promptTokens={contextUsage.promptTokens}
+                      maxContextTokens={contextUsage.maxContextTokens}
+                      label={contextUsage.label}
+                    />
+                  ))}
+                <SubmitButton
+                  onClick={() => handleSubmit()}
+                  isGenerating={isGenerating}
+                  onAbort={onAbort}
+                  disabled={submitDisabled}
+                />
               </div>
             </div>
           )}

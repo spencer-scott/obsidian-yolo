@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover'
-import { ComponentPropsWithoutRef, forwardRef } from 'react'
+import { ComponentPropsWithoutRef, RefObject, forwardRef } from 'react'
 
 import {
   YoloPopoverProps,
@@ -11,7 +11,14 @@ type RadixContentProps = ComponentPropsWithoutRef<typeof Popover.Content>
 
 export type YoloPopoverContentProps = Omit<RadixContentProps, 'className'> &
   YoloPopoverProps & {
-    /** Portal container. Forwarded to `Popover.Portal`. */
+    /**
+     * Trigger (or anchor) ref. Used to resolve the Portal container from the
+     * trigger's current `ownerDocument.body` — keeps the popover in the same
+     * document as its trigger, including after the panel is moved to an
+     * Obsidian popout window.
+     */
+    anchorRef?: RefObject<Node | null>
+    /** Explicit Portal container override. Takes precedence over `anchorRef`. */
     container?: HTMLElement
     /** Extra class on the inner Content (escape hatch). */
     className?: string
@@ -30,6 +37,7 @@ export const YoloPopoverContent = forwardRef<
     minWidth,
     maxWidth,
     maxHeight,
+    anchorRef,
     container,
     className,
     style,
@@ -38,8 +46,10 @@ export const YoloPopoverContent = forwardRef<
   },
   ref,
 ) {
+  const portalContainer =
+    container ?? anchorRef?.current?.ownerDocument?.body ?? undefined
   return (
-    <Popover.Portal container={container}>
+    <Popover.Portal container={portalContainer}>
       <Popover.Content
         ref={ref}
         className={resolveYoloPopoverClassName(variant, className)}

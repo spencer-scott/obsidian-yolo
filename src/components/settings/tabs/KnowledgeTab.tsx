@@ -1,12 +1,12 @@
 import { App } from 'obsidian'
 import React from 'react'
 
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { RAGSection } from '../sections/RAGSection'
 
 type KnowledgeTabProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export function KnowledgeTab({ app, plugin }: KnowledgeTabProps) {

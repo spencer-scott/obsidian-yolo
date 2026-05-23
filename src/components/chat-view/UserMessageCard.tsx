@@ -78,14 +78,14 @@ function UserMessageCard({
     <div
       role="button"
       tabIndex={0}
-      className={`smtcmp-user-message-card smtcmp-chat-user-input-wrapper smtcmp-chat-user-input-wrapper--compact${className ? ` ${className}` : ''}`}
+      className={`yolo-user-message-card yolo-chat-user-input-wrapper yolo-chat-user-input-wrapper--compact${className ? ` ${className}` : ''}`}
       onClick={onClick}
       onKeyDown={handleKeyDown}
     >
       {mentionDisplayMode === 'badge' &&
         (snapshot.mentionables.length > 0 ||
           snapshot.selectedSkills.length > 0) && (
-          <div className="smtcmp-chat-user-input-files smtcmp-user-message-card__badges">
+          <div className="yolo-chat-user-input-files yolo-user-message-card__badges">
             {snapshot.selectedSkills.map((skill) => (
               <ReadOnlySkillBadge key={skill.id} skill={skill} />
             ))}
@@ -98,16 +98,16 @@ function UserMessageCard({
           </div>
         )}
 
-      <div className="smtcmp-chat-user-input-container">
-        <div className="smtcmp-chat-user-input-editor">
-          <div className="smtcmp-user-message-card__content">
+      <div className="yolo-chat-user-input-container">
+        <div className="yolo-chat-user-input-editor">
+          <div className="yolo-user-message-card__content">
             {fallbackText.length > 0 || snapshot.content ? (
               <ReadOnlyUserMessageContent
                 content={snapshot.content}
                 fallbackText={fallbackText}
               />
             ) : (
-              <div className="smtcmp-chat-user-input-placeholder">
+              <div className="yolo-chat-user-input-placeholder">
                 Click to edit...
               </div>
             )}

@@ -4,7 +4,7 @@ import {
   ChatMessage,
 } from '../../types/chat'
 import { ChatModel } from '../../types/chat-model.types'
-import { LLMProvider } from '../../types/provider.types'
+import { LLMProvider, LLMProviderApiType } from '../../types/provider.types'
 import { ReasoningLevel } from '../../types/reasoning'
 import type { ContextualInjection } from '../../utils/chat/contextual-injections'
 import { RequestContextBuilder } from '../../utils/chat/requestContextBuilder'
@@ -22,6 +22,12 @@ export type AgentRuntimeSubscribe = (snapshot: AgentRuntimeSnapshot) => void
 export type AgentRuntimeRunInput = {
   providerClient: BaseLLMProvider<LLMProvider>
   model: ChatModel
+  /**
+   * API protocol of the active provider. Used by the tool stub builder to
+   * pick a schema that the provider accepts (Gemini's restricted OpenAPI
+   * subset vs. the open `additionalProperties` form used by everyone else).
+   */
+  apiType?: LLMProviderApiType | null
   messages: ChatMessage[]
   requestMessages?: ChatMessage[]
   conversationId: string
@@ -44,11 +50,13 @@ export type AgentRuntimeRunInput = {
     streamFallbackRecoveryEnabled?: boolean
   }
   allowedToolNames?: string[]
+  enableToolDisclosure?: boolean
   toolPreferences?: Record<
     string,
     {
       enabled?: boolean
       approvalMode?: 'full_access' | 'require_approval'
+      disclosureMode?: 'always' | 'on_demand'
     }
   >
   workspaceScope?: {
@@ -63,6 +71,15 @@ export type AgentRuntimeRunInput = {
     useWebSearch?: boolean
     useUrlContext?: boolean
   }
+  /**
+   * Optional hook called at every `llm_request` boundary inside the runtime
+   * loop. Returns user messages that should be merged into the response stream
+   * before the next LLM turn. Used to inject mid-run user messages enqueued by
+   * the service layer. Returning an empty array is a no-op.
+   *
+   * Not invoked by the single-turn fast path (single LLM call, no boundary).
+   */
+  drainPendingUserMessages?: () => ChatMessage[]
 }
 
 export type AgentRuntimeLoopConfig = {

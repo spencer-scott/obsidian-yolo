@@ -32,7 +32,7 @@ export function CollapsibleToolDescription({ description, name }: Props) {
     <button
       type="button"
       className={
-        'smtcmp-mcp-tool-description-toggle clickable-icon' +
+        'yolo-mcp-tool-description-toggle clickable-icon' +
         (expanded ? ' is-expanded' : '')
       }
       onClick={() => setExpanded((v) => !v)}
@@ -52,17 +52,17 @@ export function CollapsibleToolDescription({ description, name }: Props) {
   ) : null
 
   return (
-    <div className="smtcmp-mcp-tool-description">
+    <div className="yolo-mcp-tool-description">
       {name !== undefined && (
-        <div className="smtcmp-mcp-tool-description-header">
-          <div className="smtcmp-mcp-tool-name">{name}</div>
+        <div className="yolo-mcp-tool-description-header">
+          <div className="yolo-mcp-tool-name">{name}</div>
           {toggleButton}
         </div>
       )}
       <div
         ref={textRef}
         className={
-          'smtcmp-mcp-tool-description-text' +
+          'yolo-mcp-tool-description-text' +
           (expanded ? ' is-expanded' : ' is-clamped')
         }
       >

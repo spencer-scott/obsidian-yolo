@@ -1,1 +1,4 @@
-declare module 'pdfjs-dist/build/pdf.worker.mjs'
+declare module 'virtual:pdfjs-worker-script' {
+  const workerSource: string
+  export default workerSource
+}

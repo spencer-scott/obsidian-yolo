@@ -1,12 +1,9 @@
 import { SETTINGS_SCHEMA_VERSION, SETTING_MIGRATIONS } from './migrations'
-import {
-  SmartComposerSettings,
-  smartComposerSettingsSchema,
-} from './setting.types'
+import { YoloSettings, yoloSettingsSchema } from './setting.types'
 
-export function normalizeSmartComposerSettingsReferences(
-  settings: SmartComposerSettings,
-): SmartComposerSettings {
+export function normalizeYoloSettingsReferences(
+  settings: YoloSettings,
+): YoloSettings {
   const validProviderIds = new Set(
     settings.providers.map((provider) => provider.id),
   )
@@ -133,9 +130,7 @@ function migrateSettings(
   return currentData
 }
 
-export function parseSmartComposerSettings(
-  data: unknown,
-): SmartComposerSettings {
+export function parseYoloSettings(data: unknown): YoloSettings {
   try {
     if (
       !data ||
@@ -143,17 +138,17 @@ export function parseSmartComposerSettings(
         data !== null &&
         Object.keys(data as Record<string, unknown>).length === 0)
     ) {
-      const parsed = smartComposerSettingsSchema.parse({})
+      const parsed = yoloSettingsSchema.parse({})
       return { ...parsed, version: SETTINGS_SCHEMA_VERSION }
     }
 
     const migratedData = migrateSettings(data as Record<string, unknown>)
-    const parsed = smartComposerSettingsSchema.parse(migratedData)
-    const normalized = normalizeSmartComposerSettingsReferences(parsed)
+    const parsed = yoloSettingsSchema.parse(migratedData)
+    const normalized = normalizeYoloSettingsReferences(parsed)
     return { ...normalized, version: SETTINGS_SCHEMA_VERSION }
   } catch (error) {
     console.warn('Invalid settings provided, using defaults:', error)
-    const defaults = smartComposerSettingsSchema.parse({})
+    const defaults = yoloSettingsSchema.parse({})
     return { ...defaults, version: SETTINGS_SCHEMA_VERSION }
   }
 }

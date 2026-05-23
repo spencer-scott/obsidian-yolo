@@ -100,6 +100,7 @@ export type ToolCallResponse =
         | ToolCallResponseStatus.PendingApproval
         | ToolCallResponseStatus.Rejected
         | ToolCallResponseStatus.Running
+        | ToolCallResponseStatus.AwaitingUserInput
     }
   | {
       status: ToolCallResponseStatus.Success
@@ -137,4 +138,11 @@ export enum ToolCallResponseStatus {
   Success = 'success',
   Error = 'error',
   Aborted = 'aborted',
+  /**
+   * The tool call (currently only `ask_user_question`) is paused waiting for
+   * the user to submit answers in a dedicated chat panel. Treated as a
+   * "still-active" state: the agent run cannot continue and the gateway will
+   * not auto-execute it.
+   */
+  AwaitingUserInput = 'awaiting_user_input',
 }

@@ -1,9 +1,9 @@
 import { ParsedTagContent, parseTagContents } from './parse-tag-content'
 
-describe('parseSmtcmpBlocks', () => {
-  it('should parse a string with smtcmp_block elements', () => {
+describe('parseYoloBlocks', () => {
+  it('should parse a string with yolo_block elements', () => {
     const input = `Some text before
-<smtcmp_block language="markdown" filename="example.md">
+<yolo_block language="markdown" filename="example.md">
 # Example Markdown
 
 This is a sample markdown content for testing purposes.
@@ -19,13 +19,13 @@ This is a sample markdown content for testing purposes.
 \`\`\`python
 print("Hello, world!")
 \`\`\`
-</smtcmp_block>
+</yolo_block>
 Some text after`
 
     const expected: ParsedTagContent[] = [
       { type: 'string', content: 'Some text before' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `# Example Markdown
 
 This is a sample markdown content for testing purposes.
@@ -51,15 +51,15 @@ print("Hello, world!")
     expect(result).toEqual(expected)
   })
 
-  it('should handle empty smtcmp_block elements', () => {
+  it('should handle empty yolo_block elements', () => {
     const input = `
-      <smtcmp_block language="python"></smtcmp_block>
+      <yolo_block language="python"></yolo_block>
     `
 
     const expected: ParsedTagContent[] = [
       { type: 'string', content: '      ' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: '',
         language: 'python',
         filename: undefined,
@@ -71,8 +71,8 @@ print("Hello, world!")
     expect(result).toEqual(expected)
   })
 
-  it('should handle input without smtcmp_block elements', () => {
-    const input = 'Just a regular string without any smtcmp_block elements.'
+  it('should handle input without yolo_block elements', () => {
+    const input = 'Just a regular string without any yolo_block elements.'
 
     const expected: ParsedTagContent[] = [{ type: 'string', content: input }]
 
@@ -80,10 +80,10 @@ print("Hello, world!")
     expect(result).toEqual(expected)
   })
 
-  it('should ignore inline literal smtcmp_block mentions and still parse real blocks', () => {
-    const input = `Here is how to use \`<smtcmp_block>\`：
+  it('should ignore inline literal yolo_block mentions and still parse real blocks', () => {
+    const input = `Here is how to use \`<yolo_block>\`:
 
-<smtcmp_block filename="example.md">
+<yolo_block filename="example.md">
 <<<<<<< REPLACE
 [old]
 old content
@@ -91,12 +91,12 @@ old content
 [new]
 new content
 >>>>>>> END
-</smtcmp_block>`
+</yolo_block>`
 
     expect(parseTagContents(input)).toEqual([
-      { type: 'string', content: 'Here is how to use `<smtcmp_block>`：\n' },
+      { type: 'string', content: 'Here is how to use `<yolo_block>`:\n' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `<<<<<<< REPLACE
 [old]
 old content
@@ -112,14 +112,14 @@ new content
     ])
   })
 
-  it('should handle multiple smtcmp_block elements', () => {
+  it('should handle multiple yolo_block elements', () => {
     const input = `Start
-<smtcmp_block language="python" filename="script.py">
+<yolo_block language="python" filename="script.py">
 def greet(name):
     print(f"Hello, {name}!")
-</smtcmp_block>
+</yolo_block>
 Middle
-<smtcmp_block language="markdown" filename="example.md">
+<yolo_block language="markdown" filename="example.md">
 # Using tildes for code blocks
 
 Did you know that you can use tildes for code blocks?
@@ -127,13 +127,13 @@ Did you know that you can use tildes for code blocks?
 ~~~python
 print("Hello, world!")
 ~~~
-</smtcmp_block>
+</yolo_block>
 End`
 
     const expected: ParsedTagContent[] = [
       { type: 'string', content: 'Start' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `def greet(name):
     print(f"Hello, {name}!")`,
         language: 'python',
@@ -141,7 +141,7 @@ End`
       },
       { type: 'string', content: 'Middle' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `# Using tildes for code blocks
 
 Did you know that you can use tildes for code blocks?
@@ -159,17 +159,17 @@ print("Hello, world!")
     expect(result).toEqual(expected)
   })
 
-  it('should handle unfinished smtcmp_block with only opening tag', () => {
+  it('should handle unfinished yolo_block with only opening tag', () => {
     const input = `Start
-<smtcmp_block language="markdown">
-# Unfinished smtcmp_block
+<yolo_block language="markdown">
+# Unfinished yolo_block
 
 Some text after without closing tag`
     const expected: ParsedTagContent[] = [
       { type: 'string', content: 'Start' },
       {
-        type: 'smtcmp_block',
-        content: `# Unfinished smtcmp_block
+        type: 'yolo_block',
+        content: `# Unfinished yolo_block
 
 Some text after without closing tag`,
         language: 'markdown',
@@ -181,11 +181,11 @@ Some text after without closing tag`,
     expect(result).toEqual(expected)
   })
 
-  it('should handle smtcmp_block with startline and endline attributes', () => {
-    const input = `<smtcmp_block language="markdown" startline="2" endline="5"></smtcmp_block>`
+  it('should handle yolo_block with startline and endline attributes', () => {
+    const input = `<yolo_block language="markdown" startline="2" endline="5"></yolo_block>`
     const expected: ParsedTagContent[] = [
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: '',
         language: 'markdown',
         startLine: 2,
@@ -197,14 +197,14 @@ Some text after without closing tag`,
     expect(result).toEqual(expected)
   })
 
-  it('should unwrap nested smtcmp_block references', () => {
-    const input = `<smtcmp_block language="markdown">
-<smtcmp_block filename="Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md" language="markdown" startline="1782" endline="1784"></smtcmp_block>
-</smtcmp_block>`
+  it('should unwrap nested yolo_block references', () => {
+    const input = `<yolo_block language="markdown">
+<yolo_block filename="Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md" language="markdown" startline="1782" endline="1784"></yolo_block>
+</yolo_block>`
 
     const expected: ParsedTagContent[] = [
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: '',
         filename: 'Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md',
         language: 'markdown',
@@ -218,16 +218,16 @@ Some text after without closing tag`,
   })
 
   it('should keep outer block when nested tags are mixed with text', () => {
-    const input = `<smtcmp_block language="markdown">
+    const input = `<yolo_block language="markdown">
 Please refer to the quote below:
-<smtcmp_block filename="example.md" language="markdown" startline="1" endline="2"></smtcmp_block>
-</smtcmp_block>`
+<yolo_block filename="example.md" language="markdown" startline="1" endline="2"></yolo_block>
+</yolo_block>`
 
     const expected: ParsedTagContent[] = [
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `Please refer to the quote below:
-<smtcmp_block filename="example.md" language="markdown" startline="1" endline="2"></smtcmp_block>`,
+<yolo_block filename="example.md" language="markdown" startline="1" endline="2"></yolo_block>`,
         language: 'markdown',
         filename: undefined,
       },
@@ -288,12 +288,12 @@ End`
   })
 })
 
-describe('parseSmtcmpBlockAndThink', () => {
-  it('should parse a string with smtcmp_block and think elements', () => {
+describe('parseYoloBlockAndThink', () => {
+  it('should parse a string with yolo_block and think elements', () => {
     const input = `Start
 <think>Thinking...</think>
 
-<smtcmp_block language="markdown" filename="example.md">
+<yolo_block language="markdown" filename="example.md">
 # Example Markdown
 
 This is a sample markdown content for testing purposes.
@@ -304,7 +304,7 @@ This is a sample markdown content for testing purposes.
 - **Bold text**
 - *Italic text*
 - [Links](https://example.com)
-</smtcmp_block>
+</yolo_block>
 End`
 
     const expected: ParsedTagContent[] = [
@@ -312,7 +312,7 @@ End`
       { type: 'think', content: 'Thinking...' },
       { type: 'string', content: '' },
       {
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: `# Example Markdown
 
 This is a sample markdown content for testing purposes.
@@ -335,16 +335,16 @@ This is a sample markdown content for testing purposes.
     expect(result).toEqual(expected)
   })
 
-  it('should handle nested smtcmp_block and think elements', () => {
+  it('should handle nested yolo_block and think elements', () => {
     const input = `Start
 <think>Thinking...
-<smtcmp_block language="markdown" filename="example.md">
+<yolo_block language="markdown" filename="example.md">
 # Example Markdown
 
 This is a sample markdown content for testing purposes.
 
 ## Features
-</smtcmp_block>
+</yolo_block>
 </think>
 End`
     const expected: ParsedTagContent[] = [
@@ -352,13 +352,13 @@ End`
       {
         type: 'think',
         content: `Thinking...
-<smtcmp_block language="markdown" filename="example.md">
+<yolo_block language="markdown" filename="example.md">
 # Example Markdown
 
 This is a sample markdown content for testing purposes.
 
 ## Features
-</smtcmp_block>`,
+</yolo_block>`,
       },
       { type: 'string', content: 'End' },
     ]

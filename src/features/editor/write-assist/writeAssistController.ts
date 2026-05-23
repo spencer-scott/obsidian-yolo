@@ -4,7 +4,7 @@ import { App, Editor, Notice, TFile, TFolder } from 'obsidian'
 import { executeSingleTurn } from '../../../core/ai/single-turn'
 import { getChatModelClient } from '../../../core/llm/manager'
 import { promoteProviderTransportModeToObsidian } from '../../../core/llm/transportModePromotion'
-import type { SmartComposerSettings } from '../../../settings/schema/setting.types'
+import type { YoloSettings } from '../../../settings/schema/setting.types'
 import type { ApplyViewState } from '../../../types/apply-view.types'
 import type { ConversationOverrideSettings } from '../../../types/conversation-settings.types'
 import type { LLMRequestBase, RequestMessage } from '../../../types/llm/request'
@@ -21,8 +21,8 @@ import { resolvePromptVariables } from '../../../utils/prompt/promptVariables'
 
 type WriteAssistDeps = {
   app: App
-  getSettings: () => SmartComposerSettings
-  setSettings: (newSettings: SmartComposerSettings) => Promise<void>
+  getSettings: () => YoloSettings
+  setSettings: (newSettings: YoloSettings) => Promise<void>
   t: (key: string, fallback?: string) => string
   getActiveConversationOverrides: () => ConversationOverrideSettings | undefined
   resolveContinuationParams: (overrides?: ConversationOverrideSettings) => {

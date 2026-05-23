@@ -11,12 +11,12 @@ const AssistantErrorCard = memo(function AssistantErrorCard({
   const { t } = useLanguage()
 
   return (
-    <div className="smtcmp-assistant-error-card" role="alert">
-      <div className="smtcmp-assistant-error-card-header">
+    <div className="yolo-assistant-error-card" role="alert">
+      <div className="yolo-assistant-error-card-header">
         <CircleAlert size={14} />
         <span>{t('chat.errorCard.title', 'Response generation failed')}</span>
       </div>
-      <div className="smtcmp-assistant-error-card-body">{errorMessage}</div>
+      <div className="yolo-assistant-error-card-body">{errorMessage}</div>
     </div>
   )
 })

@@ -76,11 +76,38 @@ body:
       placeholder: Drag and drop images here
 
   - type: textarea
+    id: llm-debug-trace
+    attributes:
+      label: LLM Debug Data (recommended for AI / chat / tool-call issues)
+      description: |
+        If your issue involves the chat, agent, tool calls, or any LLM response,
+        a debug trace is far more useful than console logs.
+
+        How to capture one:
+        1. Open **Settings → Other → Maintenance** and turn on **Enable LLM request debugging**.
+        2. Reproduce the issue in a chat.
+        3. On the assistant message that misbehaved, click the **Debug** button
+           in the message info bar (or find it under the **More actions (⋯)** menu).
+        4. In the **LLM Debug Data** dialog, click **Copy** or **Save**, then paste the content below.
+
+        Privacy note: API keys are redacted automatically, but the trace **does
+        include the full conversation text and tool inputs/outputs**. Please
+        review and redact anything sensitive before posting.
+
+        Note: debug data is kept in memory only and is cleared when Obsidian restarts,
+        so the toggle must be enabled **before** reproducing the issue.
+      render: markdown
+      placeholder: Paste the LLM Debug Data here
+
+  - type: textarea
     id: logs
     attributes:
-      label: Error logs
+      label: Console logs
       description: |
-        If you have any error messages or logs, please provide them here. 
+        If the issue is **not** LLM-related (e.g. plugin fails to load, indexing
+        crash, UI error, mobile-only issue), or if the LLM debug data above is
+        not available, please provide console logs.
+
         To access logs:
         1. Open Obsidian's Developer Tools:
            - Windows/Linux: Press Ctrl+Shift+I

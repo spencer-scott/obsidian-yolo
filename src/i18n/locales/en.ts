@@ -23,6 +23,8 @@ export const en: TranslationKeys = {
     triggerTabCompletion: 'Trigger tab completion',
     acceptInlineSuggestion: 'Accept completion',
     capturePdfRegion: 'Capture PDF region to chat',
+    exportSettings: 'Export plugin settings',
+    importSettings: 'Import plugin settings',
   },
 
   common: {
@@ -145,7 +147,7 @@ export const en: TranslationKeys = {
       agent: 'Agent',
       others: 'Others',
     },
-    supportSmartComposer: {
+    supportYolo: {
       name: 'Support the project',
       desc: 'If you find this plugin valuable, consider supporting its development!',
       buyMeACoffee: 'Buy me a coffee',
@@ -301,6 +303,8 @@ export const en: TranslationKeys = {
       noAssistants: 'No assistants available',
       noAssistant: 'Default',
       selectAssistant: 'Select assistant',
+      duplicate: 'Duplicate',
+      manageAll: 'Manage all…',
     },
     agent: {
       title: 'Agent',
@@ -326,6 +330,73 @@ export const en: TranslationKeys = {
         'No skills found. Create skill markdown files under {path}.',
       createSkillTemplates: 'Initialize Skills system',
       skillsTemplateCreated: 'Skills system initialized in {path}.',
+      importSkill: 'Import Skill',
+      importSkillDesc:
+        'Import skill packages into {path}. Supports single .md files or Agent Skills standard folders.',
+      importSkillDropzoneText: 'Drag & drop skill files or folders here',
+      importSkillBrowseFiles: 'Browse Files',
+      importSkillBrowseFolder: 'Browse Folder',
+      importSkillFileCount: '{count} skill(s) selected ({files} files total)',
+      importSkillFilesInPackage: 'file(s)',
+      importSkillRemoveFile: 'Remove',
+      importSkillConfirm: 'Import',
+      importSkillSuccess: 'Successfully imported {count} skill(s).',
+      importSkillInvalidFile: 'No valid skill files or packages found.',
+      importSkillReadError: 'Failed to read files.',
+      importSkillWriteError: 'Failed to import {name}: {error}',
+      importSkillErrHeader: '"{name}" cannot be imported:',
+      importSkillErrNoSkillMd: 'missing SKILL.md file in folder',
+      importSkillErrNoFrontmatter:
+        'missing metadata header (---) at the top of the file',
+      importSkillErrNoName: 'missing "name" field in metadata',
+      importSkillErrNameTooLong: '"name" is too long (max 64 characters)',
+      importSkillErrNameUppercase: '"name" must be all lowercase',
+      importSkillErrNameHyphenEdge: '"name" cannot start or end with a hyphen',
+      importSkillErrNameDoubleHyphen:
+        '"name" cannot contain consecutive hyphens (--)',
+      importSkillErrNameInvalidChars:
+        '"name" can only contain lowercase letters, numbers, and hyphens',
+      importSkillErrNameMismatch: '"name" must match the folder name',
+      importSkillErrNoDescription: 'missing "description" field in metadata',
+      importSkillErrDescTooLong:
+        '"description" is too long (max 1024 characters)',
+      importSkillErrCompatTooLong:
+        '"compatibility" is too long (max 500 characters)',
+      importSkillConflictTitle: 'Skill already exists',
+      importSkillConflictMessage:
+        'A skill with the same name already exists. Do you want to overwrite it?',
+      importSkillConflictOverwrite: 'Overwrite all',
+      importSkillConflictMessageList:
+        'The following skill(s) already exist: {names}\n\nClick "Overwrite all" to replace them, "Skip conflicts" to keep them, or close this dialog to cancel the import.',
+      importSkillConflictSkip: 'Skip conflicts',
+      importSkillUnsafePath: 'Refused unsafe path in "{name}": {path}',
+      importSkillDuplicateInBatch:
+        'Duplicate skill name in this batch: "{name}" (from "{source}"). Only the first occurrence is kept.',
+      importSkillFromUrlPlaceholder: 'Paste a GitHub URL (repo / blob / tree)',
+      importSkillFromUrlFetch: 'Fetch',
+      importSkillFromUrlFetching: 'Fetching...',
+      importSkillImporting: 'Importing...',
+      importSkillFromUrlInvalid:
+        'Please enter a valid GitHub URL (repo / blob / tree).',
+      importSkillFromUrlNotFound:
+        'Resource not found on GitHub. Check the URL and that the repository / file exists and is public.',
+      importSkillFromUrlRateLimit:
+        'GitHub API rate limit exceeded. Please try again later.',
+      importSkillFromUrlTooLarge: 'Skill package exceeds size limit: {error}',
+      importSkillFromUrlFetchError: 'Failed to fetch from GitHub: {error}',
+      deleteSkillTitle: 'Delete skill',
+      deleteSkillMessage:
+        'Are you sure you want to delete "{name}"? This cannot be undone.',
+      deleteSkillConfirm: 'Delete',
+      deleteSkillSuccess: '"{name}" has been deleted.',
+      deleteSkillError: 'Failed to delete "{name}": {error}',
+      deleteSkillBatchMessage:
+        'Are you sure you want to delete {count} skill(s)? This cannot be undone.',
+      deleteSkillBatchSuccess: 'Deleted {count} skill(s).',
+      deleteSkillBatchBtn: 'Delete',
+      deleteSkillSelectAll: 'Select all',
+      deleteSkillCancel: 'Cancel',
+      selectSkills: 'Select',
       agents: 'Agents',
       agentsDesc: 'Click Configure to edit each agent profile and prompt.',
       configureAgents: 'Configure',
@@ -346,6 +417,9 @@ export const en: TranslationKeys = {
       toolsEnabledCount: '{count} enabled',
       manageTools: 'Manage tools',
       manageSkills: 'Manage skills',
+      enableToolDisclosure: 'Enable on-demand tool loading (Beta)',
+      enableToolDisclosureDesc:
+        'Optional tools start as short descriptions, then load full details when needed. Recommended when you have many MCP tools enabled. Note: this mechanism relies on the model\'s own tool-use capability — some models may not reliably recognize tools loaded this way.',
       expandDescription: 'Expand',
       collapseDescription: 'Collapse',
       viewAllTools: 'View all tools',
@@ -364,6 +438,8 @@ export const en: TranslationKeys = {
         'Exclude past tool results from future context',
       builtinContextCompactLabel: 'Compact Context',
       builtinContextCompactDesc: 'Compress earlier conversation into a summary',
+      builtinToolSearchLabel: 'Load Tool',
+      builtinToolSearchDesc: 'Load full schemas for on-demand tools',
       builtinFsEditLabel: 'Text Editing',
       builtinFsEditDesc: 'Edit text in a single file',
       safetyControls: 'Safety Controls',
@@ -395,7 +471,13 @@ export const en: TranslationKeys = {
       builtinWebOpsDesc: 'Web search and page scraping',
       builtinDelegateExternalAgentLabel: 'Delegate to External Agent',
       builtinDelegateExternalAgentDesc:
-        'Spawn a local CLI agent (codex exec or claude -p) as a subprocess, stream its output back into the chat, and feed the result to the LLM. Desktop-only. Requires manual approval every time.',
+        'Delegate complex tasks to a CLI agent installed locally (Codex / Claude Code).',
+      builtinTodoWriteLabel: 'Task List',
+      builtinTodoWriteDesc:
+        'Let the agent plan and track multi-step task progress autonomously. Agent mode only.',
+      builtinAskUserQuestionLabel: 'Ask User',
+      builtinAskUserQuestionDesc:
+        'Ask the user a question when required information is missing, then resume after the answer.',
       editorDefaultName: 'New agent',
       editorIntro: "Configure this agent's capabilities, model, and behavior.",
       editorTabProfile: 'Profile',
@@ -427,6 +509,9 @@ export const en: TranslationKeys = {
       editorSystemPrompt: 'System prompt',
       editorSystemPromptDesc:
         'Primary behavior instruction for this agent. Supported variables: date {{current_date}}, date + current hour {{current_hour}}, date + current hour and minute {{current_minute}}, weekday {{current_weekday}}.',
+      editorEnableProjectInstructions: 'Load project instruction files',
+      editorEnableProjectInstructionsDesc:
+        'Auto-load AGENTS.md and CLAUDE.md from the vault root for this agent. Compatible with Codex / Claude Code / Cursor and similar tools.',
       editorEnableTools: 'Enable tools',
       editorEnableToolsDesc: 'Allow this agent to call tools',
       editorIncludeBuiltinTools: 'Include built-in tools',
@@ -435,6 +520,8 @@ export const en: TranslationKeys = {
       toolApproval: 'Approval',
       toolApprovalFullAccess: 'Full access',
       toolApprovalRequire: 'Require approval',
+      toolDisclosureAlways: 'In context',
+      toolDisclosureOnDemand: 'On demand',
       editorEnabled: 'Enabled',
       editorDisabled: 'Disabled',
       editorModel: 'Model',
@@ -563,6 +650,40 @@ export const en: TranslationKeys = {
       desc: 'Enter your API keys for the providers you want to use',
       howToGetApiKeys: 'How to obtain API keys',
       addProvider: 'Add provider',
+      pickerTitle: 'Add provider',
+      pickerSearchPlaceholder: 'Search providers · press Enter',
+      pickerCustomLabel: 'Custom provider',
+      pickerCustomDesc: 'Manually enter base URL and API key',
+      pickerEmpty: 'No matching providers',
+      categoryAll: 'All',
+      categoryMain: 'International',
+      categoryCn: 'China',
+      categoryGateway: 'Gateway',
+      categoryCloud: 'Cloud',
+      categoryLocal: 'Local',
+      badgeOpenAiCompatible: 'OpenAI compatible',
+      badgeNative: 'Native protocol',
+      badgeOAuth: 'OAuth',
+      badgeAdded: 'Added',
+      kind: {
+        openai: 'Reasoning · Multimodal',
+        chatgptOAuth: 'ChatGPT Plus / Pro',
+        anthropic: 'Chat · Reasoning',
+        gemini: 'Multimodal',
+        geminiOAuth: 'Google account',
+        mistral: 'Chat · Embedding',
+        perplexity: 'Search-augmented chat',
+        groq: 'Fast inference',
+        morph: 'Edit model',
+        deepseek: 'Chat · Reasoning',
+        moonshot: 'Long context',
+        qwenOAuth: 'Qwen account',
+        openrouter: 'Router',
+        azure: 'Enterprise cloud',
+        bedrock: 'Enterprise cloud',
+        ollama: 'Local',
+        lmStudio: 'Local',
+      },
       providersCount: '{count} providers added',
       editProvider: 'Edit provider',
       deleteProvider: 'Delete provider',
@@ -683,6 +804,11 @@ export const en: TranslationKeys = {
         'Input types this model actually supports. A wrong pick will cause request failures.',
       inputModalityText: 'Text',
       inputModalityVision: 'Vision',
+      inputModalityVisionTooltip:
+        'Requires a model with native vision capability.',
+      inputModalityPdf: 'PDF (native)',
+      inputModalityPdfTooltip:
+        'Requires a model that supports native PDF input (Gemini / Anthropic).',
       openaiReasoningEffort: 'Reasoning effort',
       openaiReasoningEffortDesc:
         'Choose effort: minimal (gpt-5 only) / low / medium / high',
@@ -690,16 +816,36 @@ export const en: TranslationKeys = {
       geminiThinkingBudgetDesc:
         'Units are thinking tokens. 0 = off; -1 = dynamic (gemini only); ranges vary by model.',
       geminiThinkingBudgetPlaceholder: 'For example, -1 (dynamic, 0=off)',
-      toolType: 'Tool type',
-      toolTypeDesc: 'Select the tool type supported by the model',
-      toolTypeNone: 'No tools',
-      toolTypeGemini: 'Gemini tools',
-      toolTypeGpt: 'GPT tools',
-      gptTools: 'GPT tools',
-      gptToolsDesc: 'Choose the built-in GPT tools available to this model',
-      gptToolWebSearch: 'Web Search',
-      gptToolWebSearchDesc:
+      builtinToolProvider: 'Built-in provider tools',
+      builtinToolProviderDesc:
+        'Native tools provided by the model provider. Independent of YOLO built-in tools. Whether they actually take effect depends on the gateway the request runs through.',
+      builtinToolProviderNone: 'Disabled',
+      builtinToolProviderGemini: 'Gemini',
+      builtinToolProviderGpt: 'OpenAI',
+      builtinToolProviderOpenRouter: 'OpenRouter',
+      builtinToolProviderGrok: 'Grok',
+      builtinToolsGpt: 'OpenAI built-in tools',
+      builtinToolsOpenRouter: 'OpenRouter built-in tools',
+      builtinToolsGrok: 'Grok built-in tools',
+      builtinToolsGemini: 'Gemini built-in tools',
+      builtinToolWebSearch: 'Web Search',
+      builtinToolWebSearchDesc:
         'Allow the model to search the web and return cited sources.',
+      builtinToolUrlContext: 'URL Context',
+      builtinToolUrlContextDesc:
+        'Allow the model to fetch links mentioned in the conversation as context.',
+      openRouterWebSearchEngine: 'Search engine',
+      openRouterWebSearchEngineDesc:
+        'Auto lets OpenRouter pick (default). Native uses the model provider’s built-in search. Exa / Firecrawl / Parallel force the corresponding engine. Firecrawl requires your own API key configured in the OpenRouter dashboard.',
+      openRouterWebSearchEngineAuto: 'Auto (default)',
+      openRouterWebSearchEngineNative: 'Native',
+      openRouterWebSearchEngineExa: 'Exa',
+      openRouterWebSearchEngineFirecrawl: 'Firecrawl (BYOK)',
+      openRouterWebSearchEngineParallel: 'Parallel',
+      openRouterWebSearchMaxResults: 'Max results',
+      openRouterWebSearchMaxResultsDesc:
+        'Optional, 1–25. Leave empty to use the OpenRouter default.',
+      openRouterWebSearchMaxResultsPlaceholder: 'default',
       sampling: 'Custom parameters',
       restoreDefaults: 'Restore defaults',
       maxContextTokens: 'Context window tokens',
@@ -738,6 +884,9 @@ export const en: TranslationKeys = {
       limit: 'Limit',
       limitDesc:
         'Maximum number of retrieval-augmented generation results to include in the prompt; higher values provide more context but increase token usage.',
+      embeddingConcurrency: 'Embedding concurrency',
+      embeddingConcurrencyDesc:
+        'Maximum parallel embedding requests during indexing (1–24, default 10). Lower this if the embedding provider returns 429 / rate-limit errors (e.g. Azure S0 tier or per-minute-quota free tiers).',
       includePatterns: 'Include patterns',
       includePatternsDesc:
         "Specify glob patterns to include files in indexing (one per line); for example, use 'notes/**' for all files in the notes folder, leave empty to include all files, and rebuild the entire vault index after changes.",
@@ -748,6 +897,11 @@ export const en: TranslationKeys = {
       manageEmbeddingDatabase: 'Manage embedding database',
       manage: 'Manage',
       rebuildIndex: 'Rebuild index',
+      rebuildFromScratch: 'Rebuild from scratch',
+      rebuildFromScratchConfirm:
+        'This will clear all existing vectors for the current embedding model and re-index the entire vault, which may incur many embedding API calls. Continue?',
+      continueIndex: 'Continue indexing',
+      continueIndexNow: 'Continue now',
       // UI additions
       selectedFolders: 'Selected folders',
       excludedFolders: 'Excluded folders',
@@ -839,11 +993,6 @@ export const en: TranslationKeys = {
       pgliteDeliveryManual: 'Manual download',
       pgliteDownload: 'Download resources',
       pgliteRedownload: 'Download again',
-      pgliteVerifyIntegrity: 'Verify integrity',
-      pgliteVerifyingIntegrity: 'Verifying…',
-      pgliteIntegrityOk: 'PGlite runtime integrity check passed.',
-      pgliteIntegrityFailed: 'Integrity check failed',
-      pgliteIntegrityFailedHint: 'Please re-download the runtime.',
       pgliteRecheck: 'Check again',
       pgliteDeleteLocal: 'Delete local resources',
       pgliteDownloadPlaceholder:
@@ -951,6 +1100,33 @@ export const en: TranslationKeys = {
       editTemplate: 'Edit template',
       name: 'Name',
       actions: 'Actions',
+    },
+    editor: {
+      snippets: {
+        sectionTitle: 'Snippets',
+        sectionDesc:
+          'Type / in the chat input and pick a snippet to insert a preset prompt. Snippets live in YOLO/snippets.md.',
+        cardName: 'Snippet library',
+        cardDescCount: '{count} snippets',
+        cardDescMissing: 'No snippets.md file yet',
+        manageBtn: 'Manage snippets',
+        initBtn: 'Initialize snippets',
+        modalTitle: 'Manage snippets',
+        modalCallout:
+          'Snippets live in YOLO/snippets.md. Trigger the chat input with / and pick one to insert its body.',
+        openFileBtn: 'Open snippets.md',
+        createFileBtn: 'Create snippets.md',
+        empty: 'No snippets yet',
+        jumpBtn: 'Edit',
+        deleteBtn: 'Delete',
+        deleteTitle: 'Delete snippet',
+        deleteMessage:
+          'Are you sure you want to delete snippet "{trigger}"? This cannot be undone.',
+        deleteConfirm: 'Delete',
+        deleteSuccess: 'Deleted snippet "{trigger}"',
+        deleteError: 'Delete failed: {error}',
+        openError: 'Failed to open snippets.md: {error}',
+      },
     },
     continuation: {
       title: 'Sparkle mode',
@@ -1073,6 +1249,14 @@ export const en: TranslationKeys = {
     },
     etc: {
       title: 'Other',
+      exportConfig: 'Export settings',
+      exportConfigDesc:
+        'Export current plugin settings to a JSON file for use in other vaults.',
+      export: 'Export',
+      importConfig: 'Import settings',
+      importConfigDesc:
+        'Import plugin settings from an export file or another vault.',
+      import: 'Import',
       resetSettings: 'Reset settings',
       resetSettingsDesc: 'Reset all settings to default values',
       resetSettingsConfirm:
@@ -1102,13 +1286,28 @@ export const en: TranslationKeys = {
       resetAgentsConfirm:
         'Are you sure you want to reset agent configuration? This will remove custom agents and reset the current selection.',
       resetAgentsSuccess: 'Agent configuration has been reset to defaults',
-      logModelRequestContext: 'Log model request context',
-      logModelRequestContextDesc:
-        'Print the final request payload actually sent to the model for each Agent turn in the developer console.',
+      captureRawRequestDebug: 'Enable LLM request debugging',
+      captureRawRequestDebugDesc:
+        'When enabled, each AI response shows a Debug button (in the info bar and the more-actions menu) that lets you view or export the raw LLM, tool-call, and web-search requests and responses for that turn. Captured data is kept in memory for the current Obsidian session only and is cleared on restart. API keys are redacted in the export, but the original conversation content is included.',
+      captureRawRequestDebugExcludeLogsTitle:
+        'Exclude debug logs from knowledge base?',
+      captureRawRequestDebugExcludeLogsMessage:
+        'Debug logs may contain raw conversation and tool contents. Add {{path}} to the knowledge base exclude list so they are not indexed by RAG?',
+      captureRawRequestDebugExcludeLogsCta: 'Exclude logs',
+      captureRawRequestDebugExcludeLogsSuccess:
+        '{{path}} has been excluded from the knowledge base.',
       yoloBaseDir: 'YOLO base folder',
       yoloBaseDirDesc:
         'Enter a vault-relative path (without a leading /). Example: use YOLO at vault root, or setting/YOLO under the setting folder. Current skills directory: {path}.',
       yoloBaseDirPlaceholder: 'YOLO',
+      ribbonClickAction: 'Ribbon icon opens chat in',
+      ribbonClickActionDesc:
+        'Where the YOLO ribbon icon opens the Chat view. If a chat already exists in the chosen location it is activated; otherwise a new one is created.',
+      ribbonClickActionSidebar: 'Right sidebar',
+      ribbonClickActionTab: 'New tab',
+      ribbonClickActionSplit: 'Right split',
+      ribbonClickActionWindow: 'New window',
+      ribbonClickActionLast: 'Last used location',
       mentionDisplayMode: 'Mention display position',
       mentionDisplayModeDesc:
         'Choose whether @ file mentions and / skill selections are shown inline in the editor or as badges above the input box.',
@@ -1151,9 +1350,6 @@ export const en: TranslationKeys = {
         'Alert you after the current Agent run finishes without waiting for more approvals.',
       interactionSectionTitle: 'Interaction',
       maintenanceSectionTitle: 'Maintenance',
-      tabTitleFollowsConversation: 'Follow conversation title in tab',
-      tabTitleFollowsConversationDesc:
-        'When enabled, the Chat tab title shows the current conversation title. When disabled, it stays as Yolo chat.',
     },
   },
 
@@ -1165,10 +1361,74 @@ export const en: TranslationKeys = {
     placeholderMention: 'add references or models',
     placeholderSkill: 'choose a skill or command',
     contextUsage: 'Context window usage',
+    contextBreakdown: {
+      title: 'Context',
+      fullLabel: '{{percent}} Full',
+      tokensSuffix: 'Tokens',
+      localEstimateCaption:
+        'Local estimate — may differ from server-side billing.',
+      error: 'Estimation failed',
+      bucket: {
+        system: 'System prompt',
+        tools: 'Tools',
+        rules: 'Rules',
+        skills: 'Skills',
+        memory: 'Memory',
+        conversation: 'Conversation',
+      },
+    },
+    inlineInfo: {
+      callsTitle: '{{count}} calls this turn',
+      nextTurnContext: 'Context used: ~{{tokens}} tokens',
+      nextTurnContextCached:
+        'Context used: ~{{tokens}} tokens ({{cached}} cached)',
+    },
+    llmDebug: {
+      title: 'LLM Debug Data',
+      open: 'Open LLM debug data',
+      openFailed: 'Failed to open debug data',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Failed to copy debug data',
+      save: 'Save',
+      savedShort: 'Saved',
+      saved: 'LLM debug data saved to {{path}}',
+      saveFailed: 'Failed to save debug data',
+      expired: 'Debug data was cleared on restart (current session only)',
+    },
     sendMessage: 'Send message',
     newChat: 'New chat',
     continueResponse: 'Continue response',
     stopGeneration: 'Stop generation',
+    queueMessage: {
+      tooltip: 'Queue this message — it will be sent after the current step',
+      hint: 'Waiting for the agent to finish the current step...',
+      blockedApproval:
+        'Approve or reject the pending tool call before sending a new message.',
+      blockedAwaitingInput:
+        'Answer the agent’s question in the chat before sending a new message.',
+      abortedRestoredOne: 'Queued message restored to the input box',
+      abortedRestoredMany:
+        'Restored the latest queued message to the input box ({{count}} dropped)',
+    },
+    askUserQuestion: {
+      title: 'The agent has questions for you',
+      submit: 'Submit answers',
+      submitHint: 'Press Cmd / Ctrl + Enter to submit',
+      cancel: 'Cancel',
+      cancelTooltip: 'Dismiss the questions and end this turn',
+      answeredBadge: 'Submitted',
+      rejected:
+        'The system rejected this question (one ask_user_question per turn, or tool disabled).',
+      aborted: 'Stopped before the user could answer.',
+      schemaError: 'The agent provided invalid question parameters: {{error}}',
+      stale: 'This question has expired or was already handled.',
+      otherOption: 'Other (please specify)',
+      otherPlaceholder: 'Add your own answer…',
+      otherAnswerPrefix: 'Other: ',
+      otherAnswerFallback: 'Other',
+      freeTextOptional: 'Optional · leave blank to submit empty',
+    },
     selectModel: 'Select model',
     uploadImage: 'Upload image',
     uploadFile: 'Add file',
@@ -1209,6 +1469,11 @@ export const en: TranslationKeys = {
           'Manually compress earlier conversation history and continue the current task in a fresh context window.',
       },
     },
+    slashMenu: {
+      entrySkill: 'Skills',
+      entrySnippet: 'Snippets',
+      createSnippetsFile: 'Click to create snippets.md',
+    },
     emptyState: {
       chatTitle: 'Think first, then write',
       chatDescription:
@@ -1238,6 +1503,14 @@ export const en: TranslationKeys = {
         'Resolve the current pending tool approval before compacting context.',
       autoFailed:
         'Automatic context compaction failed. Sending with the previous context.',
+    },
+    todoPanel: {
+      summaryPlanning: '{count} tasks pending',
+      summaryInProgress: 'Step {index}/{total}: {text}',
+      summaryPartial: '{done}/{total} done',
+      summaryAllDone: 'All {total} done',
+      expand: 'Expand',
+      collapse: 'Collapse',
     },
     codeBlock: {
       showRawText: 'Show raw text',
@@ -1350,6 +1623,7 @@ export const en: TranslationKeys = {
         failed: 'Failed',
         completed: 'Completed',
         aborted: 'Aborted',
+        awaitingUserInput: 'Awaiting',
         unknown: 'Unknown',
       },
       displayName: {
@@ -1391,6 +1665,14 @@ export const en: TranslationKeys = {
       abort: 'Abort',
       alwaysAllowThisTool: 'Always allow this tool',
       allowForThisChat: 'Allow for this chat',
+    },
+    toolSummary: {
+      todoWrite: {
+        cleared: 'Cleared list',
+        allCompleted: 'All completed ({count})',
+        created: 'Planned {count} tasks',
+        progress: 'Progress {done}/{total}',
+      },
     },
     externalAgent: {
       statusRunning: 'Running',
@@ -1438,6 +1720,8 @@ export const en: TranslationKeys = {
     rebuildingIndex: 'Rebuilding vault index…',
     rebuildComplete: 'Rebuilding vault index complete.',
     rebuildFailed: 'Rebuilding vault index failed.',
+    continueComplete: 'Resumed index completed.',
+    continueFailed: 'Resumed index failed.',
     openYoloNewChatFailed:
       'Failed to open the YOLO chat window; try the command palette first.',
     pgliteUnavailable:
@@ -1605,6 +1889,109 @@ export const en: TranslationKeys = {
     mediumDesc: 'Balanced thinking depth',
     highDesc: 'Deep thinking, suited for complex problems',
     extraHighDesc: 'Maximum thinking, for the toughest reasoning',
+  },
+
+  configTransfer: {
+    export: {
+      title: 'Export settings',
+      description: 'Select the settings to export',
+      selectAll: 'Select all',
+      selectNone: 'Select none',
+      sensitive: 'Contains credentials',
+      redactedOption:
+        'Redact credentials (replace API keys / passwords / headers / env vars with random strings)',
+      submit: 'Export',
+      cancel: 'Cancel',
+      noticeAtLeastOne: 'Please select at least one item',
+      noticeReadFailed: 'Failed to read current settings',
+      noticeSuccess: 'Settings exported as {fileName}',
+      noticeFailed: 'Failed to export settings — check console for details',
+    },
+    import: {
+      title: 'Import settings',
+      sourceFile: 'Import from file',
+      sourceFileDesc: 'Choose a previously exported .json file',
+      sourceVault: 'Import from another vault',
+      sourceVaultDesc: 'Choose a vault directory with YOLO installed',
+      description: 'Select the settings to import',
+      selectAll: 'Select all',
+      selectNone: 'Select none',
+      sensitive: 'Contains credentials',
+      strategyOverwriteTitle: 'Overwrite',
+      strategyOverwriteDesc: 'Replace selected settings with the imported ones',
+      strategyMergeTitle: 'JSON merge',
+      strategyMergeDesc:
+        'Deep merge, keep existing values for fields not present in the import',
+      submit: 'Import',
+      back: 'Back',
+      cancel: 'Cancel',
+      noticeInvalidJson:
+        'File is not valid JSON. Please pick the correct settings file.',
+      noticeFileReadFailed: 'Failed to read the file. Please try again.',
+      noticeRedactedHint:
+        'Note: this export was redacted. All API keys / passwords / headers / env vars have been cleared and must be re-entered after import.',
+      noticeRedactedReminder:
+        'Note: this export was redacted. All API keys / passwords / headers / env vars have been cleared — please re-enter them in settings.',
+      noticePluginNotFound:
+        'No YOLO plugin settings found in the selected directory.',
+      noticeAtLeastOne: 'Please select at least one item',
+      noticeSuccess: 'Settings imported successfully',
+      noticeFailed: 'Failed to import settings',
+    },
+    errors: {
+      errorNotJson: 'File content is not a valid JSON object.',
+      errorNotExportFile:
+        'This file is not a YOLO plugin export file. Please pick a .json produced by the "Export settings" feature.',
+      errorInvalidFormatVersion:
+        'Invalid export format version — the file may be corrupted.',
+      errorInvalidSettingsVersion:
+        'Invalid settings version in the export file — it may be corrupted.',
+      errorFileFromNewerVersion:
+        'This file was exported by a newer plugin version ({fileVersion}); current plugin schema is {currentVersion}. Please upgrade this plugin before importing.',
+      errorFileFromOlderVersion:
+        'This file was exported by an older plugin version ({fileVersion}); current plugin schema is {currentVersion}. Please upgrade YOLO on the source vault and re-export.',
+      errorEmptyKeys: 'The export file contains no settings to import.',
+      errorMissingData:
+        'The data field is missing or invalid in the export file.',
+      errorTampered:
+        'Export file is inconsistent: data contains fields not declared in keys ({fields}). The file may have been tampered with.',
+      errorChecksumMismatch:
+        'Export file integrity check failed — the content may have been modified.',
+      errorVaultParseFailed:
+        'Could not parse the settings data from the target vault.',
+      errorVaultMissingVersion:
+        'Target vault settings are missing the version field — cannot check compatibility.',
+      errorVaultFromNewerVersion:
+        'Target vault uses a newer plugin version ({vaultVersion}); current is {currentVersion}. Please upgrade this plugin before importing.',
+      errorVaultFromOlderVersion:
+        'Target vault uses an older plugin version ({vaultVersion}); current is {currentVersion}. Please upgrade YOLO in the target vault before importing.',
+      errorVaultEmpty: 'Target vault contains no exportable settings.',
+      errorApplyVersionMismatch:
+        'Import data version ({importVersion}) does not match current plugin schema ({currentVersion}).',
+      errorApplySchema:
+        'The imported settings failed validation — fields may be missing or malformed.',
+    },
+    keyLabels: {
+      providers: 'AI providers',
+      chatModels: 'Chat models',
+      embeddingModels: 'Embedding models',
+      chatModelId: 'Default chat model',
+      chatTitleModelId: 'Title-generation model',
+      embeddingModelId: 'Default embedding model',
+      systemPrompt: 'System prompt',
+      ragOptions: 'Knowledge base settings',
+      mcp: 'MCP tools',
+      webSearch: 'Web search',
+      skills: 'Skills',
+      yolo: 'Base settings',
+      debug: 'Debug settings',
+      chatOptions: 'Chat preferences',
+      notificationOptions: 'Notifications',
+      continuationOptions: 'Continuation & completion',
+      assistants: 'Agents',
+      currentAssistantId: 'Current agent',
+      quickAskAssistantId: 'Quick Ask agent',
+    },
   },
 
   update: {

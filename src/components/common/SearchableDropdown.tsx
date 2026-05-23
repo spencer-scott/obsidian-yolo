@@ -153,12 +153,12 @@ export function SearchableDropdown({
   const { t } = useLanguage()
 
   return (
-    <div ref={containerRef} className="smtcmp-searchable-dropdown">
+    <div ref={containerRef} className="yolo-searchable-dropdown">
       {/* Input field */}
       <input
         ref={inputRef}
         type="text"
-        className="smtcmp-searchable-dropdown__input"
+        className="yolo-searchable-dropdown__input"
         value={searchQuery}
         onChange={handleInputChange}
         onFocus={handleInputFocus}
@@ -170,22 +170,22 @@ export function SearchableDropdown({
 
       {/* Dropdown list */}
       {isOpen && !disabled && !loading && (
-        <div className="smtcmp-searchable-dropdown__list" ref={listRef}>
+        <div className="yolo-searchable-dropdown__list" ref={listRef}>
           {filteredOptions.length === 0 ? (
-            <div className="smtcmp-searchable-dropdown__empty">
+            <div className="yolo-searchable-dropdown__empty">
               {t('common.noResults') ?? 'No matches found'}
             </div>
           ) : (
             filteredOptions.map((option, index) => (
               <div
                 key={option}
-                className={`smtcmp-searchable-dropdown__item ${
+                className={`yolo-searchable-dropdown__item ${
                   index === selectedIndex
-                    ? 'smtcmp-searchable-dropdown__item--selected'
+                    ? 'yolo-searchable-dropdown__item--selected'
                     : ''
                 } ${
                   option === value
-                    ? 'smtcmp-searchable-dropdown__item--current'
+                    ? 'yolo-searchable-dropdown__item--current'
                     : ''
                 }`}
                 onClick={() => handleSelect(option)}

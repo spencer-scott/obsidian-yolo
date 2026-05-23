@@ -19,11 +19,11 @@ function SyntaxHighlighterWrapper({
   children: string
 }) {
   const className = [
-    'smtcmp-syntax-highlighter',
+    'yolo-syntax-highlighter',
     hasFilename
-      ? 'smtcmp-syntax-highlighter--with-filename'
-      : 'smtcmp-syntax-highlighter--standalone',
-    language === 'markdown' ? 'smtcmp-syntax-highlighter--markdown' : '',
+      ? 'yolo-syntax-highlighter--with-filename'
+      : 'yolo-syntax-highlighter--standalone',
+    language === 'markdown' ? 'yolo-syntax-highlighter--markdown' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -37,7 +37,7 @@ function SyntaxHighlighterWrapper({
       lineProps={
         wrapLines
           ? {
-              className: 'smtcmp-syntax-highlighter-line-wrap',
+              className: 'yolo-syntax-highlighter-line-wrap',
             }
           : undefined
       }

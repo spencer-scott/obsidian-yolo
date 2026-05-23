@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { usePlugin } from '../../contexts/plugin-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 import { ObsidianButton } from '../common/ObsidianButton'
 import { ObsidianSetting } from '../common/ObsidianSetting'
 import { ObsidianTextArea } from '../common/ObsidianTextArea'
@@ -57,12 +57,12 @@ function CustomRewritePanelBody({
   return (
     <>
       {/* Input area fills remaining space */}
-      <div className="smtcmp-instruction-editor-container">
+      <div className="yolo-instruction-editor-container">
         <ObsidianTextArea
           value={instruction}
           placeholder={t('chat.customRewritePromptPlaceholder') ?? ''}
           onChange={(v) => setInstruction(v)}
-          inputClassName="smtcmp-instruction-textarea"
+          inputClassName="yolo-instruction-textarea"
           autoFocus
           onKeyDown={handleKeyDown}
         />
@@ -91,7 +91,7 @@ export class CustomRewritePanel {
     selectedText,
     selectionFrom,
   }: {
-    plugin: SmartComposerPlugin
+    plugin: YoloPlugin
     editor: Editor
     position?: { x: number; y: number }
     selectedText?: string

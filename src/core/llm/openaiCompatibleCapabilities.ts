@@ -135,10 +135,7 @@ export function applyOpenAICompatibleCapabilities(params: {
         if (reasoningLevel === 'auto') {
           return
         }
-        const effort =
-          reasoningLevel === 'off'
-            ? 'low'
-            : REASONING_META[reasoningLevel].effort
+        const effort = REASONING_META[reasoningLevel].effort
         request.reasoning_effort = effort
         request.reasoning = { effort }
         return

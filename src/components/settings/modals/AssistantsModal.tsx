@@ -2,13 +2,13 @@ import { App } from 'obsidian'
 import React from 'react'
 
 import { SettingsProvider } from '../../../contexts/settings-context'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ReactModal } from '../../common/ReactModal'
 import { AgentsSectionContent } from '../sections/AgentsSectionContent'
 
 type AssistantsModalComponentProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   initialAssistantId?: string
   initialCreate?: boolean
 }
@@ -16,7 +16,7 @@ type AssistantsModalComponentProps = {
 export class AssistantsModal extends ReactModal<AssistantsModalComponentProps> {
   constructor(
     app: App,
-    plugin: SmartComposerPlugin,
+    plugin: YoloPlugin,
     initialAssistantId?: string,
     initialCreate?: boolean,
   ) {
@@ -32,9 +32,9 @@ export class AssistantsModal extends ReactModal<AssistantsModalComponentProps> {
       },
       plugin: plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
     if (initialAssistantId || initialCreate) {
-      this.modalEl.classList.add('smtcmp-modal--agent-direct-edit')
+      this.modalEl.classList.add('yolo-modal--agent-direct-edit')
     }
   }
 }

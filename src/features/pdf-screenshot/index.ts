@@ -7,7 +7,7 @@
 
 import { Platform } from 'obsidian'
 
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 
 import {
   cleanupCapturePdfRegionCommand,
@@ -15,7 +15,7 @@ import {
 } from './command'
 import { PdfToolbarButtonManager } from './toolbarButton'
 
-export function enablePdfScreenshotFeature(plugin: SmartComposerPlugin): void {
+export function enablePdfScreenshotFeature(plugin: YoloPlugin): void {
   if (Platform.isMobile) {
     // PDF UI is completely different on mobile; skip silently
     return

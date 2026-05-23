@@ -4,6 +4,7 @@ import {
   YOLO_SKILLS_INDEX_FILE_NAME,
   getYoloSkillsDir,
   getYoloSkillsDirPrefix,
+  getYoloSnippetsPath,
 } from '../paths/yoloPaths'
 
 import {
@@ -157,6 +158,7 @@ export function listLiteSkillEntries(
 
   listBuiltinLiteSkills({
     skillsDir: getYoloSkillsDir(options?.settings),
+    snippetsPath: getYoloSnippetsPath(options?.settings),
   }).forEach((skill) => {
     mergedById.set(skill.id, {
       id: skill.id,
@@ -278,6 +280,7 @@ export async function getLiteSkillDocument({
     id,
     name,
     skillsDir: getYoloSkillsDir(settings),
+    snippetsPath: getYoloSnippetsPath(settings),
   })
   if (!builtin) {
     return null

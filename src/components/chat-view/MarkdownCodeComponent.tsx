@@ -192,21 +192,21 @@ export default function MarkdownCodeComponent({
   }
 
   return (
-    <div className="smtcmp-code-block">
-      <div className="smtcmp-code-block-header">
+    <div className="yolo-code-block">
+      <div className="yolo-code-block-header">
         {filename && (
           <button
             type="button"
-            className="smtcmp-code-block-header-filename"
+            className="yolo-code-block-header-filename"
             onClick={handleOpenFile}
           >
             {filename}
           </button>
         )}
-        <div className="smtcmp-code-block-header-button-container">
+        <div className="yolo-code-block-header-button-container">
           <button
             type="button"
-            className="clickable-icon smtcmp-code-block-header-button"
+            className="clickable-icon yolo-code-block-header-button"
             onClick={() => {
               void handleCopy()
             }}
@@ -225,7 +225,7 @@ export default function MarkdownCodeComponent({
           </button>
           <button
             type="button"
-            className="clickable-icon smtcmp-code-block-header-button"
+            className="clickable-icon yolo-code-block-header-button"
             onClick={
               parsedPlan && isApplying && !isBlockApplying
                 ? undefined
@@ -241,7 +241,7 @@ export default function MarkdownCodeComponent({
           >
             {isBlockApplying ? (
               <>
-                <Loader2 className="smtcmp-spinner" size={14} />
+                <Loader2 className="yolo-spinner" size={14} />
                 <span>{t('chat.codeBlock.stopApplying', 'Stop apply')}</span>
               </>
             ) : (
@@ -254,38 +254,38 @@ export default function MarkdownCodeComponent({
         </div>
       </div>
       <div
-        className={`smtcmp-code-block-obsidian-markdown${
+        className={`yolo-code-block-obsidian-markdown${
           shouldOverlayPlanPanels ? ' is-plan-transitioning' : ''
         }`}
       >
         {(isStreamingPlanStatusVisible || isTransitioningToContent) && (
           <div
-            className={`smtcmp-plan-preview-panel smtcmp-plan-preview-panel--streaming${
+            className={`yolo-plan-preview-panel yolo-plan-preview-panel--streaming${
               isTransitioningToContent ? ' is-exiting' : ''
             }`}
             aria-live="polite"
           >
-            <div className="smtcmp-plan-streaming-preview">
-              <div className="smtcmp-plan-streaming-preview-header">
-                <span className="smtcmp-plan-streaming-preview-status-dot" />
-                <span className="smtcmp-plan-streaming-preview-title">
+            <div className="yolo-plan-streaming-preview">
+              <div className="yolo-plan-streaming-preview-header">
+                <span className="yolo-plan-streaming-preview-status-dot" />
+                <span className="yolo-plan-streaming-preview-title">
                   {streamingStatusLabel}
                 </span>
                 <DotLoader
                   variant="dots"
-                  className="smtcmp-plan-streaming-preview-loader"
+                  className="yolo-plan-streaming-preview-loader"
                 />
               </div>
-              <div className="smtcmp-plan-streaming-preview-body" aria-hidden>
-                <span className="smtcmp-plan-streaming-preview-line is-wide" />
-                <span className="smtcmp-plan-streaming-preview-line is-short" />
+              <div className="yolo-plan-streaming-preview-body" aria-hidden>
+                <span className="yolo-plan-streaming-preview-line is-wide" />
+                <span className="yolo-plan-streaming-preview-line is-short" />
               </div>
             </div>
           </div>
         )}
         {(!isStreamingPlanStatusVisible || isTransitioningToContent) && (
           <div
-            className={`smtcmp-plan-preview-panel smtcmp-plan-preview-panel--resolved${
+            className={`yolo-plan-preview-panel yolo-plan-preview-panel--resolved${
               isTransitioningToContent ? ' is-entering' : ''
             }`}
           >

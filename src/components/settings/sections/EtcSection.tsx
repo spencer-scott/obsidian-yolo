@@ -22,8 +22,14 @@ import { clearPdfTextCache } from '../../../database/json/chat/pdfTextCacheStore
 import { clearAllPromptSnapshotStores } from '../../../database/json/chat/promptSnapshotStore'
 import { clearAllTimelineHeightCacheStores } from '../../../database/json/chat/timelineHeightCacheStore'
 import { CHAT_DIR } from '../../../database/json/constants'
-import SmartComposerPlugin from '../../../main'
-import { smartComposerSettingsSchema } from '../../../settings/schema/setting.types'
+import { ExportConfigModal } from '../../../features/config-transfer/components/ExportConfigModal'
+import { ImportConfigModal } from '../../../features/config-transfer/components/ImportConfigModal'
+import YoloPlugin from '../../../main'
+import { yoloSettingsSchema } from '../../../settings/schema/setting.types'
+import {
+  folderPathsToIncludePatterns,
+  includePatternsToFolderPaths,
+} from '../../../utils/rag-utils'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
 import { ObsidianTextInput } from '../../common/ObsidianTextInput'
@@ -32,7 +38,7 @@ import { ConfirmModal } from '../../modals/ConfirmModal'
 
 type EtcSectionProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   className?: string
 }
 
@@ -46,6 +52,7 @@ const EDIT_REVIEW_SNAPSHOT_DIR = 'edit_review_snapshots'
 const TIMELINE_HEIGHT_CACHE_DIR = 'timeline_height_cache'
 const IMAGE_CACHE_DIR = 'image_cache'
 const PDF_CACHE_DIR = 'pdf_cache'
+const DEBUG_LOGS_DIR = 'YOLO/logs'
 // re-exported from store so EtcSection doesn't hardcode the dir name
 const AGENT_PROGRESS_DIR = EXTERNAL_AGENT_PROGRESS_DIR
 
@@ -136,13 +143,13 @@ const StorageBadge = ({ value }: { value: number | null }) => {
   const { t } = useLanguage()
 
   return (
-    <span className="smtcmp-setting-size-badge">
+    <span className="yolo-setting-size-badge">
       {value === null ? t('common.loading', 'Loading...') : formatBytes(value)}
     </span>
   )
 }
 
-export function EtcSection({ app, className }: EtcSectionProps) {
+export function EtcSection({ app, plugin, className }: EtcSectionProps) {
   const { settings, setSettings } = useSettings()
   const { t } = useLanguage()
   const yoloBaseDir = settings.yolo?.baseDir ?? 'YOLO'
@@ -196,6 +203,85 @@ export function EtcSection({ app, className }: EtcSectionProps) {
     })
   }
 
+  const isDebugLogsExcludedFromKnowledgeBase = (): boolean => {
+    return includePatternsToFolderPaths(
+      settings.ragOptions.excludePatterns,
+    ).includes(DEBUG_LOGS_DIR)
+  }
+
+  const excludeDebugLogsFromKnowledgeBase = async () => {
+    const currentSettings = plugin.settings
+    const excludeFolders = includePatternsToFolderPaths(
+      currentSettings.ragOptions.excludePatterns,
+    )
+    if (excludeFolders.includes(DEBUG_LOGS_DIR)) {
+      return
+    }
+
+    await setSettings({
+      ...currentSettings,
+      debug: {
+        ...currentSettings.debug,
+        captureRawRequestDebug: true,
+      },
+      ragOptions: {
+        ...currentSettings.ragOptions,
+        excludePatterns: folderPathsToIncludePatterns([
+          ...excludeFolders,
+          DEBUG_LOGS_DIR,
+        ]),
+      },
+    })
+    new Notice(
+      t('settings.etc.captureRawRequestDebugExcludeLogsSuccess').replace(
+        '{{path}}',
+        DEBUG_LOGS_DIR,
+      ),
+    )
+  }
+
+  const handleCaptureRawRequestDebugChange = (value: boolean) => {
+    const shouldPromptExcludeLogs =
+      value && !isDebugLogsExcludedFromKnowledgeBase()
+    const updateDebugSettingPromise = Promise.resolve(
+      setSettings({
+        ...settings,
+        debug: {
+          ...settings.debug,
+          captureRawRequestDebug: value,
+        },
+      }),
+    )
+
+    if (shouldPromptExcludeLogs) {
+      new ConfirmModal(app, {
+        title: t('settings.etc.captureRawRequestDebugExcludeLogsTitle'),
+        message: t(
+          'settings.etc.captureRawRequestDebugExcludeLogsMessage',
+        ).replace('{{path}}', DEBUG_LOGS_DIR),
+        ctaText: t('settings.etc.captureRawRequestDebugExcludeLogsCta'),
+        cancelText: t('common.cancel', 'Cancel'),
+        onConfirm: () => {
+          void (async () => {
+            await updateDebugSettingPromise
+            await excludeDebugLogsFromKnowledgeBase()
+          })().catch((error: unknown) => {
+            console.error(
+              'Failed to exclude debug logs from knowledge base',
+              error,
+            )
+            new Notice(t('common.error'))
+          })
+        },
+      }).open()
+    }
+
+    void updateDebugSettingPromise.catch((error: unknown) => {
+      console.error('Failed to update raw request debug setting', error)
+      new Notice(t('common.error'))
+    })
+  }
+
   const handleResetSettings = () => {
     new ConfirmModal(app, {
       title: t('settings.etc.resetSettings'),
@@ -203,7 +289,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
       ctaText: t('settings.etc.reset'),
       onConfirm: () => {
         void (async () => {
-          const defaultSettings = smartComposerSettingsSchema.parse({})
+          const defaultSettings = yoloSettingsSchema.parse({})
           await setSettings(defaultSettings)
           new Notice(t('settings.etc.resetSettingsSuccess'))
         })().catch((error: unknown) => {
@@ -229,7 +315,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
           const nextUsage = await loadStorageUsage(app, settings)
           setStorageUsage(nextUsage)
           // Notify UI hooks (useChatHistory) to refresh chat list immediately
-          window.dispatchEvent(new Event('smtcmp:chat-history-cleared'))
+          window.dispatchEvent(new Event('yolo:chat-history-cleared'))
           new Notice(t('settings.etc.clearChatHistorySuccess'))
         })().catch((error: unknown) => {
           console.error('Failed to clear chat history', error)
@@ -321,27 +407,53 @@ export function EtcSection({ app, className }: EtcSectionProps) {
 
   return (
     <div
-      className={['smtcmp-settings-section', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={['yolo-settings-section', className].filter(Boolean).join(' ')}
     >
-      <section className="smtcmp-settings-block">
-        <div className="smtcmp-settings-block-head">
-          <div className="smtcmp-settings-block-head-title-row">
-            <div className="smtcmp-settings-sub-header smtcmp-settings-block-title">
+      <section className="yolo-settings-block">
+        <div className="yolo-settings-block-head">
+          <div className="yolo-settings-block-head-title-row">
+            <div className="yolo-settings-sub-header yolo-settings-block-title">
               {t('settings.etc.maintenanceSectionTitle', 'Maintenance')}
             </div>
           </div>
         </div>
 
-        <div className="smtcmp-settings-block-content">
+        <div className="yolo-settings-block-content">
+          <ObsidianSetting
+            name={t('settings.etc.exportConfig', 'Export Config')}
+            desc={t(
+              'settings.etc.exportConfigDesc',
+              'Export current plugin configuration as a JSON file for importing into other vaults.',
+            )}
+            className="yolo-settings-card"
+          >
+            <ObsidianButton
+              text={t('settings.etc.export', 'Export')}
+              onClick={() => new ExportConfigModal(app, plugin).open()}
+            />
+          </ObsidianSetting>
+
+          <ObsidianSetting
+            name={t('settings.etc.importConfig', 'Import Config')}
+            desc={t(
+              'settings.etc.importConfigDesc',
+              'Import plugin configuration from an exported file or another vault.',
+            )}
+            className="yolo-settings-card"
+          >
+            <ObsidianButton
+              text={t('settings.etc.import', 'Import')}
+              onClick={() => new ImportConfigModal(app, plugin).open()}
+            />
+          </ObsidianSetting>
+
           <ObsidianSetting
             name={t('settings.etc.yoloBaseDir', 'YOLO base directory')}
             desc={t(
               'settings.etc.yoloBaseDirDesc',
               'Relative directory within the vault for storing YOLO managed files (e.g., Config/YOLO). Skills will be loaded from {path}.',
             ).replace('{path}', `${yoloBaseDir}/skills`)}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianTextInput
               value={yoloBaseDirInput}
@@ -352,21 +464,13 @@ export function EtcSection({ app, className }: EtcSectionProps) {
           </ObsidianSetting>
 
           <ObsidianSetting
-            name={t('settings.etc.logModelRequestContext')}
-            desc={t('settings.etc.logModelRequestContextDesc')}
-            className="smtcmp-settings-card"
+            name={t('settings.etc.captureRawRequestDebug')}
+            desc={t('settings.etc.captureRawRequestDebugDesc')}
+            className="yolo-settings-card"
           >
             <ObsidianToggle
-              value={settings.debug?.logModelRequestContext ?? false}
-              onChange={(value) => {
-                void setSettings({
-                  ...settings,
-                  debug: {
-                    ...settings.debug,
-                    logModelRequestContext: value,
-                  },
-                })
-              }}
+              value={settings.debug?.captureRawRequestDebug ?? false}
+              onChange={handleCaptureRawRequestDebugChange}
             />
           </ObsidianSetting>
 
@@ -374,7 +478,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
             name={t('settings.etc.clearChatHistory')}
             nameExtra={<StorageBadge value={storageUsage.chatHistoryBytes} />}
             desc={t('settings.etc.clearChatHistoryDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianButton
               text={t('common.clear')}
@@ -387,7 +491,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
             name={t('settings.etc.clearChatSnapshots')}
             nameExtra={<StorageBadge value={storageUsage.chatSnapshotBytes} />}
             desc={t('settings.etc.clearChatSnapshotsDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianButton
               text={t('common.clear')}
@@ -399,7 +503,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
           <ObsidianSetting
             name={t('settings.etc.resetProviders')}
             desc={t('settings.etc.resetProvidersDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianButton
               text={t('settings.etc.reset')}
@@ -411,7 +515,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
           <ObsidianSetting
             name={t('settings.etc.resetAgents')}
             desc={t('settings.etc.resetAgentsDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianButton
               text={t('settings.etc.reset')}
@@ -423,7 +527,7 @@ export function EtcSection({ app, className }: EtcSectionProps) {
           <ObsidianSetting
             name={t('settings.etc.resetSettings')}
             desc={t('settings.etc.resetSettingsDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianButton
               text={t('settings.etc.reset')}

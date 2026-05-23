@@ -1,3 +1,5 @@
+import { loadPdfjs } from './pdfjsLoader'
+
 type PdfTextItem = {
   str: string
   transform: number[]
@@ -78,9 +80,9 @@ export type LoadedPdfPages = {
 }
 
 /**
- * Lazy-loads pdfjs-dist and extracts plain text page-by-page. Preloads the
- * official worker entry so PDF.js uses its in-thread fake worker (no separate
- * `pdf.worker.mjs` on disk required for single-file `main.js` releases).
+ * Lazy-loads pdfjs-dist (with its worker configured as a Blob URL — see
+ * pdfjsLoader for why we route through it) and extracts plain text
+ * page-by-page.
  */
 export async function loadPdfPages(
   data: Uint8Array,
@@ -88,8 +90,7 @@ export async function loadPdfPages(
 ): Promise<LoadedPdfPages> {
   const { maxPages, maybeYield, signal } = options
 
-  await import('pdfjs-dist/build/pdf.worker.mjs')
-  const pdfjs = await import('pdfjs-dist')
+  const pdfjs = await loadPdfjs()
 
   const loadingTask = pdfjs.getDocument({
     data,
@@ -118,4 +119,33 @@ export async function loadPdfPages(
   }
 
   return { totalPages, pages }
+}
+
+/**
+ * Lightweight metadata-only probe — opens the document just long enough to read
+ * `numPages`, skipping the per-page text extraction. Used at upload time when
+ * we want page-count metadata without paying the full extraction cost.
+ */
+export async function getPdfPageCount(
+  data: Uint8Array,
+  options: { maybeYield?: () => Promise<void>; signal?: AbortSignal } = {},
+): Promise<number> {
+  const { maybeYield, signal } = options
+
+  if (signal?.aborted) {
+    throw new DOMException('PDF probe aborted', 'AbortError')
+  }
+  if (maybeYield) {
+    await maybeYield()
+  }
+
+  const pdfjs = await loadPdfjs()
+
+  const loadingTask = pdfjs.getDocument({
+    data,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+  })
+  const pdf = await loadingTask.promise
+  return pdf.numPages
 }

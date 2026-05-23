@@ -10,7 +10,7 @@ import {
 } from '../../../core/rag/ragIndexService'
 import type { PGliteRuntimeStatus } from '../../../database/runtime/PGliteRuntimeManager'
 import { PGLITE_RUNTIME_VERSION } from '../../../database/runtime/pgliteRuntimeMetadata'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { findFilesMatchingPatterns } from '../../../utils/glob-utils'
 import {
   folderPathsToIncludePatterns,
@@ -25,6 +25,7 @@ import {
 import { ObsidianSetting } from '../../common/ObsidianSetting'
 import { ObsidianTextInput } from '../../common/ObsidianTextInput'
 import { ObsidianToggle } from '../../common/ObsidianToggle'
+import { ConfirmModal } from '../../modals/ConfirmModal'
 import { IndexProgressRing } from '../IndexProgressRing'
 import { FolderSelectionList } from '../inputs/FolderSelectionList'
 import { EmbeddingDbManageModal } from '../modals/EmbeddingDbManageModal'
@@ -33,7 +34,7 @@ import { IncludedFilesModal } from '../modals/IncludedFilesModal'
 
 type RAGSectionProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 type IndexJob = {
@@ -75,19 +76,19 @@ function RAGCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="smtcmp-rag-card">
-      <div className="smtcmp-rag-card-header">
-        <div className="smtcmp-rag-card-header-copy">
-          <div className="smtcmp-rag-card-title">{title}</div>
+    <section className="yolo-rag-card">
+      <div className="yolo-rag-card-header">
+        <div className="yolo-rag-card-header-copy">
+          <div className="yolo-rag-card-title">{title}</div>
           {description ? (
-            <div className="smtcmp-rag-card-description">{description}</div>
+            <div className="yolo-rag-card-description">{description}</div>
           ) : null}
         </div>
         {actions ? (
-          <div className="smtcmp-rag-card-actions">{actions}</div>
+          <div className="yolo-rag-card-actions">{actions}</div>
         ) : null}
       </div>
-      <div className="smtcmp-rag-card-body">{children}</div>
+      <div className="yolo-rag-card-body">{children}</div>
     </section>
   )
 }
@@ -110,7 +111,6 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   const [isCheckingPgliteResources, setIsCheckingPgliteResources] =
     useState(false)
   const [isRunningPgliteAction, setIsRunningPgliteAction] = useState(false)
-  const [isVerifyingIntegrity, setIsVerifyingIntegrity] = useState(false)
   const [pgliteResourceStatus, setPgliteResourceStatus] =
     useState<PGliteRuntimeStatus | null>(null)
   const isRagEnabled = settings.ragOptions.enabled ?? true
@@ -130,6 +130,9 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   )
   const [limitInput, setLimitInput] = useState(
     String(settings.ragOptions.limit),
+  )
+  const [embeddingConcurrencyInput, setEmbeddingConcurrencyInput] = useState(
+    String(settings.ragOptions.embeddingConcurrency ?? 10),
   )
   const [showAdvancedRagSettings, setShowAdvancedRagSettings] = useState(false)
   const syncInputsRef = useRef<{
@@ -159,6 +162,12 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   useEffect(() => {
     setLimitInput(String(settings.ragOptions.limit))
   }, [settings.ragOptions.limit])
+
+  useEffect(() => {
+    setEmbeddingConcurrencyInput(
+      String(settings.ragOptions.embeddingConcurrency ?? 10),
+    )
+  }, [settings.ragOptions.embeddingConcurrency])
 
   const applySettingsUpdate = useCallback(
     (nextSettings: typeof settings, errorMessage: string = ragUpdateError) => {
@@ -587,31 +596,6 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
     })()
   }, [pgliteResourceStatus?.kind, plugin, refreshPgliteResourceStatus, t])
 
-  const runVerifyIntegrity = useCallback(() => {
-    if (pgliteResourceStatus?.kind !== 'ready') return
-    const versionDir = pgliteResourceStatus.dir
-    setIsVerifyingIntegrity(true)
-    void (async () => {
-      try {
-        await plugin.getPGliteRuntimeManager().verifyIntegrity(versionDir)
-        new Notice(
-          t(
-            'settings.rag.pgliteIntegrityOk',
-            'PGlite runtime integrity check passed.',
-          ),
-        )
-      } catch (error: unknown) {
-        const reason = error instanceof Error ? error.message : String(error)
-        new Notice(
-          `${t('settings.rag.pgliteIntegrityFailed', 'Integrity check failed')}: ${reason}. ${t('settings.rag.pgliteIntegrityFailedHint', 'Please re-download the runtime.')}`,
-          8000,
-        )
-      } finally {
-        setIsVerifyingIntegrity(false)
-      }
-    })()
-  }, [pgliteResourceStatus, plugin, t])
-
   const runIndexJob = useCallback(
     async ({ mode, successNotice, failureNotice }: IndexJob) => {
       try {
@@ -619,7 +603,9 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           mode,
           scope: { kind: 'all' },
           trigger: 'manual',
-          retryPolicy: mode === 'rebuild' ? 'transient' : 'none',
+          // Both rebuild and sync get transient retry so an interrupted
+          // resume can itself be resumed next launch.
+          retryPolicy: 'transient',
         })
         await plugin.setSettings({
           ...plugin.settings,
@@ -797,17 +783,17 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
   }, [settings.embeddingModels, settings.providers, t])
 
   return (
-    <div className="smtcmp-settings-section">
-      <div className="smtcmp-settings-header">
+    <div className="yolo-settings-section">
+      <div className="yolo-settings-header">
         {t('settings.rag.title', 'Knowledge Base')}
       </div>
-      <div className="smtcmp-settings-desc">
+      <div className="yolo-settings-desc">
         {t(
           'settings.rag.desc',
           'Manage the knowledge base index. RAG capabilities are automatically invoked when the Agent uses the Search tool in hybrid & RAG mode.',
         )}
       </div>
-      <div className="smtcmp-rag-layout">
+      <div className="yolo-rag-layout">
         <RAGCard
           title={t('settings.rag.resourceCardTitle', 'PGlite Resources')}
           description={t(
@@ -815,48 +801,31 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
             'Manage database runtime resources required for the knowledge base.',
           )}
           actions={
-            <>
-              {pgliteResourceStatus?.kind === 'ready' && (
-                <ObsidianButton
-                  text={
-                    isVerifyingIntegrity
-                      ? t('settings.rag.pgliteVerifyingIntegrity', 'Verifying…')
-                      : t(
-                          'settings.rag.pgliteVerifyIntegrity',
-                          'Verify integrity',
-                        )
-                  }
-                  onClick={() => runVerifyIntegrity()}
-                  disabled={isVerifyingIntegrity || isRunningPgliteAction}
-                />
-              )}
-              <ObsidianButton
-                text={pglitePrimaryActionLabel}
-                onClick={() => runPgliteAction()}
-                disabled={
-                  isCheckingPgliteResources ||
-                  isRunningPgliteAction ||
-                  isVerifyingIntegrity ||
-                  pgliteResourceStatus?.kind === 'downloading'
-                }
-              />
-            </>
+            <ObsidianButton
+              text={pglitePrimaryActionLabel}
+              onClick={() => runPgliteAction()}
+              disabled={
+                isCheckingPgliteResources ||
+                isRunningPgliteAction ||
+                pgliteResourceStatus?.kind === 'downloading'
+              }
+            />
           }
         >
-          <div className="smtcmp-rag-resource-summary">
-            <span className={`smtcmp-rag-status-pill ${pgliteStatusTone}`}>
+          <div className="yolo-rag-resource-summary">
+            <span className={`yolo-rag-status-pill ${pgliteStatusTone}`}>
               {pgliteStatusLabel}
             </span>
           </div>
 
           {pgliteDownloadDetail ? (
-            <div className="smtcmp-rag-inline-status">
-              <div className="smtcmp-rag-inline-status-text">
+            <div className="yolo-rag-inline-status">
+              <div className="yolo-rag-inline-status-text">
                 {pgliteDownloadDetail}
               </div>
-              <div className="smtcmp-rag-inline-progress" aria-hidden="true">
+              <div className="yolo-rag-inline-progress" aria-hidden="true">
                 <div
-                  className="smtcmp-rag-inline-progress-bar"
+                  className="yolo-rag-inline-progress-bar"
                   style={{ width: `${pgliteDownloadProgress ?? 0}%` }}
                 />
               </div>
@@ -864,17 +833,17 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           ) : null}
 
           {pgliteFailureReason ? (
-            <div className="smtcmp-rag-inline-status smtcmp-rag-inline-status--error">
-              <div className="smtcmp-rag-inline-status-title">
+            <div className="yolo-rag-inline-status yolo-rag-inline-status--error">
+              <div className="yolo-rag-inline-status-title">
                 {t('settings.rag.pgliteInlineErrorTitle', 'Download failed')}
               </div>
-              <div className="smtcmp-rag-inline-status-text">
+              <div className="yolo-rag-inline-status-text">
                 {pgliteFailureReason}
               </div>
             </div>
           ) : null}
 
-          <div className="smtcmp-muted-note">{pgliteSummaryText}</div>
+          <div className="yolo-muted-note">{pgliteSummaryText}</div>
         </RAGCard>
 
         <RAGCard
@@ -887,7 +856,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           <ObsidianSetting
             name={t('settings.rag.enableRag')}
             desc={t('settings.rag.enableRagDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianToggle
               value={isRagEnabled}
@@ -918,7 +887,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
               'settings.rag.autoUpdateDesc',
               'When enabled, the index will be incrementally updated in the background when documents change.',
             )}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianToggle
               value={isAutoUpdateEnabled}
@@ -940,7 +909,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
               'settings.rag.indexPdfDesc',
               'Extract and index PDF text for the knowledge base; the first full rebuild may be slow. Can be disabled for large vaults if not needed.',
             )}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianToggle
               value={isIndexPdfEnabled}
@@ -959,7 +928,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           <ObsidianSetting
             name={t('settings.rag.embeddingModel')}
             desc={t('settings.rag.embeddingModelDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianDropdown
               value={settings.embeddingModelId}
@@ -974,7 +943,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           </ObsidianSetting>
 
           {!canUseIndexMaintenance && isRagEnabled && (
-            <div className="smtcmp-muted-note">
+            <div className="yolo-muted-note">
               {t(
                 'settings.rag.maintenanceUnavailableHint',
                 'Please prepare PGlite resources above before performing index maintenance or embedding database management.',
@@ -987,25 +956,25 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
               <ObsidianSetting
                 name={t('settings.rag.maintenanceActions', 'Maintenance actions')}
                 nameExtra={
-                  <div className="smtcmp-index-inline-status">
+                  <div className="yolo-index-inline-status">
                     <IndexProgressRing percent={ringPercent} />
                     {isAnimatingCurrentFile ? (
                       <span
-                        className="smtcmp-index-current-file"
+                        className="yolo-index-current-file"
                         title={`${maintenanceStatusPrefix} ${maintenanceStatusLine}`}
                       >
-                        <span className="smtcmp-index-current-file-prefix">
+                        <span className="yolo-index-current-file-prefix">
                           {maintenanceStatusPrefix}
                         </span>
-                        <span className="smtcmp-index-current-file-viewport">
+                        <span className="yolo-index-current-file-viewport">
                           {leavingCurrentFile ? (
-                            <span className="smtcmp-index-current-file-text is-leaving">
+                            <span className="yolo-index-current-file-text is-leaving">
                               {leavingCurrentFile}
                             </span>
                           ) : null}
                           <span
                             key={fileAnimationKey}
-                            className={`smtcmp-index-current-file-text${leavingCurrentFile ? ' is-entering' : ''}`}
+                            className={`yolo-index-current-file-text${leavingCurrentFile ? ' is-entering' : ''}`}
                           >
                             {maintenanceStatusLine}
                           </span>
@@ -1014,7 +983,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     ) : (
                       <span
                         key={maintenanceStatusKey}
-                        className="smtcmp-index-current-file"
+                        className="yolo-index-current-file"
                         title={maintenanceStatusLine}
                       >
                         {maintenanceStatusLine}
@@ -1022,9 +991,9 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     )}
                   </div>
                 }
-                className="smtcmp-settings-card smtcmp-rag-maintenance-setting"
+                className="yolo-settings-card yolo-rag-maintenance-setting"
               >
-                <div className="smtcmp-flex-row-gap-8 smtcmp-rag-maintenance-actions">
+                <div className="yolo-flex-row-gap-8 yolo-rag-maintenance-actions">
                   <ObsidianButton
                     text={t('settings.rag.manage')}
                     disabled={!canUseIndexMaintenance}
@@ -1034,26 +1003,90 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   />
                   {(() => {
                     const status = indexRunSnapshot.status
-                    let label: string
+                    const isInterrupted =
+                      status === 'retry_scheduled' || status === 'failed'
+                    let primaryLabel: string
+                    let primaryMode: 'rebuild' | 'sync'
+                    let primarySuccess: string
+                    let primaryFailure: string
                     if (status === 'retry_scheduled') {
-                      label = t('settings.rag.retryNow', 'Retry now')
+                      primaryLabel = t(
+                        'settings.rag.continueIndexNow',
+                        'Continue now',
+                      )
+                      primaryMode = 'sync'
+                      primarySuccess = t(
+                        'notices.continueComplete',
+                        'Continue indexing complete',
+                      )
+                      primaryFailure = t(
+                        'notices.continueFailed',
+                        'Continue indexing failed',
+                      )
                     } else if (status === 'failed') {
-                      label = t('common.retry', 'Retry')
+                      primaryLabel = t('settings.rag.continueIndex', 'Continue indexing')
+                      primaryMode = 'sync'
+                      primarySuccess = t(
+                        'notices.continueComplete',
+                        'Continue indexing complete',
+                      )
+                      primaryFailure = t(
+                        'notices.continueFailed',
+                        'Continue indexing failed',
+                      )
                     } else {
-                      label = t('settings.rag.rebuildIndex', 'Rebuild index')
+                      primaryLabel = t('settings.rag.rebuildIndex', 'Rebuild index')
+                      primaryMode = 'rebuild'
+                      primarySuccess = t('notices.rebuildComplete')
+                      primaryFailure = t('notices.rebuildFailed')
                     }
                     return (
-                      <ObsidianButton
-                        text={label}
-                        disabled={isIndexing || !canUseIndexMaintenance}
-                        onClick={() => {
-                          void runIndexJob({
-                            mode: 'rebuild',
-                            successNotice: t('notices.rebuildComplete'),
-                            failureNotice: t('notices.rebuildFailed'),
-                          })
-                        }}
-                      />
+                      <>
+                        <ObsidianButton
+                          text={primaryLabel}
+                          disabled={isIndexing || !canUseIndexMaintenance}
+                          onClick={() => {
+                            void runIndexJob({
+                              mode: primaryMode,
+                              successNotice: primarySuccess,
+                              failureNotice: primaryFailure,
+                            })
+                          }}
+                        />
+                        {isInterrupted && (
+                          <ObsidianButton
+                            text={t(
+                              'settings.rag.rebuildFromScratch',
+                              'Rebuild from scratch',
+                            )}
+                            disabled={isIndexing || !canUseIndexMaintenance}
+                            onClick={() => {
+                              new ConfirmModal(app, {
+                                title: t(
+                                  'settings.rag.rebuildFromScratch',
+                                  'Rebuild from scratch',
+                                ),
+                                message: t(
+                                  'settings.rag.rebuildFromScratchConfirm',
+                                  'This will clear all existing vectors for the current embedding model and re-index the entire knowledge base, which may generate a large number of embedding API calls. Continue?',
+                                ),
+                                ctaText: t(
+                                  'settings.rag.rebuildFromScratch',
+                                  'Rebuild from scratch',
+                                ),
+                                cancelText: t('common.cancel', 'Cancel'),
+                                onConfirm: () => {
+                                  void runIndexJob({
+                                    mode: 'rebuild',
+                                    successNotice: t('notices.rebuildComplete'),
+                                    failureNotice: t('notices.rebuildFailed'),
+                                  })
+                                },
+                              }).open()
+                            }}
+                          />
+                        )}
+                      </>
                     )
                   })()}
                   {isIndexing && (
@@ -1083,11 +1116,11 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                 'Select which folders to include in the knowledge base index and which to exclude.',
               )}
             >
-              <div className="smtcmp-rag-scope-group">
+              <div className="yolo-rag-scope-group">
                 <ObsidianSetting
                   name={t('settings.rag.includePatterns')}
                   desc={t('settings.rag.includePatternsDesc')}
-                  className="smtcmp-rag-scope-group-setting"
+                  className="yolo-rag-scope-group-setting"
                 >
                   <ObsidianButton
                     text={t('settings.rag.testPatterns')}
@@ -1110,7 +1143,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   />
                 </ObsidianSetting>
 
-                <div className="smtcmp-rag-scope-group-body">
+                <div className="yolo-rag-scope-group-body">
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
@@ -1130,11 +1163,11 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                 </div>
               </div>
 
-              <div className="smtcmp-rag-scope-group">
+              <div className="yolo-rag-scope-group">
                 <ObsidianSetting
                   name={t('settings.rag.excludePatterns')}
                   desc={t('settings.rag.excludePatternsDesc')}
-                  className="smtcmp-rag-scope-group-setting"
+                  className="yolo-rag-scope-group-setting"
                 >
                   <ObsidianButton
                     text={t('settings.rag.testPatterns')}
@@ -1153,7 +1186,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   />
                 </ObsidianSetting>
 
-                <div className="smtcmp-rag-scope-group-body">
+                <div className="yolo-rag-scope-group-body">
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
@@ -1181,7 +1214,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                 conflictInfo.exactConflicts.length > 0 ||
                 conflictInfo.includeUnderExcluded.length > 0 ||
                 conflictInfo.excludeWithinIncluded.length > 0) && (
-                <div className="smtcmp-muted-note">
+                <div className="yolo-muted-note">
                   {includeFolders.length === 0 && (
                     <div>
                       {t(
@@ -1235,7 +1268,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
 
             <RAGCard title={t('settings.rag.advanced', 'Advanced settings')}>
               <div
-                className={`smtcmp-settings-advanced-toggle smtcmp-clickable${
+                className={`yolo-settings-advanced-toggle yolo-clickable${
                   showAdvancedRagSettings ? ' is-expanded' : ''
                 }`}
                 onClick={() => setShowAdvancedRagSettings((prev) => !prev)}
@@ -1248,7 +1281,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   }
                 }}
               >
-                <span className="smtcmp-settings-advanced-toggle-icon">▶</span>
+                <span className="yolo-settings-advanced-toggle-icon">▶</span>
                 {t('settings.rag.advanced', 'Advanced settings')}
               </div>
 
@@ -1257,7 +1290,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <ObsidianSetting
                     name={t('settings.rag.chunkSize')}
                     desc={t('settings.rag.chunkSizeDesc')}
-                    className="smtcmp-settings-card"
+                    className="yolo-settings-card"
                   >
                     <ObsidianTextInput
                       value={chunkSizeInput}
@@ -1289,7 +1322,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <ObsidianSetting
                     name={t('settings.rag.minSimilarity')}
                     desc={t('settings.rag.minSimilarityDesc')}
-                    className="smtcmp-settings-card"
+                    className="yolo-settings-card"
                   >
                     <ObsidianTextInput
                       value={minSimilarityInput}
@@ -1322,7 +1355,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <ObsidianSetting
                     name={t('settings.rag.limit')}
                     desc={t('settings.rag.limitDesc')}
-                    className="smtcmp-settings-card"
+                    className="yolo-settings-card"
                   >
                     <ObsidianTextInput
                       value={limitInput}
@@ -1344,6 +1377,48 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                         const limit = parseIntegerInput(limitInput)
                         if (limit === null) {
                           setLimitInput(String(settings.ragOptions.limit))
+                        }
+                      }}
+                    />
+                  </ObsidianSetting>
+
+                  <ObsidianSetting
+                    name={t('settings.rag.embeddingConcurrency')}
+                    desc={t('settings.rag.embeddingConcurrencyDesc')}
+                    className="yolo-settings-card"
+                  >
+                    <ObsidianTextInput
+                      value={embeddingConcurrencyInput}
+                      placeholder="10"
+                      onChange={(value) => {
+                        setEmbeddingConcurrencyInput(value)
+                        const parsed = parseIntegerInput(value)
+                        if (parsed !== null) {
+                          const clamped = Math.max(1, Math.min(24, parsed))
+                          applySettingsUpdate({
+                            ...settings,
+                            ragOptions: {
+                              ...settings.ragOptions,
+                              embeddingConcurrency: clamped,
+                            },
+                          })
+                        }
+                      }}
+                      onBlur={() => {
+                        const parsed = parseIntegerInput(
+                          embeddingConcurrencyInput,
+                        )
+                        if (parsed === null) {
+                          setEmbeddingConcurrencyInput(
+                            String(
+                              settings.ragOptions.embeddingConcurrency ?? 10,
+                            ),
+                          )
+                          return
+                        }
+                        const clamped = Math.max(1, Math.min(24, parsed))
+                        if (clamped !== parsed) {
+                          setEmbeddingConcurrencyInput(String(clamped))
                         }
                       }}
                     />

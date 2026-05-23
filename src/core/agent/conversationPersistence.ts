@@ -2,7 +2,7 @@ import { App } from 'obsidian'
 
 import { ChatManager } from '../../database/json/chat/ChatManager'
 import { compactConversationMessagesForStorage } from '../../database/json/chat/promptSnapshotStore'
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 import type {
   ChatConversationCompactionState,
   ChatMessage,
@@ -13,7 +13,7 @@ import { ToolCallResponseStatus } from '../../types/tool-call.types'
 import { serializeMentionable } from '../../utils/chat/mentionable'
 
 const DEFAULT_UNTITLED_CONVERSATION_TITLE = 'New Conversation'
-const CHAT_HISTORY_UPDATED_EVENT = 'smtcmp:chat-history-updated'
+const CHAT_HISTORY_UPDATED_EVENT = 'yolo:chat-history-updated'
 
 const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
   switch (message.role) {
@@ -77,7 +77,7 @@ const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
 
 export const createAgentConversationPersistence = (
   app: App,
-  getSettings: () => SmartComposerSettings,
+  getSettings: () => YoloSettings,
 ) => {
   return {
     persistConversationMessages: async ({

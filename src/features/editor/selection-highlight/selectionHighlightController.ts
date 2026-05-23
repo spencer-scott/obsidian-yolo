@@ -82,10 +82,10 @@ const selectionHighlightField = StateField.define<EffectPayload>({
 })
 
 const INTERACTIVE_OVERLAY_SELECTOR = [
-  '.smtcmp-quick-ask-overlay-root',
-  '.smtcmp-quick-ask-overlay',
-  '.smtcmp-selection-chat-overlay-root',
-  '.smtcmp-selection-chat-overlay',
+  '.yolo-quick-ask-overlay-root',
+  '.yolo-quick-ask-overlay',
+  '.yolo-selection-chat-overlay-root',
+  '.yolo-selection-chat-overlay',
 ].join(', ')
 
 // ──────────────────────────────────────────────────────────────────────────────

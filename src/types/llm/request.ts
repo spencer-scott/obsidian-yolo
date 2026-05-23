@@ -64,7 +64,25 @@ type ImageContentPart = {
   }
 }
 
-export type ContentPart = TextContent | ImageContentPart
+// Native document (currently PDF) input. The base64 bytes are forwarded to
+// providers that advertise the 'pdf' modality:
+//   • anthropic       → document block (base64 source)
+//   • gemini          → inlineData (mimeType + data)
+//   • openai-compatible → OpenAI `file` content part (file_data data-URL),
+//     the de-facto format adopted by OpenRouter and most proxies that fan out
+//     to PDF-capable upstreams. Proxies that don't speak it return their own
+//     error, which is more useful than ours.
+// For models without the 'pdf' modality, the request pipeline converts this
+// part into extracted plain text upstream of the adapter.
+type DocumentContentPart = {
+  type: 'document'
+  mediaType: 'application/pdf'
+  name: string
+  data: string // base64-encoded document bytes
+  pageCount?: number
+}
+
+export type ContentPart = TextContent | ImageContentPart | DocumentContentPart
 
 type RequestSystemMessage = {
   role: 'system'
@@ -94,6 +112,7 @@ export type RequestMessage =
 
 export type LLMOptions = {
   signal?: AbortSignal
+  debugTraceId?: string
   geminiTools?: {
     useWebSearch?: boolean
     useUrlContext?: boolean

@@ -15,6 +15,7 @@ export type SelectionAction = {
   instruction: string
   mode: SelectionActionMode
   rewriteBehavior?: SelectionActionRewriteBehavior
+  assistantId?: string
   handler: () => void | Promise<void>
 }
 
@@ -30,6 +31,7 @@ type SelectionActionsMenuProps = {
     instruction: string,
     mode: SelectionActionMode,
     rewriteBehavior?: SelectionActionRewriteBehavior,
+    assistantId?: string,
   ) => void | Promise<void>
   onHoverChange: (isHovering: boolean) => void
   /** PDF selections cannot be rewritten — pass 'pdf' to hide rewrite actions. */
@@ -115,6 +117,7 @@ export function SelectionActionsMenu({
                     ? 'chat-input'
                     : 'ask'),
             rewriteBehavior: action.rewriteBehavior,
+            assistantId: action.assistantId,
           }))
       : defaultActions
 
@@ -165,8 +168,15 @@ export function SelectionActionsMenu({
         instruction: resolvedInstruction,
         mode,
         rewriteBehavior,
+        assistantId: action.assistantId,
         handler: () =>
-          onAction(action.id, resolvedInstruction, mode, rewriteBehavior),
+          onAction(
+            action.id,
+            resolvedInstruction,
+            mode,
+            rewriteBehavior,
+            action.assistantId,
+          ),
       }
     })
   }, [
@@ -306,8 +316,7 @@ export function SelectionActionsMenu({
     [isMobile, position.left, position.top],
   )
 
-  const menuClasses =
-    `smtcmp-selection-menu ${isVisible ? 'visible' : ''}`.trim()
+  const menuClasses = `yolo-selection-menu ${isVisible ? 'visible' : ''}`.trim()
 
   return (
     <div
@@ -317,15 +326,15 @@ export function SelectionActionsMenu({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="smtcmp-selection-menu-content">
+      <div className="yolo-selection-menu-content">
         {actions.map((action) => (
           <button
             key={action.id}
             type="button"
-            className="smtcmp-selection-menu-item"
+            className="yolo-selection-menu-item"
             onClick={() => void handleActionClick(action)}
           >
-            <span className="smtcmp-selection-menu-item-label">
+            <span className="yolo-selection-menu-item-label">
               {action.label}
             </span>
           </button>

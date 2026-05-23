@@ -159,38 +159,38 @@ const AssistantMessageReasoning = memo(function AssistantMessageReasoning({
 
   return (
     <div
-      className={`smtcmp-assistant-message-metadata smtcmp-assistant-message-metadata--${stage}${showBody ? ' is-expanded' : ''}${showActivity ? ' is-active' : ''}${showPreview ? ' has-preview' : ''}`}
+      className={`yolo-assistant-message-metadata yolo-assistant-message-metadata--${stage}${showBody ? ' is-expanded' : ''}${showActivity ? ' is-active' : ''}${showPreview ? ' has-preview' : ''}`}
       data-stage={stage}
     >
       <button
         type="button"
-        className={`smtcmp-assistant-message-metadata-toggle${!isToggleable ? ' is-static' : ''}`}
+        className={`yolo-assistant-message-metadata-toggle${!isToggleable ? ' is-static' : ''}`}
         onClick={handleToggle}
         disabled={!isToggleable}
       >
-        <span className="smtcmp-assistant-message-metadata-label">
-          <span className="smtcmp-assistant-message-metadata-status-dot" />
-          <span className="smtcmp-assistant-message-metadata-label-text">
+        <span className="yolo-assistant-message-metadata-label">
+          <span className="yolo-assistant-message-metadata-status-dot" />
+          <span className="yolo-assistant-message-metadata-label-text">
             {visibleStageLabel}
           </span>
           {showDots && (
             <DotLoader
               variant="dots"
-              className="smtcmp-assistant-message-metadata-loader"
+              className="yolo-assistant-message-metadata-loader"
             />
           )}
         </span>
         {isToggleable && isExpanded ? (
-          <ChevronUp className="smtcmp-assistant-message-metadata-toggle-icon" />
+          <ChevronUp className="yolo-assistant-message-metadata-toggle-icon" />
         ) : isToggleable ? (
-          <ChevronDown className="smtcmp-assistant-message-metadata-toggle-icon" />
+          <ChevronDown className="yolo-assistant-message-metadata-toggle-icon" />
         ) : null}
       </button>
-      <div className="smtcmp-assistant-message-metadata-preview" aria-hidden>
+      <div className="yolo-assistant-message-metadata-preview" aria-hidden>
         <span>{reasoningPreview}</span>
       </div>
-      <div className="smtcmp-assistant-message-metadata-body">
-        <div className="smtcmp-assistant-message-metadata-content">
+      <div className="yolo-assistant-message-metadata-body">
+        <div className="yolo-assistant-message-metadata-content">
           <EffectiveMarkdownComponent
             content={reasoning}
             scale="xs"

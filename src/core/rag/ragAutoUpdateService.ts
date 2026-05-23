@@ -1,7 +1,7 @@
 import { minimatch } from 'minimatch'
 import { TAbstractFile, TFile, TFolder } from 'obsidian'
 
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 
 import { classifyRagIndexError } from './ragIndexErrors'
 
@@ -15,8 +15,8 @@ export type AutoUpdateRunRequest =
   | { kind: 'paths'; paths: string[] }
 
 type RagAutoUpdateServiceDeps = {
-  getSettings: () => SmartComposerSettings
-  setSettings: (settings: SmartComposerSettings) => Promise<void>
+  getSettings: () => YoloSettings
+  setSettings: (settings: YoloSettings) => Promise<void>
   runIndex: (request: AutoUpdateRunRequest) => Promise<void>
   markRetryScheduled: (input: {
     retryAt: number
@@ -31,10 +31,8 @@ export class RagAutoUpdateService {
   private static readonly SUCCESS_COOLDOWN_MS = 2 * 60 * 1000
   private static readonly FAILURE_RETRY_DELAY_MS = 5 * 60 * 1000
 
-  private readonly getSettings: () => SmartComposerSettings
-  private readonly setSettings: (
-    settings: SmartComposerSettings,
-  ) => Promise<void>
+  private readonly getSettings: () => YoloSettings
+  private readonly setSettings: (settings: YoloSettings) => Promise<void>
   private readonly runIndex: (request: AutoUpdateRunRequest) => Promise<void>
   private readonly markRetryScheduled: (input: {
     retryAt: number
@@ -135,7 +133,7 @@ export class RagAutoUpdateService {
     this.scheduleAutoUpdate(0)
   }
 
-  private isAutoUpdateEnabled(settings: SmartComposerSettings): boolean {
+  private isAutoUpdateEnabled(settings: YoloSettings): boolean {
     if (
       !settings?.ragOptions?.enabled ||
       !settings?.ragOptions?.autoUpdateEnabled
@@ -179,7 +177,7 @@ export class RagAutoUpdateService {
 
   private isPathSelectedByIncludeExclude(
     path: string,
-    settings: SmartComposerSettings,
+    settings: YoloSettings,
   ): boolean {
     const lower = path.toLowerCase()
     if (lower.endsWith('.md')) {

@@ -38,15 +38,15 @@ class ThinkingIndicatorWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const container = document.createElement('span')
-    container.className = 'smtcmp-thinking-indicator-inline'
+    container.className = 'yolo-thinking-indicator-inline'
 
     // Create thinking animation container
     const loader = document.createElement('span')
-    loader.className = 'smtcmp-thinking-loader'
+    loader.className = 'yolo-thinking-loader'
 
     // Icon container
     const icon = document.createElement('span')
-    icon.className = 'smtcmp-thinking-icon'
+    icon.className = 'yolo-thinking-icon'
 
     // SVG icon (Sparkles)
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -58,7 +58,7 @@ class ThinkingIndicatorWidget extends WidgetType {
     svg.setAttribute('stroke-width', '2')
     svg.setAttribute('stroke-linecap', 'round')
     svg.setAttribute('stroke-linejoin', 'round')
-    svg.classList.add('smtcmp-thinking-icon-svg')
+    svg.classList.add('yolo-thinking-icon-svg')
 
     const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path1.setAttribute(
@@ -84,14 +84,14 @@ class ThinkingIndicatorWidget extends WidgetType {
 
     // Text
     const textEl = document.createElement('span')
-    textEl.className = 'smtcmp-thinking-text'
+    textEl.className = 'yolo-thinking-text'
     textEl.textContent = this.label
 
     loader.appendChild(icon)
     loader.appendChild(textEl)
     if (this.snippet) {
       const snippetEl = document.createElement('span')
-      snippetEl.className = 'smtcmp-thinking-snippet'
+      snippetEl.className = 'yolo-thinking-snippet'
       snippetEl.textContent = this.snippet
       loader.appendChild(snippetEl)
     }
@@ -132,6 +132,63 @@ export const thinkingIndicatorField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 })
 
+export type TabLoadingDotsPayload = { from: number } | null
+
+export const tabLoadingDotsEffect = StateEffect.define<TabLoadingDotsPayload>()
+
+class TabLoadingDotsWidget extends WidgetType {
+  eq(_other: TabLoadingDotsWidget) {
+    return true
+  }
+
+  ignoreEvent(): boolean {
+    return true
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('span')
+    container.className = 'yolo-tab-loading-dots'
+    container.setAttribute('aria-hidden', 'true')
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('span')
+      dot.className = 'yolo-tab-loading-dots__dot'
+      container.appendChild(dot)
+    }
+    return container
+  }
+}
+
+export const tabLoadingDotsField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none
+  },
+  update(value, tr) {
+    let decorations = value.map(tr.changes)
+
+    for (const effect of tr.effects) {
+      if (effect.is(tabLoadingDotsEffect)) {
+        const payload = effect.value
+        if (!payload) {
+          decorations = Decoration.none
+          continue
+        }
+        const widget = Decoration.widget({
+          widget: new TabLoadingDotsWidget(),
+          side: 1,
+        }).range(payload.from)
+        decorations = Decoration.set([widget])
+      }
+    }
+
+    if (tr.docChanged) {
+      decorations = Decoration.none
+    }
+
+    return decorations
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
+
 class InlineSuggestionGhostWidget extends WidgetType {
   constructor(private readonly text: string) {
     super()
@@ -147,7 +204,7 @@ class InlineSuggestionGhostWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const span = document.createElement('span')
-    span.className = 'smtcmp-ghost-text'
+    span.className = 'yolo-ghost-text'
     span.textContent = this.text
     return span
   }

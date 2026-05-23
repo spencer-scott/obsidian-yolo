@@ -8,7 +8,7 @@ import React, {
 } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 
 import { AgentTab } from './tabs/AgentTab'
 import { EditorTab } from './tabs/EditorTab'
@@ -18,7 +18,7 @@ import { OthersTab } from './tabs/OthersTab'
 
 type SettingsTabsProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export type SettingsTabId =
@@ -62,7 +62,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   },
 ]
 
-const STORAGE_KEY = 'smtcmp_settings_active_tab'
+const STORAGE_KEY = 'yolo_settings_active_tab'
 
 export function SettingsTabs({ app, plugin }: SettingsTabsProps) {
   const { t } = useLanguage()
@@ -103,11 +103,11 @@ export function SettingsTabs({ app, plugin }: SettingsTabsProps) {
     }
 
     nav.style.setProperty(
-      '--smtcmp-tab-glider-left',
+      '--yolo-tab-glider-left',
       `${activeButton.offsetLeft}px`,
     )
     nav.style.setProperty(
-      '--smtcmp-tab-glider-width',
+      '--yolo-tab-glider-width',
       `${activeButton.offsetWidth}px`,
     )
   }
@@ -140,23 +140,23 @@ export function SettingsTabs({ app, plugin }: SettingsTabsProps) {
   }, [])
 
   return (
-    <div className="smtcmp-settings-tabs-container">
+    <div className="yolo-settings-tabs-container">
       <div
-        className="smtcmp-settings-tabs-nav smtcmp-settings-tabs-nav--glider"
+        className="yolo-settings-tabs-nav yolo-settings-tabs-nav--glider"
         role="tablist"
         ref={navRef}
         style={
           {
-            '--smtcmp-tab-count': SETTINGS_TABS.length,
-            '--smtcmp-tab-index': activeTabIndex,
+            '--yolo-tab-count': SETTINGS_TABS.length,
+            '--yolo-tab-index': activeTabIndex,
           } as React.CSSProperties
         }
       >
-        <div className="smtcmp-settings-tabs-glider" aria-hidden="true" />
+        <div className="yolo-settings-tabs-glider" aria-hidden="true" />
         {SETTINGS_TABS.map((tab, index) => (
           <button
             key={tab.id}
-            className={`smtcmp-settings-tab-button ${
+            className={`yolo-settings-tab-button ${
               activeTab === tab.id ? 'is-active' : ''
             }`}
             onClick={() => setActiveTab(tab.id)}
@@ -166,11 +166,11 @@ export function SettingsTabs({ app, plugin }: SettingsTabsProps) {
               tabRefs.current[index] = element
             }}
           >
-            <span className="smtcmp-settings-tab-label">{t(tab.labelKey)}</span>
+            <span className="yolo-settings-tab-label">{t(tab.labelKey)}</span>
           </button>
         ))}
       </div>
-      <div className="smtcmp-settings-tabs-content">
+      <div className="yolo-settings-tabs-content">
         <ActiveComponent app={app} plugin={plugin} />
       </div>
     </div>

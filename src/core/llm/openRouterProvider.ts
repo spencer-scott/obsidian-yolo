@@ -5,6 +5,7 @@ import {
   LLMOptions,
   LLMRequestNonStreaming,
   LLMRequestStreaming,
+  RequestTool,
 } from '../../types/llm/request'
 import {
   LLMResponseNonStreaming,
@@ -15,7 +16,7 @@ import {
   REASONING_META,
   resolveRequestReasoningLevel,
 } from '../../types/reasoning'
-import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
+import { getBuiltinProviderTools } from '../../utils/llm/model-tools'
 import { resolveProviderBaseUrl } from '../../utils/llm/provider-base-url'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 import { detectReasoningTypeFromModelId } from '../../utils/model-id-utils'
@@ -31,7 +32,7 @@ import {
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
+import { createTransportClients } from './transportClients'
 
 export class OpenRouterProvider extends BaseLLMProvider<LLMProvider> {
   private adapter: OpenAIMessageAdapter
@@ -87,15 +88,16 @@ export class OpenRouterProvider extends BaseLLMProvider<LLMProvider> {
       }),
       timeout: options?.requestPolicy?.timeoutMs,
     }
-    this.browserClient = new OpenAI(clientOptions)
-    this.obsidianClient = new OpenAI({
-      ...clientOptions,
-      fetch: createObsidianFetch(),
-    })
-    this.nodeClient = new OpenAI({
-      ...clientOptions,
-      fetch: createDesktopNodeFetch(),
-    })
+    const clients = createTransportClients(
+      (transportFetch) =>
+        new OpenAI({
+          ...clientOptions,
+          fetch: transportFetch,
+        }),
+    )
+    this.browserClient = clients.browserClient
+    this.obsidianClient = clients.obsidianClient
+    this.nodeClient = clients.nodeClient
   }
 
   async generateResponse(
@@ -105,7 +107,10 @@ export class OpenRouterProvider extends BaseLLMProvider<LLMProvider> {
   ): Promise<LLMResponseNonStreaming> {
     const mergedRequest = this.applyCustomModelParameters(
       model,
-      this.applyReasoningConfig(model, request),
+      this.applyBuiltinProviderTools(
+        model,
+        this.applyReasoningConfig(model, request),
+      ),
     )
 
     return runWithRequestTransport({
@@ -136,7 +141,10 @@ export class OpenRouterProvider extends BaseLLMProvider<LLMProvider> {
   ): Promise<AsyncIterable<LLMResponseStreaming>> {
     const mergedRequest = this.applyCustomModelParameters(
       model,
-      this.applyReasoningConfig(model, request),
+      this.applyBuiltinProviderTools(
+        model,
+        this.applyReasoningConfig(model, request),
+      ),
     )
 
     return runWithRequestTransportForStream({
@@ -200,6 +208,55 @@ export class OpenRouterProvider extends BaseLLMProvider<LLMProvider> {
         `Failed to get embedding from OpenRouter: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
     }
+  }
+
+  /**
+   * Serialize OpenRouter's hosted web search to the official server-tool entry
+   * (https://openrouter.ai/docs/guides/features/server-tools/web-search):
+   *
+   *   tools: [{ type: 'openrouter:web_search', parameters: { engine?, max_results? } }]
+   *
+   * OpenRouter intercepts the entry at the router layer, runs the search, and
+   * stitches results into the prompt before forwarding to the upstream model,
+   * so it works uniformly across Claude / Gemini / DeepSeek / etc. — the older
+   * `plugins:[{id:'web'}]` form is deprecated.
+   *
+   * `engine` is omitted when set to `auto` (OpenRouter's default).
+   *
+   * Other built-in tool families are dropped: forwarding `{type:'web_search'}`
+   * or `grok:live_search` to OpenRouter would be rejected (or change the
+   * user's intent), so a stale cross-provider config silently no-ops on this
+   * transport instead.
+   */
+  private applyBuiltinProviderTools<
+    RequestType extends LLMRequestNonStreaming | LLMRequestStreaming,
+  >(model: ChatModel, request: RequestType): RequestType {
+    const orTool = getBuiltinProviderTools(model).find(
+      (t) => t.type === 'openrouter:web_search',
+    )
+    if (!orTool || orTool.type !== 'openrouter:web_search') {
+      return request
+    }
+    const parameters: Record<string, unknown> = {}
+    if (orTool.engine) {
+      parameters.engine = orTool.engine
+    }
+    if (typeof orTool.maxResults === 'number') {
+      parameters.max_results = orTool.maxResults
+    }
+    const entry: Record<string, unknown> = { type: 'openrouter:web_search' }
+    if (Object.keys(parameters).length > 0) {
+      entry.parameters = parameters
+    }
+    // Cast: `entry` is OpenRouter's namespaced server-tool variant
+    // (`type:'openrouter:web_search'`), which sits outside the local
+    // `RequestTool` union (function-only). It's passed through verbatim to the
+    // OpenRouter HTTP body — no other provider sees it because this method is
+    // OpenRouter-specific.
+    const next = { ...request } as RequestType & Record<string, unknown>
+    const existingTools = Array.isArray(next.tools) ? next.tools : []
+    next.tools = [...existingTools, entry as unknown as RequestTool]
+    return next
   }
 
   private applyReasoningConfig<

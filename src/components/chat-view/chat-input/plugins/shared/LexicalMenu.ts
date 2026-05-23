@@ -17,6 +17,8 @@ import {
   COMMAND_PRIORITY_LOW,
   CommandListenerPriority,
   KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_ARROW_UP_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
@@ -75,6 +77,22 @@ export class MenuOption {
   setRefElement(element: HTMLElement | null) {
     this.ref = { current: element }
   }
+}
+
+/**
+ * The shared layer (LexicalMenu / LexicalTypeaheadMenuPlugin) originally only
+ * exposed default keyboard behavior. MentionPlugin needs to inject its own logic
+ * before arrow/Enter keys (cross-panel focus switching for hover preview sub-panels),
+ * without breaking the existing SkillSlashPlugin experience. This optional prop
+ * provides the single extension point: a handler returning true means "handled",
+ * skipping default logic; returning false falls through to default behavior.
+ * Not passing it (SkillSlash) is fully equivalent to the old behavior. */
+export type CustomKeyHandlers = {
+  onArrowUp?: (event: KeyboardEvent) => boolean
+  onArrowDown?: (event: KeyboardEvent) => boolean
+  onArrowLeft?: (event: KeyboardEvent) => boolean
+  onArrowRight?: (event: KeyboardEvent) => boolean
+  onEnter?: (event: KeyboardEvent | null) => boolean
 }
 
 export type MenuRenderFn<TOption extends MenuOption> = (
@@ -287,6 +305,7 @@ export function LexicalMenu<TOption extends MenuOption>({
   shouldSplitNodeWithQuery = false,
   commandPriority = COMMAND_PRIORITY_LOW,
   getDefaultHighlightedIndex,
+  customKeyHandlers,
 }: {
   close: () => void
   editor: LexicalEditor
@@ -303,8 +322,19 @@ export function LexicalMenu<TOption extends MenuOption>({
   ) => void
   commandPriority?: CommandListenerPriority
   getDefaultHighlightedIndex?: (options: TOption[]) => number
+  customKeyHandlers?: CustomKeyHandlers
 }): ReactJSX.Element | null {
   const [selectedIndex, setHighlightedIndex] = useState<null | number>(null)
+
+  // Store the latest customKeyHandlers in a ref so we don't re-register lexical
+  // commands on every props change (registration cost is low but it changes
+  // command priority ordering, adding unnecessary uncertainty).
+  const customKeyHandlersRef = useRef<CustomKeyHandlers | undefined>(
+    customKeyHandlers,
+  )
+  useEffect(() => {
+    customKeyHandlersRef.current = customKeyHandlers
+  }, [customKeyHandlers])
 
   const matchingString = resolution.match?.matchingString
 
@@ -408,6 +438,15 @@ export function LexicalMenu<TOption extends MenuOption>({
         KEY_ARROW_DOWN_COMMAND,
         (payload) => {
           const event = payload
+          const customHandler = customKeyHandlersRef.current?.onArrowDown
+          if (customHandler && customHandler(event)) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            return true
+          }
+          // During IME composition, fall through to Lexical default behavior
+          // to avoid hijacking IME candidate navigation.
+          if (event?.isComposing) return false
           if (options?.length && selectedIndex !== null) {
             const newSelectedIndex =
               selectedIndex !== options.length - 1 ? selectedIndex + 1 : 0
@@ -433,6 +472,15 @@ export function LexicalMenu<TOption extends MenuOption>({
         KEY_ARROW_UP_COMMAND,
         (payload) => {
           const event = payload
+          const customHandler = customKeyHandlersRef.current?.onArrowUp
+          if (customHandler && customHandler(event)) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            return true
+          }
+          // During IME composition, fall through to Lexical default behavior
+          // to avoid hijacking IME candidate navigation.
+          if (event?.isComposing) return false
           if (options?.length && selectedIndex !== null) {
             const newSelectedIndex =
               selectedIndex !== 0 ? selectedIndex - 1 : options.length - 1
@@ -445,6 +493,35 @@ export function LexicalMenu<TOption extends MenuOption>({
             event.stopImmediatePropagation()
           }
           return true
+        },
+        commandPriority,
+      ),
+      editor.registerCommand<KeyboardEvent>(
+        KEY_ARROW_LEFT_COMMAND,
+        (payload) => {
+          const event = payload
+          const customHandler = customKeyHandlersRef.current?.onArrowLeft
+          if (customHandler && customHandler(event)) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            return true
+          }
+          // No custom handler processed it, fall through to Lexical default (cursor movement).
+          return false
+        },
+        commandPriority,
+      ),
+      editor.registerCommand<KeyboardEvent>(
+        KEY_ARROW_RIGHT_COMMAND,
+        (payload) => {
+          const event = payload
+          const customHandler = customKeyHandlersRef.current?.onArrowRight
+          if (customHandler && customHandler(event)) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            return true
+          }
+          return false
         },
         commandPriority,
       ),
@@ -489,6 +566,17 @@ export function LexicalMenu<TOption extends MenuOption>({
       editor.registerCommand(
         KEY_ENTER_COMMAND,
         (event: KeyboardEvent | null) => {
+          const customHandler = customKeyHandlersRef.current?.onEnter
+          if (customHandler && customHandler(event)) {
+            if (event !== null) {
+              event.preventDefault()
+              event.stopImmediatePropagation()
+            }
+            return true
+          }
+          // During IME composition, fall through to Lexical default behavior
+          // to avoid hijacking IME candidate confirmation.
+          if (event?.isComposing) return false
           if (
             options === null ||
             selectedIndex === null ||
@@ -575,10 +663,7 @@ export function useMenuAnchorRef(
     }
 
     // Use dynamic style class to position the popup container with fixed positioning
-    containerDiv.classList.remove(
-      'smtcmp-menu-above',
-      'smtcmp-menu-right-align',
-    )
+    containerDiv.classList.remove('yolo-menu-above', 'yolo-menu-right-align')
 
     const menuEle = containerDiv.firstChild as HTMLElement | null
 
@@ -589,7 +674,7 @@ export function useMenuAnchorRef(
       if (className != null) {
         containerDiv.className = className
       }
-      containerDiv.classList.add('smtcmp-typeahead-menu')
+      containerDiv.classList.add('yolo-typeahead-menu')
       containerDiv.setAttribute('aria-label', 'Typeahead menu')
       containerDiv.setAttribute('id', 'typeahead-menu')
       containerDiv.setAttribute('role', 'listbox')
@@ -600,15 +685,15 @@ export function useMenuAnchorRef(
       const offsetTop = 4
       const margin = 8
       const containerEl = rootElement.closest(
-        '.smtcmp-chat-user-input-container, .smtcmp-quick-ask-input-row',
+        '.yolo-chat-user-input-container, .yolo-quick-ask-input-row',
       )
       const centeredChatContainer = rootElement.closest(
-        '.smtcmp-chat-container--centered',
+        '.yolo-chat-container--centered',
       )
       const isCenteredChatContainer = Boolean(centeredChatContainer)
       const centeredChatTypeaheadMaxWidth = centeredChatContainer
         ? getComputedStyle(centeredChatContainer)
-            .getPropertyValue('--smtcmp-chat-typeahead-max-width')
+            .getPropertyValue('--yolo-chat-typeahead-max-width')
             .trim() || '560px'
         : '560px'
 
@@ -619,6 +704,10 @@ export function useMenuAnchorRef(
         }
 
         const rect = containerEl.getBoundingClientRect()
+        const boundaryRect =
+          rootElement
+            .closest('.yolo-chat-container')
+            ?.getBoundingClientRect() ?? rect
         const cs = getComputedStyle(containerEl)
 
         // Calculate focus ring thickness from box-shadow
@@ -654,7 +743,7 @@ export function useMenuAnchorRef(
             top: menuTop,
             width: menuWidth,
           }
-          updateDynamicStyleClass(containerDiv, 'smtcmp-typeahead-menu-pos', {
+          updateDynamicStyleClass(containerDiv, 'yolo-typeahead-menu-pos', {
             position: 'fixed',
             left: menuLeft,
             top: menuTop,
@@ -666,13 +755,13 @@ export function useMenuAnchorRef(
         if (menuEle) {
           const available = Math.max(margin, Math.floor(rect.top - margin))
           const isMentionPopover = menuEle.classList.contains(
-            'smtcmp-smart-space-mention-popover',
+            'yolo-smart-space-mention-popover',
           )
           if (isMentionPopover) {
             const mentionPopoverWidth = isCenteredChatContainer
               ? `min(100%, ${centeredChatTypeaheadMaxWidth})`
               : '100%'
-            updateDynamicStyleClass(menuEle, 'smtcmp-typeahead-pop', {
+            updateDynamicStyleClass(menuEle, 'yolo-typeahead-pop', {
               position: 'absolute',
               left: 0,
               right: isCenteredChatContainer ? 'auto' : 0,
@@ -681,10 +770,16 @@ export function useMenuAnchorRef(
               maxWidth: mentionPopoverWidth,
               boxSizing: 'border-box',
               overflow: 'visible',
-              '--smtcmp-typeahead-available-height': `${available}px`,
+              '--yolo-typeahead-available-height': `${available}px`,
+              '--yolo-typeahead-boundary-left': `${Math.round(
+                boundaryRect.left,
+              )}px`,
+              '--yolo-typeahead-boundary-right': `${Math.round(
+                boundaryRect.right,
+              )}px`,
             })
           } else {
-            updateDynamicStyleClass(menuEle, 'smtcmp-typeahead-pop', {
+            updateDynamicStyleClass(menuEle, 'yolo-typeahead-pop', {
               position: 'absolute',
               left: 0,
               right: 0,
@@ -712,22 +807,22 @@ export function useMenuAnchorRef(
       if (!containerDiv.isConnected) {
         portalParent.append(containerDiv)
       }
-      updateDynamicStyleClass(containerDiv, 'smtcmp-typeahead-menu-pos', {
+      updateDynamicStyleClass(containerDiv, 'yolo-typeahead-menu-pos', {
         position: 'fixed',
         left: Math.round(leftPos),
         top: Math.round(topPos),
         width: 360,
         zIndex: '1000',
       })
-      // Avoid adding smtcmp-menu-above here; topPos is already computed above the caret
+      // Avoid adding yolo-menu-above here; topPos is already computed above the caret
       if (menuEle) {
-        updateDynamicStyleClass(menuEle, 'smtcmp-typeahead-pop', {
+        updateDynamicStyleClass(menuEle, 'yolo-typeahead-pop', {
           width: '100%',
         })
         ownerWindow.requestAnimationFrame(() => {
           const finalH = menuEle.getBoundingClientRect().height || estimatedH
           const t2 = Math.max(margin, top - offsetTop - finalH)
-          updateDynamicStyleClass(containerDiv, 'smtcmp-typeahead-menu-pos', {
+          updateDynamicStyleClass(containerDiv, 'yolo-typeahead-menu-pos', {
             position: 'fixed',
             left: Math.round(leftPos),
             top: Math.round(t2),
@@ -743,28 +838,35 @@ export function useMenuAnchorRef(
     rootElement.setAttribute('aria-controls', 'typeahead-menu')
   }, [editor, resolution, className, parent])
 
-  useEffect(() => {
+  const cleanupMenu = useCallback(() => {
     const rootElement = editor.getRootElement()
+    if (rootElement !== null) {
+      rootElement.removeAttribute('aria-controls')
+    }
+
+    const containerDiv = anchorElementRef.current
+    if (containerDiv?.isConnected) {
+      clearDynamicStyleClass(containerDiv)
+      containerDiv.remove()
+    }
+    if (containerDiv?.firstChild instanceof HTMLElement) {
+      clearDynamicStyleClass(containerDiv.firstChild)
+    }
+    // Reset position cache: containerDiv has been removed, so styles must be rewritten on next open.
+    lastWrittenPositionRef.current = null
+  }, [editor])
+
+  useLayoutEffect(() => {
     if (resolution !== null) {
       positionMenu()
-      return () => {
-        if (rootElement !== null) {
-          rootElement.removeAttribute('aria-controls')
-        }
-
-        const containerDiv = anchorElementRef.current
-        if (containerDiv?.isConnected) {
-          clearDynamicStyleClass(containerDiv)
-          containerDiv.remove()
-        }
-        if (containerDiv?.firstChild instanceof HTMLElement) {
-          clearDynamicStyleClass(containerDiv.firstChild)
-        }
-        // Reset position cache: containerDiv has been removed, styles must be rewritten on next open.
-        lastWrittenPositionRef.current = null
-      }
+    } else {
+      cleanupMenu()
     }
-  }, [editor, positionMenu, resolution])
+  }, [cleanupMenu, positionMenu, resolution])
+
+  useEffect(() => {
+    return cleanupMenu
+  }, [cleanupMenu])
 
   const onVisibilityChange = useCallback(
     (isInView: boolean) => {

@@ -13,8 +13,7 @@ import {
 } from '../../types/llm/response'
 import { LLMProvider, RequestTransportMode } from '../../types/provider.types'
 import { resolveRequestReasoningLevel } from '../../types/reasoning'
-import { getHostedToolsForModel } from '../../utils/llm/model-tools'
-import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
+import { getBuiltinProviderTools } from '../../utils/llm/model-tools'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 import { formatMessages } from '../../utils/llm/request'
 import { getQwenOAuthService } from '../auth/qwenOAuthRuntime'
@@ -33,7 +32,78 @@ import {
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
+import { createTransportClients } from './transportClients'
+
+const GOOGLE_SEARCH_FUNCTION_TOOL: RequestTool = {
+  type: 'function',
+  function: {
+    name: 'googleSearch',
+    description: 'Search the web using Google Search',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The search query' },
+      },
+    },
+  },
+}
+
+const URL_CONTEXT_FUNCTION_TOOL: RequestTool = {
+  type: 'function',
+  function: {
+    name: 'urlContext',
+    description: 'Get context from a URL',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The URL to get context from' },
+      },
+    },
+  },
+}
+
+const hasFunctionToolNamed = (
+  tools: RequestTool[] | undefined,
+  name: string,
+): boolean =>
+  Array.isArray(tools) &&
+  tools.some((t) => t.type === 'function' && t.function?.name === name)
+
+/**
+ * Synthesize Gemini-style function tools (`googleSearch` / `urlContext`) for
+ * Qwen's openai-compatible gateway when the user toggles conversation-level
+ * Gemini tools from the chat input. This is a pre-existing path; we keep it
+ * working but deliberately do NOT read model-level `builtinTools.gemini.*` —
+ * synthesizing those as `function` tools on a non-Gemini gateway looks
+ * reasonable but the gateway has no way to execute them, so model-level
+ * Gemini hosted tools only land on the native Gemini transports.
+ */
+function injectQwenGeminiFunctionTools(
+  formattedRequest: { tools?: RequestTool[] },
+  model: ChatModel,
+  options: LLMOptions | undefined,
+) {
+  if (model.builtinToolProvider !== 'gemini') return
+  const conversation = options?.geminiTools
+  if (!conversation) return
+
+  const additions: RequestTool[] = []
+  if (
+    conversation.useWebSearch &&
+    !hasFunctionToolNamed(formattedRequest.tools, 'googleSearch')
+  ) {
+    additions.push(GOOGLE_SEARCH_FUNCTION_TOOL)
+  }
+  if (
+    conversation.useUrlContext &&
+    !hasFunctionToolNamed(formattedRequest.tools, 'urlContext')
+  ) {
+    additions.push(URL_CONTEXT_FUNCTION_TOOL)
+  }
+  if (additions.length > 0) {
+    formattedRequest.tools = [...(formattedRequest.tools ?? []), ...additions]
+  }
+}
 
 type GeminiThinkingConfig = {
   thinking_budget: number
@@ -122,18 +192,16 @@ export class QwenOAuthProvider extends BaseLLMProvider<LLMProvider> {
       defaultHeaders,
     }
 
-    this.browserClient = new ClientCtor({
-      ...clientOptions,
-      fetch: this.createAuthorizedFetch(globalThis.fetch),
-    })
-    this.obsidianClient = new ClientCtor({
-      ...clientOptions,
-      fetch: this.createAuthorizedFetch(createObsidianFetch()),
-    })
-    this.nodeClient = new ClientCtor({
-      ...clientOptions,
-      fetch: this.createAuthorizedFetch(createDesktopNodeFetch()),
-    })
+    const clients = createTransportClients(
+      (transportFetch) =>
+        new ClientCtor({
+          ...clientOptions,
+          fetch: this.createAuthorizedFetch(transportFetch),
+        }),
+    )
+    this.browserClient = clients.browserClient
+    this.obsidianClient = clients.obsidianClient
+    this.nodeClient = clients.nodeClient
   }
 
   async generateResponse(
@@ -146,61 +214,18 @@ export class QwenOAuthProvider extends BaseLLMProvider<LLMProvider> {
       messages: formatMessages(request.messages),
     }
 
-    const geminiToolsSettings = options?.geminiTools
-    if (model.toolType === 'gemini' && geminiToolsSettings) {
-      const openaiTools: RequestTool[] = []
+    injectQwenGeminiFunctionTools(formattedRequest, model, options)
 
-      if (geminiToolsSettings.useWebSearch) {
-        openaiTools.push({
-          type: 'function',
-          function: {
-            name: 'googleSearch',
-            description: 'Search the web using Google Search',
-            parameters: {
-              type: 'object',
-              properties: {
-                query: {
-                  type: 'string',
-                  description: 'The search query',
-                },
-              },
-            },
-          },
-        })
-      }
-
-      if (geminiToolsSettings.useUrlContext) {
-        openaiTools.push({
-          type: 'function',
-          function: {
-            name: 'urlContext',
-            description: 'Get context from a URL',
-            parameters: {
-              type: 'object',
-              properties: {
-                url: {
-                  type: 'string',
-                  description: 'The URL to get context from',
-                },
-              },
-            },
-          },
-        })
-      }
-
-      if (openaiTools.length > 0) {
-        formattedRequest.tools = [
-          ...(formattedRequest.tools ?? []),
-          ...openaiTools,
-        ]
-      }
-    }
-
-    const hostedTools = getHostedToolsForModel(model)
-    if (hostedTools.length > 0) {
+    // Only OpenAI-style `web_search` is forwarded on the Qwen OAuth transport
+    // (Qwen's gateway accepts the OpenAI Chat Completions hosted tool shape via
+    // `extra_body.tools`). Other built-in tool families would not be understood.
+    const extraBodyTools = getBuiltinProviderTools(model).filter(
+      (t) => t.type === 'web_search',
+    )
+    if (extraBodyTools.length > 0) {
       formattedRequest.extra_body = {
         ...(formattedRequest.extra_body ?? {}),
-        tools: hostedTools,
+        tools: extraBodyTools,
       }
     }
 
@@ -250,11 +275,18 @@ export class QwenOAuthProvider extends BaseLLMProvider<LLMProvider> {
       messages: formatMessages(request.messages),
     }
 
-    const hostedTools = getHostedToolsForModel(model)
-    if (hostedTools.length > 0) {
+    injectQwenGeminiFunctionTools(formattedRequest, model, options)
+
+    // Only OpenAI-style `web_search` is forwarded on the Qwen OAuth transport
+    // (Qwen's gateway accepts the OpenAI Chat Completions hosted tool shape via
+    // `extra_body.tools`). Other built-in tool families would not be understood.
+    const extraBodyTools = getBuiltinProviderTools(model).filter(
+      (t) => t.type === 'web_search',
+    )
+    if (extraBodyTools.length > 0) {
       formattedRequest.extra_body = {
         ...(formattedRequest.extra_body ?? {}),
-        tools: hostedTools,
+        tools: extraBodyTools,
       }
     }
 

@@ -62,7 +62,7 @@ export function AgentImageReadingSection() {
       <ObsidianSetting
         name={t('settings.agent.imageReadingEnabled')}
         desc={t('settings.agent.imageReadingEnabledDesc')}
-        className="smtcmp-settings-card"
+        className="yolo-settings-card"
       >
         <ObsidianToggle
           value={isImageReadingEnabled}
@@ -80,7 +80,7 @@ export function AgentImageReadingSection() {
           <ObsidianSetting
             name={t('settings.agent.externalImageFetchEnabled')}
             desc={t('settings.agent.externalImageFetchEnabledDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianToggle
               value={isExternalFetchEnabled}
@@ -96,7 +96,7 @@ export function AgentImageReadingSection() {
           <ObsidianSetting
             name={t('settings.agent.imageCompressionEnabled')}
             desc={t('settings.agent.imageCompressionEnabledDesc')}
-            className="smtcmp-settings-card"
+            className="yolo-settings-card"
           >
             <ObsidianToggle
               value={isCompressionEnabled}
@@ -113,7 +113,7 @@ export function AgentImageReadingSection() {
             <ObsidianSetting
               name={t('settings.agent.imageCompressionQuality')}
               desc={t('settings.agent.imageCompressionQualityDesc')}
-              className="smtcmp-settings-card"
+              className="yolo-settings-card"
             >
               <ObsidianTextInput
                 value={qualityInput}

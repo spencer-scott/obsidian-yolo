@@ -325,7 +325,7 @@ const ragOptionsSchema = z.object({
   excludePatterns: z.array(z.string()).catch([]),
   includePatterns: z.array(z.string()).catch([]),
 })
-const smartComposerSettingsSchemaV1 = z.object({
+const yoloSettingsSchemaV1 = z.object({
   // Version
   version: z.literal(SETTINGS_SCHEMA_VERSION).catch(SETTINGS_SCHEMA_VERSION),
 
@@ -381,7 +381,7 @@ const smartComposerSettingsSchemaV1 = z.object({
     includePatterns: [],
   }),
 })
-type SmartComposerSettingsV1 = z.infer<typeof smartComposerSettingsSchemaV1>
+type YoloSettingsV1 = z.infer<typeof yoloSettingsSchemaV1>
 
 /**
  * V2 constants
@@ -611,9 +611,9 @@ export const V2_DEFAULT_EMBEDDING_MODELS: readonly LegacyEmbeddingModel[] = [
 ]
 
 export const migrateFrom1To2: SettingMigration['migrate'] = (
-  rawData: SmartComposerSettingsV1,
+  rawData: YoloSettingsV1,
 ) => {
-  const data = smartComposerSettingsSchemaV1.parse(rawData)
+  const data = yoloSettingsSchemaV1.parse(rawData)
   const providers: LegacyProvider[] = [...V2_DEFAULT_PROVIDERS]
   const chatModels: LegacyChatModel[] = [...V2_DEFAULT_CHAT_MODELS]
   const ollamaChatModelData = data.ollamaChatModel ?? { baseUrl: '', model: '' }

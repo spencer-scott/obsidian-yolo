@@ -5,6 +5,7 @@ import {
   ChatConversationCompactionState,
   ChatExternalAgentResultMessage,
   ChatMessage,
+  ChatUserMessage,
   normalizeChatConversationCompactionState,
 } from '../../types/chat'
 import {
@@ -14,6 +15,7 @@ import {
   getToolCallArgumentsObject,
 } from '../../types/tool-call.types'
 
+import { DEFAULT_BRANCH_ID } from './branch'
 import type { AsyncTaskRecord } from './external-cli/async-task-registry'
 import type { ExternalCliEvent } from './external-cli/streamBus'
 import { NativeAgentRuntime } from './native-runtime'
@@ -49,7 +51,18 @@ export type AgentConversationRunSummary = {
   conversationId: string
   status: AgentRunStatus
   isRunning: boolean
+  /**
+   * True when the run is blocked on either a pending tool approval OR an
+   * `ask_user_question` awaiting the user's answer. Kept as a single field so
+   * existing UI gates (stop-button, queue text, etc.) cover both cases.
+   */
   isWaitingApproval: boolean
+  /**
+   * Narrower flag: only `ask_user_question` is pending. Used by Chat.tsx to
+   * intercept submits regardless of whether the run state is still `running`
+   * (the run may have already finalized, leaving only the awaiting tool call).
+   */
+  isWaitingUserInput: boolean
 }
 
 export type AgentConversationRunSummarySubscriber = (
@@ -89,8 +102,6 @@ export type AgentReplaceConversationMessagesReason =
   | 'mutation'
   | 'hydrate'
   | 'self-heal'
-
-const DEFAULT_BRANCH_ID = '__default__'
 
 function buildExternalAgentResultMessage(
   record: AsyncTaskRecord,
@@ -213,7 +224,8 @@ const abortVisibleMessages = (messages: ChatMessage[]): ChatMessage[] => {
     const nextToolCalls = message.toolCalls.map((toolCall) => {
       if (
         toolCall.response.status !== ToolCallResponseStatus.PendingApproval &&
-        toolCall.response.status !== ToolCallResponseStatus.Running
+        toolCall.response.status !== ToolCallResponseStatus.Running &&
+        toolCall.response.status !== ToolCallResponseStatus.AwaitingUserInput
       ) {
         return toolCall
       }
@@ -275,6 +287,64 @@ const hasPendingApproval = (messages: ChatMessage[]): boolean => {
   )
 }
 
+const hasAwaitingUserInput = (messages: ChatMessage[]): boolean => {
+  return messages.some(
+    (message) =>
+      message.role === 'tool' &&
+      message.toolCalls.some(
+        (toolCall) =>
+          toolCall.response.status === ToolCallResponseStatus.AwaitingUserInput,
+      ),
+  )
+}
+
+const hasPendingUserInteraction = (messages: ChatMessage[]): boolean => {
+  return hasPendingApproval(messages) || hasAwaitingUserInput(messages)
+}
+
+const isTrailingResolvedToolMessage = (
+  messages: ChatMessage[],
+  toolMessageId: string,
+): boolean => {
+  const last = messages.at(-1)
+  if (!last || last.id !== toolMessageId || last.role !== 'tool') {
+    return false
+  }
+  return last.toolCalls.every((toolCall) =>
+    TOOL_CALL_TERMINAL_STATUSES.includes(toolCall.response.status),
+  )
+}
+
+const patchAwaitingUserInputInMessages = (
+  messages: ChatMessage[],
+  toolCallId: string,
+  response: ToolCallResponse,
+): {
+  toolMessageId: string | null
+  updatedMessages: ChatMessage[]
+  didPatch: boolean
+  wasAwaiting: boolean
+} => {
+  let toolMessageId: string | null = null
+  let didPatch = false
+  let wasAwaiting = false
+  const updatedMessages = messages.map((message) => {
+    if (message.role !== 'tool') return message
+    let messageUpdated = false
+    const nextToolCalls = message.toolCalls.map((toolCall) => {
+      if (toolCall.request.id !== toolCallId) return toolCall
+      didPatch = true
+      toolMessageId = message.id
+      wasAwaiting =
+        toolCall.response.status === ToolCallResponseStatus.AwaitingUserInput
+      messageUpdated = true
+      return { ...toolCall, response }
+    })
+    return messageUpdated ? { ...message, toolCalls: nextToolCalls } : message
+  })
+  return { toolMessageId, updatedMessages, didPatch, wasAwaiting }
+}
+
 const getRunKey = (conversationId: string, branchId?: string): string => {
   return `${conversationId}::${branchId ?? DEFAULT_BRANCH_ID}`
 }
@@ -283,6 +353,15 @@ const isAssistantOrToolMessage = (
   message: ChatMessage,
 ): message is Extract<ChatMessage, { role: 'assistant' | 'tool' }> => {
   return message.role === 'assistant' || message.role === 'tool'
+}
+
+// Mirrors NativeAgentRuntime.shouldUseSingleTurnFastPath. A fast-path run does
+// not call drainPendingUserMessages (no llm_request boundary), so queued
+// messages can never be consumed inside that run. Treat fast-path runs as
+// "not enqueueable" and skip after-run continuation that would otherwise loop
+// forever re-launching fast-path runs that ignore the queue.
+const isFastPathLoopConfig = (config: AgentRuntimeLoopConfig): boolean => {
+  return !config.enableTools && config.maxAutoIterations <= 1
 }
 
 const matchesBranchMessage = (
@@ -356,7 +435,9 @@ const buildBranchAggregateMessages = ({
   )
 
   if (responseMessages.length === 0) {
-    const branchWaitingApproval = hasPendingApproval(branchState.messages)
+    const branchWaitingApproval = hasPendingUserInteraction(
+      branchState.messages,
+    )
     return [
       ...baseMessages.slice(0, userIndex + 1),
       ...existingGroupMessages.map((message) => {
@@ -401,6 +482,55 @@ export type PendingExternalAgentResultsSubscriber = (
   conversationId: string,
 ) => void
 
+export type EnqueueUserMessageResult =
+  | 'enqueued'
+  | 'idle'
+  | 'blocked_awaiting_approval'
+
+/**
+ * Terminal tool-call statuses. The agent run loop and `approveToolCall` /
+ * `answerUserQuestion` use this set to decide whether the trailing tool
+ * message is fully resolved (so a fresh LLM turn can be triggered). All four
+ * are emitted as valid `tool_result` payloads by `requestContextBuilder`.
+ */
+const TOOL_CALL_TERMINAL_STATUSES: ToolCallResponse['status'][] = [
+  ToolCallResponseStatus.Success,
+  ToolCallResponseStatus.Error,
+  ToolCallResponseStatus.Rejected,
+  ToolCallResponseStatus.Aborted,
+]
+
+export type AnswerUserQuestionAnswer = {
+  id: string
+  question: string
+  inputType: 'free_text' | 'single_select' | 'multi_select'
+  value: string | string[]
+  /**
+   * Free-text content the user typed into the auto-appended "Other" escape
+   * hatch. Present only when `value` is (or contains) the reserved
+   * `__other__` id; absent otherwise. The model should read this alongside
+   * `value` to recover what the user actually meant.
+   */
+  otherText?: string
+}
+
+export type AnswerUserQuestionPayload = {
+  type: 'user_answers'
+  answers: AnswerUserQuestionAnswer[]
+}
+
+export type AnswerUserQuestionOutcome =
+  | { kind: 'continued' }
+  | { kind: 'recorded' }
+  | { kind: 'needs_recovery'; resolvedMessages: ChatMessage[] }
+  | { kind: 'not_found' }
+  | { kind: 'not_awaiting' }
+
+export type AbortedQueuedMessagesSubscriber = (
+  conversationId: string,
+  messages: ChatUserMessage[],
+) => void
+
 export class AgentService {
   private conversationEntries = new Map<string, ConversationEntry>()
   private runEntriesByKey = new Map<string, AgentRunEntry>()
@@ -420,8 +550,84 @@ export class AgentService {
   // auto-runs when multiple task-completed events arrive in the gap between
   // `submitChatMutation.mutate` and `agentService.run` actually starting.
   private autoRunScheduled = new Set<string>()
+  /**
+   * Mid-run user messages queued per run key (conversationId+branchId), waiting
+   * to be injected at the next `llm_request` boundary by the runtime, or used
+   * to drive an after-run continuation when the current run finishes.
+   */
+  private pendingUserMessagesByKey = new Map<string, ChatUserMessage[]>()
+  /**
+   * Latch preventing duplicate after-run continuations for the same run key
+   * while the microtask spawning the next `run()` is still pending.
+   */
+  private continuationScheduledByKey = new Set<string>()
+  private abortedQueuedMessagesSubscribers =
+    new Set<AbortedQueuedMessagesSubscriber>()
 
   constructor(private readonly options: AgentServiceOptions = {}) {}
+
+  /**
+   * Enqueue a user message to be injected mid-run at the next safe LLM
+   * boundary. v1 only supports the default branch; calls for non-default
+   * branches return 'idle' so the caller falls through to the normal run path.
+   */
+  enqueueUserMessage(
+    conversationId: string,
+    message: ChatUserMessage,
+    branchId?: string,
+  ): EnqueueUserMessageResult {
+    const effectiveBranchId = branchId ?? DEFAULT_BRANCH_ID
+    if (effectiveBranchId !== DEFAULT_BRANCH_ID) {
+      return 'idle'
+    }
+    const runKey = getRunKey(conversationId, effectiveBranchId)
+    const runEntry = this.runEntriesByKey.get(runKey)
+    if (!runEntry || runEntry.state.status !== 'running') {
+      return 'idle'
+    }
+    if (
+      runEntry.lastLoopConfig &&
+      isFastPathLoopConfig(runEntry.lastLoopConfig)
+    ) {
+      // Fast-path runs have no llm_request boundary to drain at. Fall through
+      // to the normal submit path so the caller starts a fresh run instead.
+      return 'idle'
+    }
+    if (hasPendingUserInteraction(runEntry.state.messages)) {
+      return 'blocked_awaiting_approval'
+    }
+
+    const queue = this.pendingUserMessagesByKey.get(runKey) ?? []
+    queue.push(message)
+    this.pendingUserMessagesByKey.set(runKey, queue)
+    this.notifyConversationSubscribers(conversationId)
+    return 'enqueued'
+  }
+
+  /**
+   * Peek at currently queued mid-run user messages for the conversation's
+   * default branch run. Returns an empty array if nothing is queued.
+   */
+  peekPendingUserMessages(
+    conversationId: string,
+    branchId?: string,
+  ): ChatUserMessage[] {
+    const runKey = getRunKey(conversationId, branchId ?? DEFAULT_BRANCH_ID)
+    return [...(this.pendingUserMessagesByKey.get(runKey) ?? [])]
+  }
+
+  /**
+   * Subscribe to abort events that carry the queued user messages dropped at
+   * abort time, so the UI can restore them into the input box.
+   */
+  subscribeToAbortedQueuedMessages(
+    fn: AbortedQueuedMessagesSubscriber,
+  ): () => void {
+    this.abortedQueuedMessagesSubscribers.add(fn)
+    return () => {
+      this.abortedQueuedMessagesSubscribers.delete(fn)
+    }
+  }
 
   /** Subscribe to be notified when pending external agent results are ready to drain */
   subscribeToPendingExternalAgentResults(
@@ -709,9 +915,7 @@ export class AgentService {
       latestToolMessage?.role === 'tool' &&
       nextMessages.at(-1)?.id === latestToolMessage.id &&
       latestToolMessage.toolCalls.every((currentToolCall) =>
-        [ToolCallResponseStatus.Success, ToolCallResponseStatus.Error].includes(
-          currentToolCall.response.status,
-        ),
+        TOOL_CALL_TERMINAL_STATUSES.includes(currentToolCall.response.status),
       )
     ) {
       await this.run({
@@ -724,6 +928,169 @@ export class AgentService {
       })
     }
 
+    return true
+  }
+
+  /**
+   * Submit user-provided answers to an in-flight `ask_user_question` tool
+   * call. Mirrors `approveToolCall` but skips the MCP execution path: the
+   * answers themselves are the tool's "result". When the current run still
+   * has a live `runEntry` (active run path), we continue the loop directly.
+   * When the run has already finalized (recovery path), we hand control back
+   * to the UI via the same callback used by `handleRecoverPendingToolCall`.
+   */
+  async answerUserQuestion({
+    conversationId,
+    toolCallId,
+    payload,
+  }: {
+    conversationId: string
+    toolCallId: string
+    payload: AnswerUserQuestionPayload
+  }): Promise<AnswerUserQuestionOutcome> {
+    const successResponse: ToolCallResponse = {
+      status: ToolCallResponseStatus.Success,
+      data: {
+        type: 'text',
+        text: JSON.stringify(payload),
+      },
+    }
+
+    // Active-run path: the awaiting tool call still lives inside an
+    // AgentRunEntry. Commit through updateToolCallResponse so subscribers
+    // see the status change and we can drive the loop forward.
+    const located = this.findToolCall(conversationId, toolCallId)
+    if (located) {
+      if (
+        located.toolCall.response.status !==
+        ToolCallResponseStatus.AwaitingUserInput
+      ) {
+        return { kind: 'not_awaiting' }
+      }
+
+      const nextMessages = this.updateToolCallResponse({
+        conversationId,
+        toolCallId,
+        response: successResponse,
+      })
+      if (!nextMessages) {
+        return { kind: 'not_found' }
+      }
+
+      const isLastMessage = isTrailingResolvedToolMessage(
+        nextMessages,
+        located.toolMessage.id,
+      )
+      if (!isLastMessage) {
+        return { kind: 'recorded' }
+      }
+
+      const { runEntry } = located
+      if (runEntry.lastRunInput && runEntry.lastLoopConfig) {
+        await this.run({
+          conversationId,
+          loopConfig: runEntry.lastLoopConfig,
+          input: {
+            ...runEntry.lastRunInput,
+            messages: nextMessages,
+          },
+        })
+        return { kind: 'continued' }
+      }
+
+      return { kind: 'needs_recovery', resolvedMessages: nextMessages }
+    }
+
+    // Recovery path: the run finalized before the user answered, so the
+    // run entry has been cleaned up. The awaiting message lives only in the
+    // conversation-level baseMessages. Patch it there, broadcast, and ask
+    // the UI to drive the resume via submitChatMutation.
+    const conversationEntry =
+      this.conversationEntries.get(conversationId) ?? null
+    if (!conversationEntry) {
+      return { kind: 'not_found' }
+    }
+
+    const { toolMessageId, updatedMessages, didPatch, wasAwaiting } =
+      patchAwaitingUserInputInMessages(
+        conversationEntry.state.messages,
+        toolCallId,
+        successResponse,
+      )
+
+    if (!didPatch) {
+      return { kind: 'not_found' }
+    }
+    if (!wasAwaiting) {
+      return { kind: 'not_awaiting' }
+    }
+
+    conversationEntry.baseMessages = updatedMessages
+    conversationEntry.state = {
+      ...conversationEntry.state,
+      messages: updatedMessages,
+    }
+    this.notifyConversationSubscribers(conversationId)
+
+    const isLastMessage =
+      toolMessageId !== null &&
+      isTrailingResolvedToolMessage(updatedMessages, toolMessageId)
+
+    if (!isLastMessage) {
+      return { kind: 'recorded' }
+    }
+    return { kind: 'needs_recovery', resolvedMessages: updatedMessages }
+  }
+
+  /**
+   * Cancel a pending ask_user_question prompt: flip the awaiting tool call
+   * to Aborted and terminate the surrounding run. Handles both the active
+   * run case (runtime still alive while the user is being prompted) and the
+   * recovery case where the run already finalized while the panel was open.
+   */
+  cancelAskUserQuestion({
+    conversationId,
+    toolCallId,
+  }: {
+    conversationId: string
+    toolCallId: string
+  }): boolean {
+    // Active-run path: the awaiting tool call still lives inside a runEntry.
+    // Delegate to abortConversation so the runtime is aborted, run status
+    // flipped to 'aborted', and queued user messages restored — mirroring
+    // the global Stop button.
+    const located = this.findToolCall(conversationId, toolCallId)
+    if (located) {
+      if (
+        located.toolCall.response.status !==
+        ToolCallResponseStatus.AwaitingUserInput
+      ) {
+        return false
+      }
+      return this.abortConversation(conversationId)
+    }
+
+    // Recovery path: the run finalized before the user answered. Patch the
+    // awaiting tool call in conversation-level state to Aborted and notify.
+    const conversationEntry = this.conversationEntries.get(conversationId)
+    if (!conversationEntry) {
+      return false
+    }
+    const { updatedMessages, didPatch, wasAwaiting } =
+      patchAwaitingUserInputInMessages(
+        conversationEntry.state.messages,
+        toolCallId,
+        { status: ToolCallResponseStatus.Aborted },
+      )
+    if (!didPatch || !wasAwaiting) {
+      return false
+    }
+    conversationEntry.baseMessages = updatedMessages
+    conversationEntry.state = {
+      ...conversationEntry.state,
+      messages: updatedMessages,
+    }
+    this.notifyConversationSubscribers(conversationId)
     return true
   }
 
@@ -760,7 +1127,6 @@ export class AgentService {
         conversationId,
         toolCallId,
         response: { status: ToolCallResponseStatus.Aborted },
-        status: located.runEntry.runtime ? 'aborted' : undefined,
       }),
     )
   }
@@ -809,6 +1175,23 @@ export class AgentService {
     runEntry.runToken = runToken
     runEntry.lastRunInput = input
     runEntry.lastLoopConfig = loopConfig
+
+    const runtimeInput: AgentRuntimeRunInput = {
+      ...input,
+      drainPendingUserMessages: () => {
+        const queue = this.pendingUserMessagesByKey.get(runKey)
+        if (!queue || queue.length === 0) {
+          return []
+        }
+        this.pendingUserMessagesByKey.delete(runKey)
+        // Notify so the UI removes the "queued" bubble immediately; the
+        // injected messages will materialize in the runtime snapshot next.
+        this.notifyConversationSubscribers(conversationId)
+        return queue
+      },
+    }
+    // Clear the continuation latch now that the new run is actually starting.
+    this.continuationScheduledByKey.delete(runKey)
     runEntry.sourceUserMessageId = input.sourceUserMessageId
     runEntry.state = {
       conversationId,
@@ -849,7 +1232,7 @@ export class AgentService {
     })
 
     try {
-      await runtime.run(input)
+      await runtime.run(runtimeInput)
 
       const currentRunEntry = this.runEntriesByKey.get(runKey)
       if (!currentRunEntry || currentRunEntry.runToken !== runToken) {
@@ -893,7 +1276,95 @@ export class AgentService {
         }
       }
       this.finalizeSettledConversationRuns(conversationId)
+      this.maybeScheduleAfterRunContinuation({
+        conversationId,
+        branchId,
+        runKey,
+        lastRunInput: input,
+        lastLoopConfig: loopConfig,
+      })
     }
+  }
+
+  private maybeScheduleAfterRunContinuation({
+    conversationId,
+    branchId,
+    runKey,
+    lastRunInput,
+    lastLoopConfig,
+  }: {
+    conversationId: string
+    branchId: string
+    runKey: string
+    lastRunInput: AgentRuntimeRunInput
+    lastLoopConfig: AgentRuntimeLoopConfig
+  }): void {
+    const queue = this.pendingUserMessagesByKey.get(runKey)
+    if (!queue || queue.length === 0) {
+      return
+    }
+    if (this.continuationScheduledByKey.has(runKey)) {
+      return
+    }
+    if (lastRunInput.abortSignal?.aborted) {
+      // Abort path is responsible for clearing the queue; do not continue.
+      return
+    }
+    if (isFastPathLoopConfig(lastLoopConfig)) {
+      // Defensive: enqueueUserMessage already rejects fast-path runs, but a
+      // queued message could in principle reach here through other paths.
+      // Skip continuation to avoid an infinite loop of fast-path runs that
+      // never drain the queue.
+      return
+    }
+    this.continuationScheduledByKey.add(runKey)
+
+    queueMicrotask(() => {
+      const pending = this.pendingUserMessagesByKey.get(runKey)
+      if (!pending || pending.length === 0) {
+        this.continuationScheduledByKey.delete(runKey)
+        return
+      }
+      const conversationEntry = this.conversationEntries.get(conversationId)
+      if (!conversationEntry) {
+        this.continuationScheduledByKey.delete(runKey)
+        return
+      }
+      const existingRunEntry = this.runEntriesByKey.get(runKey)
+      if (existingRunEntry?.state.status === 'running') {
+        // Another run already picked up; let it drain the queue at the next
+        // llm_request boundary.
+        this.continuationScheduledByKey.delete(runKey)
+        return
+      }
+
+      const baselineMessages: ChatMessage[] = [
+        ...conversationEntry.state.messages,
+      ]
+      // Keep the queue intact: the new run's drain callback (bound inside
+      // run()) will pull the queue at its first llm_request boundary and merge
+      // through the same snapshot → persist path used for mid-run injection.
+      void this.run({
+        conversationId,
+        loopConfig: lastLoopConfig,
+        input: {
+          ...lastRunInput,
+          messages: baselineMessages,
+          requestMessages: baselineMessages,
+          // The injected user messages become the new "anchor" of this run;
+          // drop the prior sourceUserMessageId so the runtime treats this as a
+          // fresh top-level turn rather than a branch continuation.
+          sourceUserMessageId: undefined,
+          branchId,
+          abortSignal: undefined,
+        },
+      }).catch((error: unknown) => {
+        console.error(
+          '[YOLO] after-run continuation for queued user messages failed',
+          error,
+        )
+      })
+    })
   }
 
   abortConversation(conversationId: string): boolean {
@@ -902,7 +1373,16 @@ export class AgentService {
       return false
     }
 
+    const droppedQueuedByConversation: ChatUserMessage[] = []
     runEntries.forEach((runEntry) => {
+      const runKey = getRunKey(conversationId, runEntry.branchId)
+      const queued = this.pendingUserMessagesByKey.get(runKey)
+      if (queued && queued.length > 0) {
+        droppedQueuedByConversation.push(...queued)
+      }
+      this.pendingUserMessagesByKey.delete(runKey)
+      this.continuationScheduledByKey.delete(runKey)
+
       runEntry.runtime?.abort()
       runEntry.state = {
         ...runEntry.state,
@@ -912,6 +1392,12 @@ export class AgentService {
       }
     })
     this.recomputeConversationState(conversationId)
+
+    if (droppedQueuedByConversation.length > 0) {
+      for (const subscriber of this.abortedQueuedMessagesSubscribers) {
+        subscriber(conversationId, droppedQueuedByConversation)
+      }
+    }
     return true
   }
 
@@ -1113,12 +1599,15 @@ export class AgentService {
   private buildRunSummary(
     state: AgentConversationState,
   ): AgentConversationRunSummary {
-    const isWaitingApproval = hasPendingApproval(state.messages)
+    const isWaitingUserInput = hasAwaitingUserInput(state.messages)
+    const isWaitingApproval =
+      hasPendingApproval(state.messages) || isWaitingUserInput
     return {
       conversationId: state.conversationId,
       status: state.status,
       isRunning: state.status === 'running' && !isWaitingApproval,
       isWaitingApproval,
+      isWaitingUserInput,
     }
   }
 

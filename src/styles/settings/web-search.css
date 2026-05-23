@@ -1,12 +1,12 @@
 /* Web search settings — V1 refined single-column layout */
 
-.smtcmp-ws {
+.yolo-ws {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-.smtcmp-ws-intro {
+.yolo-ws-intro {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   line-height: 1.55;
@@ -16,15 +16,15 @@
   margin-bottom: 16px;
 }
 
-.smtcmp-ws-section {
+.yolo-ws-section {
   padding: 0 2px;
 }
 
-.smtcmp-ws-section + .smtcmp-ws-section {
+.yolo-ws-section + .yolo-ws-section {
   margin-top: 20px;
 }
 
-.smtcmp-ws-section-head {
+.yolo-ws-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -32,13 +32,13 @@
   padding-bottom: 10px;
 }
 
-.smtcmp-ws-section-label {
+.yolo-ws-section-label {
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   font-weight: var(--font-semibold);
 }
 
-.smtcmp-ws-add-btn {
+.yolo-ws-add-btn {
   display: inline-flex !important;
   align-items: center;
   gap: 6px;
@@ -58,7 +58,7 @@
     background-color 140ms ease;
 }
 
-.smtcmp-ws-add-btn:hover:not(:disabled) {
+.yolo-ws-add-btn:hover:not(:disabled) {
   border-color: color-mix(
     in srgb,
     var(--interactive-accent) 45%,
@@ -71,14 +71,14 @@
   ) !important;
 }
 
-.smtcmp-ws-providers {
+.yolo-ws-providers {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   overflow: hidden;
   background: var(--background-primary);
 }
 
-.smtcmp-ws-provider-row {
+.yolo-ws-provider-row {
   display: grid;
   grid-template-columns: 20px 1fr auto;
   align-items: center;
@@ -89,16 +89,16 @@
   transition: background-color 120ms ease;
 }
 
-.smtcmp-ws-provider-row + .smtcmp-ws-provider-row {
+.yolo-ws-provider-row + .yolo-ws-provider-row {
   border-top: 1px solid
     color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
 }
 
-.smtcmp-ws-provider-row:hover {
+.yolo-ws-provider-row:hover {
   background: var(--background-secondary);
 }
 
-.smtcmp-ws-provider-row.is-default {
+.yolo-ws-provider-row.is-default {
   background: color-mix(
     in srgb,
     var(--interactive-accent) 6%,
@@ -106,7 +106,7 @@
   );
 }
 
-.smtcmp-ws-provider-row.is-default:hover {
+.yolo-ws-provider-row.is-default:hover {
   background: color-mix(
     in srgb,
     var(--interactive-accent) 10%,
@@ -114,7 +114,7 @@
   );
 }
 
-.smtcmp-ws-radio {
+.yolo-ws-radio {
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -126,25 +126,25 @@
   flex-shrink: 0;
 }
 
-.smtcmp-ws-provider-row.is-default .smtcmp-ws-radio {
+.yolo-ws-provider-row.is-default .yolo-ws-radio {
   border-color: var(--interactive-accent);
 }
 
-.smtcmp-ws-radio-dot {
+.yolo-ws-radio-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--interactive-accent);
 }
 
-.smtcmp-ws-provider-main {
+.yolo-ws-provider-main {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
-.smtcmp-ws-monogram {
+.yolo-ws-monogram {
   width: 24px;
   height: 24px;
   border-radius: 6px;
@@ -157,40 +157,40 @@
   flex-shrink: 0;
 }
 
-.smtcmp-ws-monogram--tavily {
+.yolo-ws-monogram--tavily {
   background: var(--color-blue, #4c7cf5);
 }
-.smtcmp-ws-monogram--jina {
+.yolo-ws-monogram--jina {
   background: var(--color-green, #3aa35c);
 }
-.smtcmp-ws-monogram--searxng {
+.yolo-ws-monogram--searxng {
   background: var(--color-orange, #d08752);
 }
-.smtcmp-ws-monogram--bing {
+.yolo-ws-monogram--bing {
   background: var(--color-cyan, #3f9aa6);
 }
-.smtcmp-ws-monogram--gemini-grounding {
+.yolo-ws-monogram--gemini-grounding {
   background: var(--color-purple, #7c6ad6);
 }
-.smtcmp-ws-monogram--grok {
+.yolo-ws-monogram--grok {
   background: color-mix(
     in srgb,
     var(--text-normal) 70%,
     var(--background-primary)
   );
 }
-.smtcmp-ws-monogram--zhipu {
+.yolo-ws-monogram--zhipu {
   background: var(--color-red, #c8553d);
 }
 
-.smtcmp-ws-provider-name-row {
+.yolo-ws-provider-name-row {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
 
-.smtcmp-ws-provider-name {
+.yolo-ws-provider-name {
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   font-weight: 500;
@@ -199,7 +199,7 @@
   text-overflow: ellipsis;
 }
 
-.smtcmp-ws-tag {
+.yolo-ws-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -211,25 +211,25 @@
   border: 1px solid transparent;
 }
 
-.smtcmp-ws-tag--default {
+.yolo-ws-tag--default {
   background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
   color: var(--interactive-accent);
   border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
 
-.smtcmp-ws-provider-actions {
+.yolo-ws-provider-actions {
   display: inline-flex;
   gap: 2px;
   opacity: 0.35;
   transition: opacity 140ms ease;
 }
 
-.smtcmp-ws-provider-row:hover .smtcmp-ws-provider-actions,
-.smtcmp-ws-provider-row:focus-within .smtcmp-ws-provider-actions {
+.yolo-ws-provider-row:hover .yolo-ws-provider-actions,
+.yolo-ws-provider-row:focus-within .yolo-ws-provider-actions {
   opacity: 1;
 }
 
-.smtcmp-ws-icon-btn {
+.yolo-ws-icon-btn {
   width: 26px;
   height: 26px;
   border-radius: 6px;
@@ -246,13 +246,13 @@
     color 120ms ease;
 }
 
-.smtcmp-ws-icon-btn:hover:not(:disabled) {
+.yolo-ws-icon-btn:hover:not(:disabled) {
   background: var(--background-modifier-hover) !important;
   background-color: var(--background-modifier-hover) !important;
   color: var(--text-normal);
 }
 
-.smtcmp-ws-empty {
+.yolo-ws-empty {
   border: 1px dashed var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: 20px 16px;
@@ -262,7 +262,7 @@
 }
 
 /* Common settings field rows */
-.smtcmp-ws-field-row {
+.yolo-ws-field-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 20px;
@@ -270,30 +270,30 @@
   padding: 12px 0;
 }
 
-.smtcmp-ws-field-row + .smtcmp-ws-field-row {
+.yolo-ws-field-row + .yolo-ws-field-row {
   border-top: 1px solid
     color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
 }
 
-.smtcmp-ws-field-label {
+.yolo-ws-field-label {
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   font-weight: 500;
 }
 
-.smtcmp-ws-field-hint {
+.yolo-ws-field-hint {
   margin-top: 3px;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   line-height: 1.5;
 }
 
-.smtcmp-ws-number {
+.yolo-ws-number {
   position: relative;
   width: 140px;
 }
 
-.smtcmp-ws-number input {
+.yolo-ws-number input {
   width: 100%;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -307,21 +307,21 @@
   transition: border-color 140ms ease;
 }
 
-.smtcmp-ws-number input:focus,
-.smtcmp-ws-number input:focus-visible {
+.yolo-ws-number input:focus,
+.yolo-ws-number input:focus-visible {
   border-color: var(--background-modifier-border);
   box-shadow: none;
   outline: none;
 }
 
-.smtcmp-ws-number input::-webkit-inner-spin-button,
-.smtcmp-ws-number input::-webkit-outer-spin-button {
+.yolo-ws-number input::-webkit-inner-spin-button,
+.yolo-ws-number input::-webkit-outer-spin-button {
   -webkit-appearance: none;
   appearance: none;
   margin: 0;
 }
 
-.smtcmp-ws-number-unit {
+.yolo-ws-number-unit {
   position: absolute;
   right: 10px;
   top: 50%;
@@ -332,7 +332,7 @@
   pointer-events: none;
 }
 
-.smtcmp-ws-info {
+.yolo-ws-info {
   margin-top: 14px;
   padding: 10px 12px;
   background: var(--background-secondary);
@@ -347,13 +347,13 @@
   line-height: 1.55;
 }
 
-.smtcmp-ws-info-icon {
+.yolo-ws-info-icon {
   flex-shrink: 0;
   color: var(--text-faint);
   margin-top: 1px;
 }
 
-.smtcmp-ws-footnote {
+.yolo-ws-footnote {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid
@@ -363,19 +363,19 @@
 }
 
 /* Provider edit/new modal — label centered (no description rows here) */
-.smtcmp-ws-edit-form .setting-item {
+.yolo-ws-edit-form .setting-item {
   align-items: center;
   padding-top: var(--size-4-2) !important;
   padding-bottom: var(--size-4-2) !important;
 }
 
-.smtcmp-ws-edit-form .setting-item .setting-item-description {
+.yolo-ws-edit-form .setting-item .setting-item-description {
   margin-top: 6px;
 }
 
-.smtcmp-ws-system-prompt-textarea {
+.yolo-ws-system-prompt-textarea {
   min-height: 140px !important;
   max-height: 360px;
-  height: var(--smtcmp-textarea-auto-height, 140px);
-  overflow-y: var(--smtcmp-textarea-auto-overflow-y, auto);
+  height: var(--yolo-textarea-auto-height, 140px);
+  overflow-y: var(--yolo-textarea-auto-overflow-y, auto);
 }

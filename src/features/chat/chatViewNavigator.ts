@@ -9,7 +9,7 @@ import {
 
 import { ChatView } from '../../ChatView'
 import { CHAT_VIEW_TYPE } from '../../constants'
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 import type {
   MentionableBlockData,
   MentionableImage,
@@ -22,7 +22,7 @@ import {
 } from './chatLeafSessionManager'
 
 type ChatViewNavigatorDeps = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 type OpenChatViewOptions = {
@@ -41,7 +41,7 @@ type ResolveTargetChatLeafOptions = {
 }
 
 export class ChatViewNavigator {
-  private readonly plugin: SmartComposerPlugin
+  private readonly plugin: YoloPlugin
 
   constructor(deps: ChatViewNavigatorDeps) {
     this.plugin = deps.plugin
@@ -81,6 +81,8 @@ export class ChatViewNavigator {
       return
     }
 
+    void this.persistLastChatPlacement(targetLeaf)
+
     if (!existingLeaf) {
       await this.activateChatLeaf(targetLeaf)
       return
@@ -107,6 +109,26 @@ export class ChatViewNavigator {
     }
 
     await this.activateChatLeaf(targetLeaf)
+  }
+
+  private async persistLastChatPlacement(leaf: WorkspaceLeaf): Promise<void> {
+    const placement =
+      this.plugin.getChatLeafSessionManager().getLeafPlacement(leaf) ??
+      this.plugin.getChatLeafSessionManager().inferLeafPlacement(leaf)
+    const current = this.plugin.settings.chatOptions.lastChatPlacement
+    if (current === placement) return
+
+    try {
+      await this.plugin.setSettings({
+        ...this.plugin.settings,
+        chatOptions: {
+          ...this.plugin.settings.chatOptions,
+          lastChatPlacement: placement,
+        },
+      })
+    } catch (error: unknown) {
+      console.error('Failed to persist lastChatPlacement', error)
+    }
   }
 
   async openChatInSidebar(openNewChat = false) {
@@ -190,6 +212,7 @@ export class ChatViewNavigator {
   async openChatWithSelectionAndPrefill(
     selectedBlock: MentionableBlockData,
     text: string,
+    assistantId?: string,
   ) {
     const pinnedSelection = this.toPinnedSelectionBlock(selectedBlock)
     const existingLeaf = this.resolveTargetChatLeaf()
@@ -198,6 +221,7 @@ export class ChatViewNavigator {
       (await this.createChatLeaf('sidebar', {
         selectedBlock: pinnedSelection,
         prefillText: text,
+        assistantId,
       }))
     if (!targetLeaf || !(targetLeaf.view instanceof ChatView)) {
       return
@@ -207,12 +231,15 @@ export class ChatViewNavigator {
     if (!existingLeaf) {
       return
     }
-    targetLeaf.view.applySelectionToMainInput(pinnedSelection, text)
+    targetLeaf.view.applySelectionToMainInput(pinnedSelection, text, {
+      assistantId,
+    })
   }
 
   async openChatWithSelectionAndSend(
     selectedBlock: MentionableBlockData,
     text: string,
+    assistantId?: string,
   ) {
     const pinnedSelection = this.toPinnedSelectionBlock(selectedBlock)
     const existingLeaf = this.resolveTargetChatLeaf()
@@ -222,6 +249,7 @@ export class ChatViewNavigator {
         selectedBlock: pinnedSelection,
         prefillText: text,
         autoSend: true,
+        assistantId,
       }))
     if (!targetLeaf || !(targetLeaf.view instanceof ChatView)) {
       return
@@ -233,6 +261,7 @@ export class ChatViewNavigator {
     }
     targetLeaf.view.applySelectionToMainInput(pinnedSelection, text, {
       submit: true,
+      assistantId,
     })
   }
 

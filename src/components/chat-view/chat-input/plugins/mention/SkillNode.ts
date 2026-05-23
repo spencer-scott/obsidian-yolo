@@ -88,7 +88,7 @@ export class SkillNode extends TextNode {
 
   createDOM(config: EditorConfig): HTMLElement {
     const dom = super.createDOM(config)
-    dom.className = 'mention smtcmp-skill-mention'
+    dom.className = 'mention yolo-skill-mention'
     dom.setAttribute('contenteditable', 'false')
     return dom
   }

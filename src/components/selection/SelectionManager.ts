@@ -190,7 +190,7 @@ export class SelectionManager {
       if (current instanceof HTMLElement) {
         if (
           current.closest(
-            '.smtcmp-quick-ask-overlay-root, .smtcmp-quick-ask-overlay',
+            '.yolo-quick-ask-overlay-root, .yolo-quick-ask-overlay',
           )
         ) {
           return false

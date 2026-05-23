@@ -305,6 +305,78 @@ describe('ChatGPTOAuthResponsesAdapter', () => {
     ])
   })
 
+  it('parses non-streaming responses when reasoning items omit summary', () => {
+    const response = {
+      id: 'resp_2',
+      created_at: 456,
+      model: 'gpt-5.4',
+      status: 'completed',
+      error: null,
+      incomplete_details: null,
+      instructions: null,
+      metadata: null,
+      output_text: 'Done',
+      parallel_tool_calls: true,
+      temperature: null,
+      tool_choice: 'auto',
+      tools: [],
+      top_p: null,
+      max_output_tokens: null,
+      previous_response_id: null,
+      reasoning: null,
+      store: false,
+      truncation: 'disabled',
+      user: null,
+      usage: {
+        input_tokens: 1,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 1,
+        output_tokens_details: { reasoning_tokens: 0 },
+        total_tokens: 2,
+      },
+      output: [
+        {
+          id: 'rs_1',
+          type: 'reasoning',
+          status: 'completed',
+        },
+        {
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          status: 'completed',
+          content: [
+            {
+              type: 'output_text',
+              text: 'Done',
+              annotations: [],
+            },
+          ],
+        },
+      ],
+    } as unknown as Response
+
+    const parsed = adapter.parseResponse(response)
+    expect(parsed.choices[0].message.content).toBe('Done')
+    expect(parsed.choices[0].message).not.toHaveProperty('reasoning')
+  })
+
+  it('handles response.output_item.done for reasoning items without summary', () => {
+    const state = adapter.createStreamState()
+    const event = {
+      type: 'response.output_item.done',
+      output_index: 0,
+      item: {
+        id: 'rs_1',
+        type: 'reasoning',
+        status: 'completed',
+      },
+    } as unknown as ResponseStreamEvent
+
+    const chunks = Array.from(adapter.parseStreamEvent(event, state))
+    expect(chunks).toEqual([])
+  })
+
   it('maps reasoning summary part and delta events', () => {
     const state = adapter.createStreamState()
     const events = [

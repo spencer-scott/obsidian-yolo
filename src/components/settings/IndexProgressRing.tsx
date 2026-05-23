@@ -21,7 +21,7 @@ export function IndexProgressRing({
 
   return (
     <div
-      className="smtcmp-index-ring"
+      className="yolo-index-ring"
       style={{ width: size, height: size }}
       role="progressbar"
       aria-valuenow={Math.round(clamped)}
@@ -41,7 +41,7 @@ export function IndexProgressRing({
           cy={center}
           r={r}
           fill="none"
-          className="smtcmp-index-ring-track"
+          className="yolo-index-ring-track"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -49,7 +49,7 @@ export function IndexProgressRing({
           cy={center}
           r={r}
           fill="none"
-          className="smtcmp-index-ring-fill"
+          className="yolo-index-ring-fill"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}

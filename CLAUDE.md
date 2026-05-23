@@ -151,7 +151,7 @@ throw new Error(typeof error === 'string' ? error : JSON.stringify(error))
 
 ## Style Conventions
 
-- New CSS classes must use the `yolo-` prefix; existing `smtcmp-*` classes are not subject to mass renaming.
+- All CSS classes must use the `yolo-` prefix.
 - Styles are organized by **responsibility**, not "first caller". See [`src/styles/README.md`](src/styles/README.md).
 - Before writing/modifying popovers or dropdowns, read the header comments in [`src/styles/popover/surface.css`](src/styles/popover/surface.css) (variant ownership, visual/size separation, checklist for new popovers).
 

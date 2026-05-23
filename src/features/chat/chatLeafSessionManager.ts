@@ -14,6 +14,11 @@ export type PendingChatOpenPayload = {
   initialConversationId?: string
   prefillText?: string
   autoSend?: boolean
+  /**
+   * Override the conversation's assistant when consuming this payload. Used by
+   * Cursor Chat selection shortcuts that bind a specific assistant to the action.
+   */
+  assistantId?: string
   fileToAdd?: TFile
   folderToAdd?: TFolder
   imageToAdd?: MentionableImage

@@ -15,7 +15,7 @@ import {
   type WebSearchSettings,
   createDefaultProviderOptions,
 } from '../../../core/web-search'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ReactModal } from '../../common/ReactModal'
 import { ConfirmModal } from '../../modals/ConfirmModal'
 
@@ -26,11 +26,11 @@ import {
 
 type WebSearchSettingsModalProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class WebSearchSettingsModal extends ReactModal<WebSearchSettingsModalProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app,
       Component: Wrapper,
@@ -40,7 +40,7 @@ export class WebSearchSettingsModal extends ReactModal<WebSearchSettingsModalPro
       },
       plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 
@@ -72,7 +72,7 @@ const PROVIDER_MONO: Record<WebSearchProviderType, string> = {
   zhipu: 'Z',
 }
 
-function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
+function Content({ app, plugin }: { app: App; plugin: YoloPlugin }) {
   const { t } = useLanguage()
   const { settings, setSettings } = useSettings()
   const webSearch = settings.webSearch
@@ -157,23 +157,23 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
   }
 
   return (
-    <div className="smtcmp-ws">
-      <div className="smtcmp-ws-intro">
+    <div className="yolo-ws">
+      <div className="yolo-ws-intro">
         {t(
           'settings.webSearch.intro',
           'Configure search providers used by the built-in web_search agent tool. The default provider below is used when the agent invokes web_search.',
         )}
       </div>
 
-      <div className="smtcmp-ws-section">
-        <div className="smtcmp-ws-section-head">
-          <div className="smtcmp-ws-section-label">
+      <div className="yolo-ws-section">
+        <div className="yolo-ws-section-head">
+          <div className="yolo-ws-section-label">
             {t('settings.webSearch.providersHeader', 'Providers')}
           </div>
           <button
             ref={addBtnRef}
             type="button"
-            className="smtcmp-ws-add-btn"
+            className="yolo-ws-add-btn"
             onClick={handleOpenAddMenu}
           >
             <Plus size={12} />
@@ -182,21 +182,21 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
         </div>
 
         {webSearch.providers.length === 0 ? (
-          <div className="smtcmp-ws-empty">
+          <div className="yolo-ws-empty">
             {t(
               'settings.webSearch.empty',
               'No providers configured yet. Add one to enable the web_search tool.',
             )}
           </div>
         ) : (
-          <div className="smtcmp-ws-providers">
+          <div className="yolo-ws-providers">
             {webSearch.providers.map((provider) => {
               const isDefault = webSearch.defaultProviderId === provider.id
               return (
                 <div
                   key={provider.id}
                   className={
-                    'smtcmp-ws-provider-row' + (isDefault ? ' is-default' : '')
+                    'yolo-ws-provider-row' + (isDefault ? ' is-default' : '')
                   }
                   role="button"
                   tabIndex={0}
@@ -208,34 +208,34 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
                     }
                   }}
                 >
-                  <span className="smtcmp-ws-radio" aria-hidden="true">
-                    {isDefault && <span className="smtcmp-ws-radio-dot" />}
+                  <span className="yolo-ws-radio" aria-hidden="true">
+                    {isDefault && <span className="yolo-ws-radio-dot" />}
                   </span>
-                  <div className="smtcmp-ws-provider-main">
+                  <div className="yolo-ws-provider-main">
                     <span
-                      className={`smtcmp-ws-monogram smtcmp-ws-monogram--${provider.type}`}
+                      className={`yolo-ws-monogram yolo-ws-monogram--${provider.type}`}
                       aria-hidden="true"
                     >
                       {PROVIDER_MONO[provider.type]}
                     </span>
-                    <div className="smtcmp-ws-provider-name-row">
-                      <span className="smtcmp-ws-provider-name">
+                    <div className="yolo-ws-provider-name-row">
+                      <span className="yolo-ws-provider-name">
                         {provider.name}
                       </span>
                       {isDefault && (
-                        <span className="smtcmp-ws-tag smtcmp-ws-tag--default">
+                        <span className="yolo-ws-tag yolo-ws-tag--default">
                           {t('settings.webSearch.tagDefault', 'Default')}
                         </span>
                       )}
                     </div>
                   </div>
                   <div
-                    className="smtcmp-ws-provider-actions"
+                    className="yolo-ws-provider-actions"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       type="button"
-                      className="smtcmp-ws-icon-btn"
+                      className="yolo-ws-icon-btn"
                       aria-label={t('common.edit', 'Edit')}
                       onClick={() =>
                         new WebSearchProviderEditModal(
@@ -249,7 +249,7 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
                     </button>
                     <button
                       type="button"
-                      className="smtcmp-ws-icon-btn"
+                      className="yolo-ws-icon-btn"
                       aria-label={t('common.delete', 'Delete')}
                       onClick={() => handleDelete(provider)}
                     >
@@ -263,9 +263,9 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
         )}
       </div>
 
-      <div className="smtcmp-ws-section">
-        <div className="smtcmp-ws-section-head">
-          <div className="smtcmp-ws-section-label">
+      <div className="yolo-ws-section">
+        <div className="yolo-ws-section-head">
+          <div className="yolo-ws-section-label">
             {t('settings.webSearch.commonHeader', 'Common')}
           </div>
         </div>
@@ -319,8 +319,8 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
           }
         />
 
-        <div className="smtcmp-ws-info">
-          <Info size={14} className="smtcmp-ws-info-icon" />
+        <div className="yolo-ws-info">
+          <Info size={14} className="yolo-ws-info-icon" />
           <div>
             {t(
               'settings.webSearch.failoverNotice',
@@ -330,7 +330,7 @@ function Content({ app, plugin }: { app: App; plugin: SmartComposerPlugin }) {
         </div>
       </div>
 
-      <div className="smtcmp-ws-footnote">
+      <div className="yolo-ws-footnote">
         {t('settings.webSearch.providerCount', 'Total providers')}:{' '}
         {webSearch.providers.length}
       </div>
@@ -356,12 +356,12 @@ function NumberFieldRow({
   onChange: (next: number) => void
 }) {
   return (
-    <div className="smtcmp-ws-field-row">
+    <div className="yolo-ws-field-row">
       <div>
-        <div className="smtcmp-ws-field-label">{label}</div>
-        {hint && <div className="smtcmp-ws-field-hint">{hint}</div>}
+        <div className="yolo-ws-field-label">{label}</div>
+        {hint && <div className="yolo-ws-field-hint">{hint}</div>}
       </div>
-      <div className="smtcmp-ws-number">
+      <div className="yolo-ws-number">
         <input
           type="number"
           value={value}
@@ -374,7 +374,7 @@ function NumberFieldRow({
             onChange(clamped)
           }}
         />
-        {unit && <span className="smtcmp-ws-number-unit">{unit}</span>}
+        {unit && <span className="yolo-ws-number-unit">{unit}</span>}
       </div>
     </div>
   )

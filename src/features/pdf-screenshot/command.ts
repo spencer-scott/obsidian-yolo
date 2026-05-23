@@ -15,7 +15,7 @@
 
 import { Notice } from 'obsidian'
 
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 import type { MentionableImage } from '../../types/mentionable'
 
 import { captureCanvasRegion } from './captureCanvasRegion'
@@ -24,9 +24,7 @@ import { RegionSelector } from './RegionSelector'
 /** Keeps track of an active region selector so double-triggering cancels it. */
 let activeSelector: RegionSelector | null = null
 
-export function registerCapturePdfRegionCommand(
-  plugin: SmartComposerPlugin,
-): void {
+export function registerCapturePdfRegionCommand(plugin: YoloPlugin): void {
   plugin.addCommand({
     id: 'capture-pdf-region',
     name: plugin.t('commands.capturePdfRegion'),
@@ -36,7 +34,7 @@ export function registerCapturePdfRegionCommand(
   })
 }
 
-async function runCapturePdfRegion(plugin: SmartComposerPlugin): Promise<void> {
+async function runCapturePdfRegion(plugin: YoloPlugin): Promise<void> {
   // If a selector is already active, cancel it (toggle behavior)
   if (activeSelector) {
     activeSelector.unmount()
@@ -108,7 +106,7 @@ async function runCapturePdfRegion(plugin: SmartComposerPlugin): Promise<void> {
  * Prefers the currently active leaf if it is a PDF view; otherwise falls back
  * to the most recently active PDF leaf tracked by Obsidian's workspace.
  */
-function findActivePdfLeaf(plugin: SmartComposerPlugin) {
+function findActivePdfLeaf(plugin: YoloPlugin) {
   const workspace = plugin.app.workspace
 
   // Check if the active leaf is a PDF view
@@ -134,7 +132,7 @@ function findActivePdfLeaf(plugin: SmartComposerPlugin) {
  * If no chat panel is open, open a new sidebar chat and then inject.
  */
 async function injectImageToActiveChat(
-  plugin: SmartComposerPlugin,
+  plugin: YoloPlugin,
   image: MentionableImage,
 ): Promise<void> {
   try {

@@ -2,7 +2,7 @@
    Settings Tabs Styles
    ======================================== */
 
-.smtcmp-settings-tabs-container {
+.yolo-settings-tabs-container {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -10,7 +10,7 @@
   align-items: center;
 }
 
-.smtcmp-settings-tabs-nav {
+.yolo-settings-tabs-nav {
   display: flex;
   gap: var(--size-2-2);
   padding: var(--size-2-2);
@@ -28,53 +28,53 @@
   width: max-content;
 }
 
-.smtcmp-settings-tabs-nav::-webkit-scrollbar {
+.yolo-settings-tabs-nav::-webkit-scrollbar {
   height: 6px;
 }
 
-.smtcmp-settings-tabs-nav::-webkit-scrollbar-track {
+.yolo-settings-tabs-nav::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.smtcmp-settings-tabs-nav::-webkit-scrollbar-thumb {
+.yolo-settings-tabs-nav::-webkit-scrollbar-thumb {
   background: var(--background-modifier-border);
   border-radius: 3px;
 }
 
 /* Glider variant for smooth animated indicator */
-.smtcmp-settings-tabs-nav--glider {
+.yolo-settings-tabs-nav--glider {
   position: relative;
   overflow: visible;
   gap: 0;
-  --smtcmp-tab-count: 6;
-  --smtcmp-tab-index: 0;
-  --smtcmp-tab-padding: var(--size-2-2);
-  --smtcmp-tab-glider-left: 0px;
-  --smtcmp-tab-glider-width: 0px;
+  --yolo-tab-count: 6;
+  --yolo-tab-index: 0;
+  --yolo-tab-padding: var(--size-2-2);
+  --yolo-tab-glider-left: 0px;
+  --yolo-tab-glider-width: 0px;
 }
 
-.smtcmp-settings-tabs-nav--glider .smtcmp-settings-tab-button {
+.yolo-settings-tabs-nav--glider .yolo-settings-tab-button {
   position: relative;
   z-index: 2;
 }
 
-.smtcmp-settings-tabs-nav--glider .smtcmp-settings-tab-button.is-active {
+.yolo-settings-tabs-nav--glider .yolo-settings-tab-button.is-active {
   border-color: transparent;
   box-shadow: none;
 }
 
-.smtcmp-settings-tabs-glider {
+.yolo-settings-tabs-glider {
   position: absolute;
-  top: var(--smtcmp-tab-padding);
+  top: var(--yolo-tab-padding);
   left: 0;
-  width: var(--smtcmp-tab-glider-width);
-  height: calc(100% - (var(--smtcmp-tab-padding) * 2));
+  width: var(--yolo-tab-glider-width);
+  height: calc(100% - (var(--yolo-tab-padding) * 2));
   background: transparent;
   border: 2px solid var(--h1-color, var(--interactive-accent));
   border-radius: var(--radius-s);
   box-shadow: 0 2px 10px
     color-mix(in srgb, var(--interactive-accent) 18%, transparent);
-  transform: translateX(var(--smtcmp-tab-glider-left));
+  transform: translateX(var(--yolo-tab-glider-left));
   transition:
     transform 0.36s cubic-bezier(0.4, 1.2, 0.4, 1),
     width 0.36s cubic-bezier(0.4, 1.2, 0.4, 1);
@@ -82,7 +82,7 @@
   z-index: 1;
 }
 
-.smtcmp-settings-tab-button {
+.yolo-settings-tab-button {
   flex: 0 0 auto;
   padding: 6px 12px;
   background: transparent !important;
@@ -101,17 +101,17 @@
   box-shadow: none !important;
 }
 
-.smtcmp-settings-tab-label {
+.yolo-settings-tab-label {
   display: block;
   white-space: nowrap;
 }
 
-.smtcmp-settings-tab-button:hover {
+.yolo-settings-tab-button:hover {
   color: var(--text-normal);
   background: transparent !important;
 }
 
-.smtcmp-settings-tab-button.is-active {
+.yolo-settings-tab-button.is-active {
   color: var(--text-normal);
   background: transparent !important;
   border: 2px solid var(--h1-color, var(--interactive-accent));
@@ -119,7 +119,7 @@
     color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 }
 
-.smtcmp-settings-tabs-content {
+.yolo-settings-tabs-content {
   flex: 1;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -133,33 +133,33 @@
     transparent;
 }
 
-.smtcmp-settings-tabs-content::-webkit-scrollbar {
+.yolo-settings-tabs-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.smtcmp-settings-tabs-content::-webkit-scrollbar-track {
+.yolo-settings-tabs-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.smtcmp-settings-tabs-content::-webkit-scrollbar-thumb {
+.yolo-settings-tabs-content::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
-.smtcmp-settings-tabs-content::-webkit-scrollbar-thumb:hover {
+.yolo-settings-tabs-content::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text-normal) 40%, transparent);
   background-clip: content-box;
 }
 
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
-  .smtcmp-settings-tabs-nav {
+  .yolo-settings-tabs-nav {
     padding: var(--size-2-2);
   }
 
-  .smtcmp-settings-tab-button {
+  .yolo-settings-tab-button {
     padding: 6px 8px;
     font-size: var(--font-ui-smaller);
   }

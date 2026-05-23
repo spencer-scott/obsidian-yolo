@@ -21,13 +21,13 @@ export function SplitButton({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="smtcmp-split-button">
-      <button onClick={onPrimaryClick} className="smtcmp-split-button-primary">
+    <div className="yolo-split-button">
+      <button onClick={onPrimaryClick} className="yolo-split-button-primary">
         {primaryText}
       </button>
       <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenu.Trigger
-          className="smtcmp-split-button-toggle"
+          className="yolo-split-button-toggle"
           aria-label="Show more options"
         >
           <ChevronDown size={16} />

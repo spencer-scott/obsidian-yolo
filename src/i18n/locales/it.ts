@@ -145,7 +145,7 @@ export const it: TranslationKeys = {
       agent: 'Agent',
       others: 'Altro',
     },
-    supportSmartComposer: {
+    supportYolo: {
       name: 'Supporta il progetto',
       desc: 'Se trovi utile questo plugin, considera di supportarne lo sviluppo!',
       buyMeACoffee: 'Offrimi un caffè',
@@ -308,6 +308,7 @@ export const it: TranslationKeys = {
       duplicate: 'Duplica',
       copySuffix: '(copia)',
       currentBadge: 'Corrente',
+      manageAll: 'Gestisci tutti…',
     },
     agent: {
       title: 'Agent',
@@ -333,6 +334,64 @@ export const it: TranslationKeys = {
         'Nessuna skill trovata. Crea file markdown skill sotto {path}.',
       createSkillTemplates: 'Inizializza sistema Skills',
       skillsTemplateCreated: 'Sistema Skills inizializzato in {path}.',
+      importSkill: 'Importa Skill',
+      importSkillDesc:
+        'Importa pacchetti skill in {path}. Supporta file .md singoli o cartelle standard Agent Skills.',
+      importSkillDropzoneText: 'Trascina file o cartelle skill qui',
+      importSkillBrowseFiles: 'Sfoglia File',
+      importSkillBrowseFolder: 'Sfoglia Cartella',
+      importSkillFileCount: '{count} skill selezionate ({files} file totali)',
+      importSkillFilesInPackage: 'file',
+      importSkillRemoveFile: 'Rimuovi',
+      importSkillConfirm: 'Importa',
+      importSkillSuccess: 'Importate con successo {count} skill.',
+      importSkillInvalidFile: 'Nessun file o pacchetto skill valido trovato.',
+      importSkillReadError: 'Impossibile leggere i file.',
+      importSkillWriteError: 'Impossibile importare {name}: {error}',
+      importSkillErrHeader: '"{name}" non può essere importato:',
+      importSkillErrNoSkillMd: 'file SKILL.md mancante nella cartella',
+      importSkillErrNoFrontmatter:
+        'intestazione metadati (---) mancante in cima al file',
+      importSkillErrNoName: 'campo "name" mancante nei metadati',
+      importSkillErrNameTooLong: '"name" troppo lungo (massimo 64 caratteri)',
+      importSkillErrNameUppercase: '"name" deve essere tutto minuscolo',
+      importSkillErrNameHyphenEdge:
+        '"name" non può iniziare o terminare con un trattino',
+      importSkillErrNameDoubleHyphen:
+        '"name" non può contenere trattini consecutivi (--)',
+      importSkillErrNameInvalidChars:
+        '"name" può contenere solo lettere minuscole, numeri e trattini',
+      importSkillErrNameMismatch:
+        '"name" deve corrispondere al nome della cartella',
+      importSkillErrNoDescription: 'campo "description" mancante nei metadati',
+      importSkillErrDescTooLong:
+        '"description" troppo lungo (massimo 1024 caratteri)',
+      importSkillErrCompatTooLong:
+        '"compatibility" troppo lungo (massimo 500 caratteri)',
+      importSkillConflictTitle: 'Skill già esistente',
+      importSkillConflictMessage:
+        'Esiste già una skill con lo stesso nome. Vuoi sovrascriverla?',
+      importSkillConflictOverwrite: 'Sovrascrivi tutto',
+      importSkillConflictMessageList:
+        'Le seguenti skill esistono già: {names}\n\nClicca "Sovrascrivi tutto" per sostituirle, "Salta conflitti" per mantenerle, o chiudi questa finestra per annullare l\'importazione.',
+      importSkillConflictSkip: 'Salta conflitti',
+      importSkillUnsafePath:
+        'Percorso non sicuro rifiutato in "{name}": {path}',
+      importSkillDuplicateInBatch:
+        'Nome skill duplicato in questo batch: "{name}" (da "{source}"). Viene mantenuta solo la prima occorrenza.',
+      deleteSkillTitle: 'Elimina skill',
+      deleteSkillMessage:
+        'Sei sicuro di voler eliminare "{name}"? Questa azione non può essere annullata.',
+      deleteSkillConfirm: 'Elimina',
+      deleteSkillSuccess: '"{name}" è stata eliminata.',
+      deleteSkillError: 'Impossibile eliminare "{name}": {error}',
+      deleteSkillBatchMessage:
+        'Sei sicuro di voler eliminare {count} skill? Questa azione non può essere annullata.',
+      deleteSkillBatchSuccess: 'Eliminate {count} skill.',
+      deleteSkillBatchBtn: 'Elimina',
+      deleteSkillSelectAll: 'Seleziona tutto',
+      deleteSkillCancel: 'Annulla',
+      selectSkills: 'Seleziona',
       agents: 'Agent',
       agentsDesc:
         'Clicca Configura per modificare il profilo e il prompt di ciascun agent.',
@@ -354,6 +413,9 @@ export const it: TranslationKeys = {
       toolsEnabledCount: '{count} abilitati',
       manageTools: 'Gestisci strumenti',
       manageSkills: 'Gestisci competenze',
+      enableToolDisclosure: 'Abilita caricamento strumenti su richiesta (Beta)',
+      enableToolDisclosureDesc:
+        'Gli strumenti opzionali partono con descrizioni brevi, poi caricano i dettagli completi quando servono. Consigliato quando sono abilitati molti strumenti MCP. Nota: questo meccanismo dipende dalle capacità di tool-use del modello — alcuni modelli potrebbero non riconoscere in modo affidabile gli strumenti caricati in questo modo.',
       descriptionColumn: 'Descrizione',
       builtinFsListLabel: 'Leggi vault',
       builtinFsListDesc: 'Elenca la struttura delle directory del vault',
@@ -367,6 +429,9 @@ export const it: TranslationKeys = {
       builtinContextCompactLabel: 'Compatta contesto',
       builtinContextCompactDesc:
         'Comprimi la cronologia meno recente in un riepilogo',
+      builtinToolSearchLabel: 'Carica strumento',
+      builtinToolSearchDesc:
+        'Carica gli schemi completi degli strumenti su richiesta',
       builtinFsEditLabel: 'Modifica testo',
       builtinFsEditDesc: 'Modifica il testo di un singolo file',
       safetyControls: 'Controlli di sicurezza',
@@ -398,7 +463,13 @@ export const it: TranslationKeys = {
       builtinWebOpsDesc: 'Ricerca web e scraping di pagine',
       builtinDelegateExternalAgentLabel: 'Delega a agente esterno',
       builtinDelegateExternalAgentDesc:
-        'Avvia un agente CLI locale (codex exec o claude -p) come sottoprocesso, trasmette il suo output in chat e passa il risultato finale al LLM. Solo desktop. Richiede approvazione manuale ogni volta.',
+        'Delega le attività complesse a un agente CLI installato localmente (Codex / Claude Code).',
+      builtinTodoWriteLabel: 'Lista delle attività',
+      builtinTodoWriteDesc:
+        "Consente all'agente di pianificare e tracciare autonomamente i progressi su task in più fasi. Solo modalità agente.",
+      builtinAskUserQuestionLabel: "Chiedi all'utente",
+      builtinAskUserQuestionDesc:
+        "Chiede all'utente quando mancano informazioni necessarie e riprende dopo la risposta.",
       editorDefaultName: 'Nuovo agent',
       editorIntro:
         'Configura le capacità, il modello e il comportamento di questo agent.',
@@ -431,11 +502,19 @@ export const it: TranslationKeys = {
       editorSystemPrompt: 'System prompt',
       editorSystemPromptDesc:
         'Istruzione comportamentale principale per questo agent. Variabili supportate: data {{current_date}}, data + ora corrente {{current_hour}}, data + ora e minuti correnti {{current_minute}}, giorno della settimana {{current_weekday}}.',
+      editorEnableProjectInstructions: 'Carica file di istruzioni del progetto',
+      editorEnableProjectInstructionsDesc:
+        'Carica automaticamente AGENTS.md e CLAUDE.md dalla radice del vault per questo agent. Compatibile con Codex / Claude Code / Cursor e strumenti analoghi.',
       editorEnableTools: 'Abilita strumenti',
       editorEnableToolsDesc: 'Consenti a questo agent di chiamare strumenti',
       editorIncludeBuiltinTools: 'Includi strumenti integrati',
       editorIncludeBuiltinToolsDesc:
         'Consenti strumenti file locali del vault per questo agent',
+      toolApproval: 'Approvazione',
+      toolApprovalFullAccess: 'Accesso completo',
+      toolApprovalRequire: 'Richiedi approvazione',
+      toolDisclosureAlways: 'In contesto',
+      toolDisclosureOnDemand: 'Su richiesta',
       editorEnabled: 'Abilitato',
       editorDisabled: 'Disabilitato',
       editorModel: 'Modello',
@@ -553,6 +632,21 @@ export const it: TranslationKeys = {
       desc: 'Configura i provider di modelli AI e le loro chiavi API.',
       howToGetApiKeys: 'Come ottenere le chiavi API',
       addProvider: 'Aggiungi provider',
+      pickerTitle: 'Aggiungi provider',
+      pickerSearchPlaceholder: 'Cerca provider · premi Invio',
+      pickerCustomLabel: 'Provider personalizzato',
+      pickerCustomDesc: 'Inserisci manualmente base URL e API key',
+      pickerEmpty: 'Nessun provider corrispondente',
+      categoryAll: 'Tutti',
+      categoryMain: 'Internazionale',
+      categoryCn: 'Cina',
+      categoryGateway: 'Aggregatori',
+      categoryCloud: 'Cloud',
+      categoryLocal: 'Locali',
+      badgeOpenAiCompatible: 'Compatibile OpenAI',
+      badgeNative: 'Protocollo nativo',
+      badgeOAuth: 'OAuth',
+      badgeAdded: 'Aggiunto',
       providersCount: '{count} provider aggiunti',
       editProvider: 'Modifica provider',
       editProviderTitle: 'Modifica provider',
@@ -680,18 +774,41 @@ export const it: TranslationKeys = {
         'Tipi di input effettivamente supportati dal modello. Una scelta errata può causare errori di richiesta.',
       inputModalityText: 'Testo',
       inputModalityVision: 'Immagini',
-      toolType: 'Tipo di strumento',
-      toolTypeDesc:
-        'Tipo di chiamata di strumento supportato da questo modello.',
-      toolTypeNone: 'Nessuno',
-      toolTypeGemini: 'Gemini',
-      toolTypeGpt: 'Strumenti GPT',
-      gptTools: 'Strumenti GPT',
-      gptToolsDesc:
-        'Scegli gli strumenti GPT integrati disponibili per questo modello.',
-      gptToolWebSearch: 'Web Search',
-      gptToolWebSearchDesc:
+      inputModalityVisionTooltip:
+        'Richiede un modello con capacità di visione native.',
+      inputModalityPdf: 'PDF (nativo)',
+      inputModalityPdfTooltip:
+        'Richiede un modello con supporto PDF nativo (Gemini / Anthropic).',
+      builtinToolProvider: 'Strumenti integrati del provider',
+      builtinToolProviderDesc:
+        'Strumenti nativi forniti dal provider del modello. Indipendenti dagli strumenti integrati di YOLO. L’effetto reale dipende dal supporto del gateway su cui passa la richiesta.',
+      builtinToolProviderNone: 'Disabilitato',
+      builtinToolProviderGemini: 'Gemini',
+      builtinToolProviderGpt: 'OpenAI',
+      builtinToolProviderOpenRouter: 'OpenRouter',
+      builtinToolProviderGrok: 'Grok',
+      builtinToolsGpt: 'Strumenti integrati OpenAI',
+      builtinToolsOpenRouter: 'Strumenti integrati OpenRouter',
+      builtinToolsGrok: 'Strumenti integrati Grok',
+      builtinToolsGemini: 'Strumenti integrati Gemini',
+      builtinToolWebSearch: 'Web Search',
+      builtinToolWebSearchDesc:
         'Consenti al modello di cercare sul web e restituire fonti citate.',
+      builtinToolUrlContext: 'URL Context',
+      builtinToolUrlContextDesc:
+        'Consenti al modello di leggere i link citati nella conversazione come contesto.',
+      openRouterWebSearchEngine: 'Motore di ricerca',
+      openRouterWebSearchEngineDesc:
+        'Auto lascia decidere a OpenRouter (predefinito). Native usa la ricerca nativa del provider. Exa / Firecrawl / Parallel forzano il motore corrispondente. Firecrawl richiede la tua API key configurata nel pannello OpenRouter.',
+      openRouterWebSearchEngineAuto: 'Auto (predefinito)',
+      openRouterWebSearchEngineNative: 'Native',
+      openRouterWebSearchEngineExa: 'Exa',
+      openRouterWebSearchEngineFirecrawl: 'Firecrawl (BYOK)',
+      openRouterWebSearchEngineParallel: 'Parallel',
+      openRouterWebSearchMaxResults: 'Risultati max',
+      openRouterWebSearchMaxResultsDesc:
+        'Opzionale, 1–25. Lascia vuoto per usare il valore predefinito di OpenRouter.',
+      openRouterWebSearchMaxResultsPlaceholder: 'predefinito',
       sampling: 'Parametri personalizzati',
       restoreDefaults: 'Ripristina predefiniti',
       maxContextTokens: 'Token finestra di contesto',
@@ -726,6 +843,9 @@ export const it: TranslationKeys = {
         'Punteggio di similarità minimo (0-1) per includere un chunk nei risultati.',
       limit: 'Limite',
       limitDesc: 'Numero massimo di chunk da recuperare.',
+      embeddingConcurrency: 'Concorrenza embedding',
+      embeddingConcurrencyDesc:
+        "Numero massimo di richieste di embedding in parallelo durante l'indicizzazione (1–24, predefinito 10). Riducilo se il provider restituisce errori 429 / limite di frequenza.",
       includePatterns: 'Pattern di inclusione',
       includePatternsDesc:
         "Pattern glob per i file da includere nell'indice (uno per riga).",
@@ -736,6 +856,11 @@ export const it: TranslationKeys = {
       manageEmbeddingDatabase: 'Gestisci database embedding',
       manage: 'Gestisci',
       rebuildIndex: 'Ricostruisci indice',
+      rebuildFromScratch: 'Ricostruisci da zero',
+      rebuildFromScratchConfirm:
+        "Verranno eliminati tutti i vettori esistenti del modello di embedding corrente e l'intero vault verrà reindicizzato, con possibili numerose chiamate API. Continuare?",
+      continueIndex: 'Continua indicizzazione',
+      continueIndexNow: 'Continua ora',
       selectedFolders: 'Cartelle selezionate',
       excludedFolders: 'Cartelle escluse',
       selectFoldersPlaceholder: 'Seleziona cartelle...',
@@ -820,11 +945,6 @@ export const it: TranslationKeys = {
       pgliteDeliveryManual: 'Download manuale',
       pgliteDownload: 'Scarica risorse',
       pgliteRedownload: 'Scarica di nuovo',
-      pgliteVerifyIntegrity: 'Verifica integrità',
-      pgliteVerifyingIntegrity: 'Verifica in corso…',
-      pgliteIntegrityOk: 'Verifica integrità del runtime PGlite superata.',
-      pgliteIntegrityFailed: 'Verifica integrità fallita',
-      pgliteIntegrityFailedHint: 'Scarica di nuovo il runtime.',
       pgliteRecheck: 'Controlla di nuovo',
       pgliteDeleteLocal: 'Elimina risorse locali',
       pgliteDownloadPlaceholder:
@@ -931,6 +1051,33 @@ export const it: TranslationKeys = {
       editTemplate: 'Modifica template',
       name: 'Nome',
       actions: 'Azioni',
+    },
+    editor: {
+      snippets: {
+        sectionTitle: 'Snippet',
+        sectionDesc:
+          "Digita / nell'input della chat e scegli uno snippet per inserire un prompt predefinito. Gli snippet sono in YOLO/snippets.md.",
+        cardName: 'Libreria snippet',
+        cardDescCount: '{count} snippet',
+        cardDescMissing: 'Nessun file snippets.md',
+        manageBtn: 'Gestisci snippet',
+        initBtn: 'Inizializza snippet',
+        modalTitle: 'Gestisci snippet',
+        modalCallout:
+          "Gli snippet sono in YOLO/snippets.md. Attiva l'input della chat con / e selezionane uno per inserire il corpo.",
+        openFileBtn: 'Apri snippets.md',
+        createFileBtn: 'Crea snippets.md',
+        empty: 'Nessuno snippet',
+        jumpBtn: 'Modifica',
+        deleteBtn: 'Elimina',
+        deleteTitle: 'Elimina snippet',
+        deleteMessage:
+          'Vuoi eliminare lo snippet "{trigger}"? Questa operazione non può essere annullata.',
+        deleteConfirm: 'Elimina',
+        deleteSuccess: 'Snippet "{trigger}" eliminato',
+        deleteError: 'Eliminazione fallita: {error}',
+        openError: 'Apertura di snippets.md fallita: {error}',
+      },
     },
     continuation: {
       title: 'Continuazione',
@@ -1086,13 +1233,28 @@ export const it: TranslationKeys = {
         'Sei sicuro di voler ripristinare la configurazione degli agent? Questa azione rimuoverà gli agent personalizzati e reimposterà la selezione corrente.',
       resetAgentsSuccess:
         'La configurazione degli agent è stata ripristinata ai valori predefiniti.',
-      logModelRequestContext: 'Registra il contesto della richiesta al modello',
-      logModelRequestContextDesc:
-        'Stampa nella console sviluppatore il payload finale realmente inviato al modello per ogni turno Agent.',
+      captureRawRequestDebug: 'Abilita debug richieste LLM',
+      captureRawRequestDebugDesc:
+        "Quando attivo, ogni risposta del modello mostra un pulsante Debug (nella barra info e nel menu Altre azioni) che consente di consultare o esportare le richieste e risposte raw di LLM, chiamate strumento e ricerche web di quel turno. I dati catturati restano in memoria solo per la sessione corrente di Obsidian e vengono cancellati al riavvio. Le chiavi API sono offuscate nell'export, ma il contenuto originale della conversazione è incluso.",
+      captureRawRequestDebugExcludeLogsTitle:
+        'Escludere i log di debug dalla knowledge base?',
+      captureRawRequestDebugExcludeLogsMessage:
+        'I log di debug possono contenere il contenuto raw della conversazione e degli strumenti. Aggiungere {{path}} alla lista di esclusione della knowledge base per evitare che vengano indicizzati dal RAG?',
+      captureRawRequestDebugExcludeLogsCta: 'Escludi log',
+      captureRawRequestDebugExcludeLogsSuccess:
+        '{{path}} è stato escluso dalla knowledge base.',
       yoloBaseDir: 'Cartella base YOLO',
       yoloBaseDirDesc:
         'Inserisci un percorso relativo al vault (senza / iniziale). Esempio: YOLO nella radice del vault, oppure setting/YOLO nella cartella setting. Directory skill attuale: {path}.',
       yoloBaseDirPlaceholder: 'YOLO',
+      ribbonClickAction: 'Icona ribbon apre la chat in',
+      ribbonClickActionDesc:
+        'Dove l’icona ribbon di YOLO apre la vista Chat. Se nella posizione scelta esiste già una chat viene attivata; altrimenti ne viene creata una nuova.',
+      ribbonClickActionSidebar: 'Barra laterale destra',
+      ribbonClickActionTab: 'Nuova scheda',
+      ribbonClickActionSplit: 'Split destro',
+      ribbonClickActionWindow: 'Nuova finestra',
+      ribbonClickActionLast: 'Ultima posizione usata',
       mentionDisplayMode: 'Posizione visualizzazione mention',
       mentionDisplayModeDesc:
         "Scegli se mostrare i file selezionati con @ e le skill selezionate con / nel testo dell'input o come badge sopra la casella.",
@@ -1131,10 +1293,6 @@ export const it: TranslationKeys = {
         "Avvisa quando l'esecuzione corrente di Agent termina senza attendere ulteriori approvazioni.",
       interactionSectionTitle: 'Interazione',
       maintenanceSectionTitle: 'Manutenzione',
-      tabTitleFollowsConversation:
-        'Usa il titolo della conversazione nella scheda',
-      tabTitleFollowsConversationDesc:
-        'Quando attivo, il titolo della scheda Chat mostra il titolo della conversazione corrente. Quando disattivo, resta Yolo chat.',
     },
   },
 
@@ -1146,10 +1304,78 @@ export const it: TranslationKeys = {
     placeholderMention: 'aggiungere riferimenti o modelli',
     placeholderSkill: 'scegliere una skill o un comando',
     contextUsage: 'Utilizzo finestra di contesto',
+    contextBreakdown: {
+      title: 'Contesto',
+      fullLabel: '{{percent}} pieno',
+      tokensSuffix: 'token',
+      localEstimateCaption:
+        'Stima locale — può differire dal conteggio del server.',
+      error: 'Stima fallita',
+      bucket: {
+        system: 'Prompt di sistema',
+        tools: 'Strumenti',
+        rules: 'Regole',
+        skills: 'Skill',
+        memory: 'Memoria',
+        conversation: 'Conversazione',
+      },
+    },
+    inlineInfo: {
+      callsTitle: '{{count}} chiamate in questo turno',
+      nextTurnContext: 'Contesto utilizzato: ~{{tokens}} token',
+      nextTurnContextCached:
+        'Contesto utilizzato: ~{{tokens}} token ({{cached}} in cache)',
+    },
+    llmDebug: {
+      title: 'Dati debug LLM',
+      open: 'Apri dati debug LLM',
+      openFailed: 'Impossibile aprire i dati di debug',
+      copy: 'Copia',
+      copied: 'Copiato',
+      copyFailed: 'Impossibile copiare i dati di debug',
+      save: 'Salva',
+      savedShort: 'Salvato',
+      saved: 'Dati debug LLM salvati in {{path}}',
+      saveFailed: 'Impossibile salvare i dati di debug',
+      expired:
+        'I dati di debug sono stati cancellati al riavvio (solo sessione corrente)',
+    },
     sendMessage: 'Invia messaggio',
     newChat: 'Nuova chat',
     continueResponse: 'Continua risposta',
     stopGeneration: 'Ferma generazione',
+    queueMessage: {
+      tooltip:
+        'Metti in coda questo messaggio — verrà inviato al termine del passaggio corrente',
+      hint: "In attesa che l'agente completi il passaggio corrente...",
+      blockedApproval:
+        'Approva o rifiuta lo strumento in attesa prima di inviare un nuovo messaggio.',
+      blockedAwaitingInput:
+        "Rispondi alla domanda dell'agente nella chat prima di inviare un nuovo messaggio.",
+      abortedRestoredOne:
+        'Messaggio in coda ripristinato nella casella di input',
+      abortedRestoredMany:
+        "Ripristinato l'ultimo messaggio in coda nella casella di input ({{count}} scartati)",
+    },
+    askUserQuestion: {
+      title: "L'agente ti pone delle domande",
+      submit: 'Invia risposte',
+      submitHint: 'Premi Cmd / Ctrl + Invio per inviare',
+      cancel: 'Annulla',
+      cancelTooltip: 'Ignora le domande e termina questo turno',
+      answeredBadge: 'Inviato',
+      rejected:
+        'Il sistema ha rifiutato la domanda (massimo una ask_user_question per turno, oppure strumento disabilitato).',
+      aborted: "Interrotto prima che l'utente potesse rispondere.",
+      schemaError:
+        "L'agente ha fornito parametri non validi per la domanda: {{error}}",
+      stale: 'Questa domanda è scaduta o è già stata gestita.',
+      otherOption: 'Altro (specificare)',
+      otherPlaceholder: 'Aggiungi la tua risposta…',
+      otherAnswerPrefix: 'Altro: ',
+      otherAnswerFallback: 'Altro',
+      freeTextOptional: 'Facoltativo · lascia vuoto per inviare senza risposta',
+    },
     selectModel: 'Seleziona modello',
     uploadImage: 'Carica immagine',
     uploadFile: 'Aggiungi file',
@@ -1187,6 +1413,11 @@ export const it: TranslationKeys = {
           'Comprimi manualmente la cronologia precedente e continua il task corrente in una nuova finestra di contesto.',
       },
     },
+    slashMenu: {
+      entrySkill: 'Abilità',
+      entrySnippet: 'Snippet',
+      createSnippetsFile: 'Clicca per creare snippets.md',
+    },
     emptyState: {
       chatTitle: 'Pensa prima, poi scrivi',
       chatDescription:
@@ -1216,6 +1447,14 @@ export const it: TranslationKeys = {
         "Gestisci prima l'approvazione dello strumento in sospeso, poi compatta il contesto.",
       autoFailed:
         'Compattazione automatica non riuscita. Invio con il contesto precedente.',
+    },
+    todoPanel: {
+      summaryPlanning: '{count} attivita da iniziare',
+      summaryInProgress: 'Passo {index}/{total}: {text}',
+      summaryPartial: '{done}/{total} completate',
+      summaryAllDone: 'Tutte {total} completate',
+      expand: 'Espandi',
+      collapse: 'Comprimi',
     },
     codeBlock: {
       showRawText: 'Mostra testo grezzo',
@@ -1349,6 +1588,7 @@ export const it: TranslationKeys = {
         failed: 'Fallito',
         completed: 'Completato',
         aborted: 'Interrotto',
+        awaitingUserInput: 'In attesa',
         unknown: 'Sconosciuto',
       },
       displayName: {
@@ -1390,6 +1630,14 @@ export const it: TranslationKeys = {
       abort: 'Interrompi',
       alwaysAllowThisTool: 'Consenti sempre questo strumento',
       allowForThisChat: 'Consenti per questa chat',
+    },
+    toolSummary: {
+      todoWrite: {
+        cleared: 'Elenco svuotato',
+        allCompleted: 'Tutte completate ({count})',
+        created: 'Pianificate {count} attivita',
+        progress: 'Avanzamento {done}/{total}',
+      },
     },
     externalAgent: {
       statusRunning: 'In esecuzione',
@@ -1437,6 +1685,8 @@ export const it: TranslationKeys = {
     rebuildingIndex: 'Ricostruzione indice vault in corso…',
     rebuildComplete: 'Ricostruzione indice vault completata.',
     rebuildFailed: 'Ricostruzione indice vault fallita.',
+    continueComplete: 'Indicizzazione ripresa completata.',
+    continueFailed: 'Indicizzazione ripresa fallita.',
     openYoloNewChatFailed:
       'Impossibile aprire la finestra chat YOLO; prova prima dal palette comandi.',
     pgliteUnavailable:

@@ -1,4 +1,4 @@
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 import { ChatModel } from '../../types/chat-model.types'
 import { LLMProvider } from '../../types/provider.types'
 
@@ -7,6 +7,7 @@ import { AzureOpenAIProvider } from './azureOpenaiProvider'
 import { BaseLLMProvider } from './base'
 import { BedrockProvider } from './bedrockProvider'
 import { ChatGPTOAuthProvider } from './chatgptOAuthProvider'
+import { DeepSeekAnthropicProvider } from './deepseekAnthropicProvider'
 import { DeepSeekStudioProvider } from './deepseekStudioProvider'
 import { LLMModelNotFoundException } from './exception'
 import { GeminiProvider } from './gemini'
@@ -25,6 +26,7 @@ import { PerplexityProvider } from './perplexityProvider'
 import { QwenOAuthProvider } from './qwenOAuthProvider'
 import { resolveModelRequestPolicy } from './requestPolicy'
 import { AutoPromotedTransportMode } from './requestTransport'
+import { XiaomimimoProvider } from './xiaomimimoProvider'
 
 /*
  * OpenAI, OpenAI-compatible, and Anthropic providers include token usage statistics
@@ -37,7 +39,7 @@ export function getProviderClient({
   providerId,
   onAutoPromoteTransportMode,
 }: {
-  settings: SmartComposerSettings
+  settings: YoloSettings
   providerId: string
   onAutoPromoteTransportMode?: (
     providerId: string,
@@ -70,6 +72,13 @@ export function getProviderClient({
             onAutoPromoteTransportMode?.(provider.id, mode),
         })
       }
+      if (provider.presetType === 'deepseek') {
+        return new DeepSeekAnthropicProvider(provider as never, {
+          requestPolicy,
+          onAutoPromoteTransportMode: (mode) =>
+            onAutoPromoteTransportMode?.(provider.id, mode),
+        })
+      }
       return new AnthropicProvider(provider as never, {
         requestPolicy,
         onAutoPromoteTransportMode: (mode) =>
@@ -82,7 +91,11 @@ export function getProviderClient({
           requestPolicy,
         })
       }
-      return new GeminiProvider(provider as never, { requestPolicy })
+      return new GeminiProvider(provider as never, {
+        requestPolicy,
+        onAutoPromoteTransportMode: (mode) =>
+          onAutoPromoteTransportMode?.(provider.id, mode),
+      })
     }
     case 'amazon-bedrock': {
       // Base URL is constructed internally by the AWS SDK as
@@ -157,6 +170,12 @@ export function getProviderClient({
             onAutoPromoteTransportMode: (mode) =>
               onAutoPromoteTransportMode?.(provider.id, mode),
           })
+        case 'xiaomimimo':
+          return new XiaomimimoProvider(provider as never, {
+            requestPolicy,
+            onAutoPromoteTransportMode: (mode) =>
+              onAutoPromoteTransportMode?.(provider.id, mode),
+          })
         default:
           return new OpenAICompatibleProvider(provider as never, {
             requestPolicy,
@@ -173,7 +192,7 @@ export function getChatModelClient({
   modelId,
   onAutoPromoteTransportMode,
 }: {
-  settings: SmartComposerSettings
+  settings: YoloSettings
   modelId: string
   onAutoPromoteTransportMode?: (
     providerId: string,

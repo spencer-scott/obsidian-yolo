@@ -4,14 +4,14 @@ import { Root, createRoot } from 'react-dom/client'
 
 import { LanguageProvider } from '../../contexts/language-context'
 import { PluginProvider } from '../../contexts/plugin-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 
 type ModalProps<T extends Record<string, unknown>> = {
   app: App
   Component: React.ComponentType<T & { onClose: () => void }>
   props: T
   options?: { title?: string }
-  plugin?: SmartComposerPlugin // Add plugin prop for context providers
+  plugin?: YoloPlugin // Add plugin prop for context providers
 }
 
 export class ReactModal<T extends Record<string, unknown>> extends Modal {
@@ -19,7 +19,7 @@ export class ReactModal<T extends Record<string, unknown>> extends Modal {
   private Component: React.ComponentType<T & { onClose: () => void }>
   private props: T
   private options?: { title?: string }
-  private plugin?: SmartComposerPlugin
+  private plugin?: YoloPlugin
 
   constructor({ app, Component, props, options, plugin }: ModalProps<T>) {
     super(app)

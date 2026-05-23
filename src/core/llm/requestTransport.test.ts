@@ -81,7 +81,7 @@ describe('requestTransport', () => {
       ).toBe('browser')
     })
 
-    it('uses remembered node mode when auto first succeeds via node', async () => {
+    it('remembers browser mode when auto falls back from node to browser', async () => {
       const memoryKey = createRequestTransportMemoryKey({
         providerType: 'openai-compatible',
         providerId: 'p1',
@@ -91,10 +91,10 @@ describe('requestTransport', () => {
       await runWithRequestTransport({
         mode: 'auto',
         memoryKey,
-        runBrowser: async () => {
+        runBrowser: async () => 'browser-ok',
+        runNode: async () => {
           throw new TypeError('Failed to fetch')
         },
-        runNode: async () => 'node-ok',
         runObsidian: async () => 'ok',
       })
 
@@ -104,7 +104,7 @@ describe('requestTransport', () => {
           hasCustomBaseUrl: true,
           memoryKey,
         }),
-      ).toBe('node')
+      ).toBe('browser')
     })
   })
 
@@ -137,10 +137,8 @@ describe('requestTransport', () => {
       expect(obsidian).not.toHaveBeenCalled()
     })
 
-    it('falls back to node before obsidian in auto mode for CORS-like errors', async () => {
-      const browser = jest
-        .fn<Promise<string>, []>()
-        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    it('uses node primary in auto mode without invoking browser or obsidian', async () => {
+      const browser = jest.fn(async () => 'browser')
       const node = jest.fn(async () => 'node')
       const obsidian = jest.fn(async () => 'obsidian')
       await expect(
@@ -151,13 +149,31 @@ describe('requestTransport', () => {
           runObsidian: obsidian,
         }),
       ).resolves.toBe('node')
-      expect(browser).toHaveBeenCalledTimes(1)
       expect(node).toHaveBeenCalledTimes(1)
+      expect(browser).not.toHaveBeenCalled()
       expect(obsidian).not.toHaveBeenCalled()
     })
 
-    it('throws node error on desktop without falling back to obsidian', async () => {
-      const nodeError = new TypeError('Failed to fetch')
+    it('falls back from node to browser on CORS-like errors in auto mode', async () => {
+      const browser = jest.fn(async () => 'browser')
+      const node = jest
+        .fn<Promise<string>, []>()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      const obsidian = jest.fn(async () => 'obsidian')
+      await expect(
+        runWithRequestTransport({
+          mode: 'auto',
+          runBrowser: browser,
+          runNode: node,
+          runObsidian: obsidian,
+        }),
+      ).resolves.toBe('browser')
+      expect(node).toHaveBeenCalledTimes(1)
+      expect(browser).toHaveBeenCalledTimes(1)
+      expect(obsidian).not.toHaveBeenCalled()
+    })
+
+    it('falls through to obsidian when both node and browser fail with CORS', async () => {
       const obsidian = jest.fn(async () => 'obsidian')
 
       await expect(
@@ -167,12 +183,32 @@ describe('requestTransport', () => {
             throw new TypeError('Failed to fetch')
           },
           runNode: async () => {
+            throw new TypeError('Failed to fetch')
+          },
+          runObsidian: obsidian,
+        }),
+      ).resolves.toBe('obsidian')
+
+      expect(obsidian).toHaveBeenCalledTimes(1)
+    })
+
+    it('throws node error in auto mode when error is not CORS-retryable', async () => {
+      const nodeError = new Error('401 unauthorized')
+      const browser = jest.fn(async () => 'browser')
+      const obsidian = jest.fn(async () => 'obsidian')
+
+      await expect(
+        runWithRequestTransport({
+          mode: 'auto',
+          runBrowser: browser,
+          runNode: async () => {
             throw nodeError
           },
           runObsidian: obsidian,
         }),
       ).rejects.toBe(nodeError)
 
+      expect(browser).not.toHaveBeenCalled()
       expect(obsidian).not.toHaveBeenCalled()
     })
 
@@ -216,33 +252,33 @@ describe('requestTransport', () => {
       await expect(
         runWithRequestTransport({
           mode: 'auto',
-          runBrowser: async () => {
+          runBrowser: async () => 'browser-ok',
+          runNode: async () => {
             throw new TypeError('Failed to fetch')
           },
-          runNode: async () => 'node',
           runObsidian: async () => 'ok',
           onAutoPromoteTransportMode,
         }),
-      ).resolves.toBe('node')
+      ).resolves.toBe('browser-ok')
 
-      expect(onAutoPromoteTransportMode).toHaveBeenCalledWith('node')
+      expect(onAutoPromoteTransportMode).toHaveBeenCalledWith('browser')
     })
   })
 
   describe('runWithRequestTransportForStream', () => {
-    it('falls back to node stream before obsidian when browser stream fails before first chunk', async () => {
+    it('falls back to browser stream when node stream fails before first chunk', async () => {
       const browser = jest.fn(async () => ({
+        async *[Symbol.asyncIterator]() {
+          yield 'browser-chunk'
+        },
+      }))
+      const node = jest.fn(async () => ({
         [Symbol.asyncIterator]() {
           return {
             next: async () => {
               throw new TypeError('Failed to fetch')
             },
           }
-        },
-      }))
-      const node = jest.fn(async () => ({
-        async *[Symbol.asyncIterator]() {
-          yield 'node-chunk'
         },
       }))
       const obsidian = jest.fn(async () => ({
@@ -258,21 +294,21 @@ describe('requestTransport', () => {
         createObsidianStream: obsidian,
       })
 
-      await expect(collectStream(stream)).resolves.toEqual(['node-chunk'])
-      expect(browser).toHaveBeenCalledTimes(1)
+      await expect(collectStream(stream)).resolves.toEqual(['browser-chunk'])
       expect(node).toHaveBeenCalledTimes(1)
+      expect(browser).toHaveBeenCalledTimes(1)
       expect(obsidian).not.toHaveBeenCalled()
     })
 
-    it('falls back to node stream when browser stream creation times out', async () => {
+    it('falls back to browser stream when node stream creation times out', async () => {
       const stream = await runWithRequestTransportForStream({
         mode: 'auto',
         firstChunkTimeoutMs: 10,
-        createBrowserStream: async () =>
+        createNodeStream: async () =>
           await new Promise<AsyncIterable<string>>(() => {}),
-        createNodeStream: async () => ({
+        createBrowserStream: async () => ({
           async *[Symbol.asyncIterator]() {
-            yield 'node-timeout-fallback'
+            yield 'browser-timeout-fallback'
           },
         }),
         createObsidianStream: async () => ({
@@ -283,15 +319,15 @@ describe('requestTransport', () => {
       })
 
       await expect(collectStream(stream)).resolves.toEqual([
-        'node-timeout-fallback',
+        'browser-timeout-fallback',
       ])
     })
 
-    it('falls back to node stream when browser first chunk times out', async () => {
+    it('falls back to browser stream when node first chunk times out', async () => {
       const stream = await runWithRequestTransportForStream({
         mode: 'auto',
         firstChunkTimeoutMs: 10,
-        createBrowserStream: async () => ({
+        createNodeStream: async () => ({
           [Symbol.asyncIterator]() {
             return {
               next: async () =>
@@ -299,9 +335,9 @@ describe('requestTransport', () => {
             }
           },
         }),
-        createNodeStream: async () => ({
+        createBrowserStream: async () => ({
           async *[Symbol.asyncIterator]() {
-            yield 'node-first-chunk-fallback'
+            yield 'browser-first-chunk-fallback'
           },
         }),
         createObsidianStream: async () => ({
@@ -312,7 +348,7 @@ describe('requestTransport', () => {
       })
 
       await expect(collectStream(stream)).resolves.toEqual([
-        'node-first-chunk-fallback',
+        'browser-first-chunk-fallback',
       ])
     })
 
@@ -343,7 +379,7 @@ describe('requestTransport', () => {
       const onAutoPromoteTransportMode = jest.fn()
       const stream = await runWithRequestTransportForStream({
         mode: 'auto',
-        createBrowserStream: async () => ({
+        createNodeStream: async () => ({
           [Symbol.asyncIterator]() {
             return {
               next: async () => {
@@ -352,9 +388,9 @@ describe('requestTransport', () => {
             }
           },
         }),
-        createNodeStream: async () => ({
+        createBrowserStream: async () => ({
           async *[Symbol.asyncIterator]() {
-            yield 'node-ok'
+            yield 'browser-ok'
           },
         }),
         createObsidianStream: async () => ({
@@ -365,21 +401,21 @@ describe('requestTransport', () => {
         onAutoPromoteTransportMode,
       })
 
-      await expect(collectStream(stream)).resolves.toEqual(['node-ok'])
-      expect(onAutoPromoteTransportMode).toHaveBeenCalledWith('node')
+      await expect(collectStream(stream)).resolves.toEqual(['browser-ok'])
+      expect(onAutoPromoteTransportMode).toHaveBeenCalledWith('browser')
     })
 
-    it('throws node error on desktop without falling back to obsidian stream', async () => {
+    it('falls through to obsidian stream when both node and browser streams fail with CORS', async () => {
       const createObsidianStream = jest.fn(async () => ({
         async *[Symbol.asyncIterator]() {
-          yield 'ok'
+          yield 'obsidian-ok'
         },
       }))
 
       const stream = await runWithRequestTransportForStream({
         mode: 'auto',
         createBrowserStream: async () => {
-          throw new TypeError('Failed to fetch')
+          throw new TypeError('Failed to fetch from browser')
         },
         createNodeStream: async () => {
           throw new TypeError('Failed to fetch from node')
@@ -387,10 +423,8 @@ describe('requestTransport', () => {
         createObsidianStream,
       })
 
-      await expect(collectStream(stream)).rejects.toThrow(
-        'Failed to fetch from node',
-      )
-      expect(createObsidianStream).not.toHaveBeenCalled()
+      await expect(collectStream(stream)).resolves.toEqual(['obsidian-ok'])
+      expect(createObsidianStream).toHaveBeenCalledTimes(1)
     })
 
     it('falls back to obsidian stream on non-desktop (no createNodeStream provided)', async () => {
@@ -413,6 +447,41 @@ describe('requestTransport', () => {
       await expect(collectStream(stream)).resolves.toEqual(['ok'])
       expect(createObsidianStream).toHaveBeenCalledTimes(1)
       expect(onAutoPromoteTransportMode).toHaveBeenCalledWith('obsidian')
+    })
+
+    it('does not fallback further after browser fallback stream already yielded chunks', async () => {
+      const obsidian = jest.fn(async () => ({
+        async *[Symbol.asyncIterator]() {
+          yield 'should-not-run'
+        },
+      }))
+      const stream = await runWithRequestTransportForStream({
+        mode: 'auto',
+        createNodeStream: async () => ({
+          [Symbol.asyncIterator]() {
+            return {
+              next: async () => {
+                throw new TypeError('Failed to fetch')
+              },
+            }
+          },
+        }),
+        createBrowserStream: async () => ({
+          async *[Symbol.asyncIterator]() {
+            yield 'browser-first'
+            throw new TypeError('Failed to fetch')
+          },
+        }),
+        createObsidianStream: obsidian,
+      })
+
+      const iterator = stream[Symbol.asyncIterator]()
+      await expect(iterator.next()).resolves.toEqual({
+        done: false,
+        value: 'browser-first',
+      })
+      await expect(iterator.next()).rejects.toThrow('Failed to fetch')
+      expect(obsidian).not.toHaveBeenCalled()
     })
 
     it('does not fallback after browser stream already yielded chunks', async () => {

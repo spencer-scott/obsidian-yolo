@@ -14,7 +14,9 @@ import {
   getBuiltinToolUiMeta,
 } from '../../../core/agent/builtinToolUiMeta'
 import { isDefaultAssistantId } from '../../../core/agent/default-assistant'
+import { getEnabledAssistantToolNames } from '../../../core/agent/tool-preferences'
 import {
+  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileTools,
@@ -26,6 +28,8 @@ import { Assistant } from '../../../types/assistant.types'
 import { McpServerState, McpServerStatus } from '../../../types/mcp.types'
 import { renderAssistantIcon } from '../../../utils/assistant-icon'
 import { ObsidianButton } from '../../common/ObsidianButton'
+import { ObsidianSetting } from '../../common/ObsidianSetting'
+import { ObsidianToggle } from '../../common/ObsidianToggle'
 import { ConfirmModal } from '../../modals/ConfirmModal'
 import { AgentSkillsModal } from '../modals/AgentSkillsModal'
 import { AgentToolsModal } from '../modals/AgentToolsModal'
@@ -172,6 +176,16 @@ export function AgentSection({ app }: AgentSectionProps) {
     modal.open()
   }
 
+  const handleToggleToolDisclosure = async (value: boolean) => {
+    await setSettings({
+      ...settings,
+      mcp: {
+        ...settings.mcp,
+        enableToolDisclosure: value,
+      },
+    })
+  }
+
   const mcpTools = useMemo(
     () =>
       mcpServers
@@ -196,6 +210,8 @@ export function AgentSection({ app }: AgentSectionProps) {
     const tools = getLocalFileTools()
       .filter(
         (tool) =>
+          (settings.mcp.enableToolDisclosure ||
+            tool.name !== LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME) &&
           !SPLIT_FS_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_MEMORY_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_WEB_TOOL_NAME_SET.has(tool.name),
@@ -266,7 +282,7 @@ export function AgentSection({ app }: AgentSectionProps) {
     }
 
     return tools
-  }, [settings.mcp.builtinToolOptions, t])
+  }, [settings.mcp.builtinToolOptions, settings.mcp.enableToolDisclosure, t])
 
   const allSkillEntries = useMemo(
     () => listLiteSkillEntries(app, { settings }),
@@ -324,46 +340,46 @@ export function AgentSection({ app }: AgentSectionProps) {
     globallyEnabledSkillEntries.length - visibleSkillEntries.length
 
   return (
-    <div className="smtcmp-settings-section smtcmp-agent-section">
-      <div className="smtcmp-settings-header">
+    <div className="yolo-settings-section yolo-agent-section">
+      <div className="yolo-settings-header">
         {t('settings.agent.title', 'Agent')}
       </div>
-      <div className="smtcmp-settings-desc smtcmp-agent-intro">
+      <div className="yolo-settings-desc yolo-agent-intro">
         {t(
           'settings.agent.desc',
           'Manage global capabilities and configure your agents.',
         )}
       </div>
 
-      <section className="smtcmp-agent-block">
-        <div className="smtcmp-agent-block-head">
-          <div className="smtcmp-settings-sub-header">
+      <section className="yolo-agent-block">
+        <div className="yolo-agent-block-head">
+          <div className="yolo-settings-sub-header">
             {t('settings.agent.globalCapabilities', 'Global capabilities')}
           </div>
-          <div className="smtcmp-settings-desc">{mcpCountLabel}</div>
+          <div className="yolo-settings-desc">{mcpCountLabel}</div>
         </div>
 
-        <div className="smtcmp-agent-cap-grid">
-          <article className="smtcmp-agent-cap-card">
-            <div className="smtcmp-agent-cap-title-row">
-              <div className="smtcmp-agent-cap-title">
+        <div className="yolo-agent-cap-grid">
+          <article className="yolo-agent-cap-card">
+            <div className="yolo-agent-cap-title-row">
+              <div className="yolo-agent-cap-title">
                 <Wrench size={14} />
                 <span>{t('settings.agent.tools', 'Tools')}</span>
               </div>
               <button
                 type="button"
-                className="mod-cta smtcmp-agent-tools-trigger"
+                className="mod-cta yolo-agent-tools-trigger"
                 onClick={handleOpenToolsModal}
               >
                 {t('settings.agent.manageTools', 'Manage tools')}
               </button>
             </div>
-            <div className="smtcmp-agent-cap-count">{toolsCountLabel}</div>
-            <div className="smtcmp-agent-cap-tags">
+            <div className="yolo-agent-cap-count">{toolsCountLabel}</div>
+            <div className="yolo-agent-cap-tags">
               {visibleToolTags.map((tool) => (
                 <span
                   key={tool.key}
-                  className="smtcmp-agent-chip"
+                  className="yolo-agent-chip"
                   title={tool.label}
                 >
                   {tool.label}
@@ -372,7 +388,7 @@ export function AgentSection({ app }: AgentSectionProps) {
               {hiddenToolTagsCount > 0 && (
                 <button
                   type="button"
-                  className="smtcmp-agent-chip smtcmp-agent-chip--more"
+                  className="yolo-agent-chip yolo-agent-chip--more"
                   onClick={handleOpenToolsModal}
                   title={t('settings.agent.viewAllTools', 'View all tools')}
                 >
@@ -382,26 +398,26 @@ export function AgentSection({ app }: AgentSectionProps) {
             </div>
           </article>
 
-          <article className="smtcmp-agent-cap-card">
-            <div className="smtcmp-agent-cap-title-row">
-              <div className="smtcmp-agent-cap-title">
+          <article className="yolo-agent-cap-card">
+            <div className="yolo-agent-cap-title-row">
+              <div className="yolo-agent-cap-title">
                 <BookOpen size={14} />
                 <span>{t('settings.agent.skills', 'Skills')}</span>
               </div>
               <button
                 type="button"
-                className="mod-cta smtcmp-agent-tools-trigger"
+                className="mod-cta yolo-agent-tools-trigger"
                 onClick={handleOpenSkillsModal}
               >
                 {t('settings.agent.manageSkills', 'Manage skills')}
               </button>
             </div>
-            <div className="smtcmp-agent-cap-count">{skillsCountLabel}</div>
-            <div className="smtcmp-agent-cap-tags">
+            <div className="yolo-agent-cap-count">{skillsCountLabel}</div>
+            <div className="yolo-agent-cap-tags">
               {visibleSkillEntries.map((skill) => (
                 <span
                   key={skill.id}
-                  className="smtcmp-agent-chip"
+                  className="yolo-agent-chip"
                   title={skill.name}
                 >
                   {skill.name}
@@ -410,7 +426,7 @@ export function AgentSection({ app }: AgentSectionProps) {
               {hiddenSkillEntriesCount > 0 && (
                 <button
                   type="button"
-                  className="smtcmp-agent-chip smtcmp-agent-chip--more"
+                  className="yolo-agent-chip yolo-agent-chip--more"
                   onClick={handleOpenSkillsModal}
                   title={t('settings.agent.viewAllSkills', 'View all skills')}
                 >
@@ -420,12 +436,28 @@ export function AgentSection({ app }: AgentSectionProps) {
             </div>
           </article>
         </div>
+
+        <ObsidianSetting
+          name={t(
+            'settings.agent.enableToolDisclosure',
+            'On-demand tool disclosure',
+          )}
+          desc={t(
+            'settings.agent.enableToolDisclosureDesc',
+            'Beta: expose large tool schemas only when the model asks for them.',
+          )}
+        >
+          <ObsidianToggle
+            value={settings.mcp.enableToolDisclosure}
+            onChange={(value) => void handleToggleToolDisclosure(value)}
+          />
+        </ObsidianSetting>
       </section>
 
-      <section className="smtcmp-agent-block">
-        <div className="smtcmp-agent-block-head">
-          <div className="smtcmp-agent-block-head-title-row">
-            <div className="smtcmp-settings-sub-header">
+      <section className="yolo-agent-block">
+        <div className="yolo-agent-block-head">
+          <div className="yolo-agent-block-head-title-row">
+            <div className="yolo-settings-sub-header">
               {t('settings.agent.agents', 'Agents')}
             </div>
             <ObsidianButton
@@ -434,7 +466,7 @@ export function AgentSection({ app }: AgentSectionProps) {
               cta
             />
           </div>
-          <div className="smtcmp-settings-desc">
+          <div className="yolo-settings-desc">
             {t(
               'settings.agent.agentsDesc',
               'Click Configure to edit each agent profile and prompt.',
@@ -442,11 +474,11 @@ export function AgentSection({ app }: AgentSectionProps) {
           </div>
         </div>
 
-        <div className="smtcmp-agent-grid">
+        <div className="yolo-agent-grid">
           {assistants.map((assistant) => (
             <article
               key={assistant.id}
-              className="smtcmp-agent-card smtcmp-agent-card--clickable"
+              className="yolo-agent-card yolo-agent-card--clickable"
               role="button"
               tabIndex={0}
               onClick={() => handleOpenAssistantsModal(assistant.id)}
@@ -457,17 +489,17 @@ export function AgentSection({ app }: AgentSectionProps) {
                 }
               }}
             >
-              <div className="smtcmp-agent-card-top">
-                <div className="smtcmp-agent-card-top-main">
-                  <div className="smtcmp-agent-avatar">
+              <div className="yolo-agent-card-top">
+                <div className="yolo-agent-card-top-main">
+                  <div className="yolo-agent-avatar">
                     {renderAssistantIcon(assistant.icon, 16)}
                   </div>
-                  <div className="smtcmp-agent-main">
-                    <div className="smtcmp-agent-name-row">
-                      <div className="smtcmp-agent-name">{assistant.name}</div>
+                  <div className="yolo-agent-main">
+                    <div className="yolo-agent-name-row">
+                      <div className="yolo-agent-name">{assistant.name}</div>
                     </div>
                     {assistant.description && (
-                      <div className="smtcmp-agent-desc">
+                      <div className="yolo-agent-desc">
                         {assistant.description}
                       </div>
                     )}
@@ -476,11 +508,11 @@ export function AgentSection({ app }: AgentSectionProps) {
 
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger
-                    className="smtcmp-agent-card-menu-trigger"
+                    className="yolo-agent-card-menu-trigger"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <span
-                      className="smtcmp-agent-card-menu-trigger-dots"
+                      className="yolo-agent-card-menu-trigger-dots"
                       aria-hidden="true"
                     >
                       ...
@@ -488,20 +520,20 @@ export function AgentSection({ app }: AgentSectionProps) {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
-                      className="smtcmp-agent-card-menu-popover"
+                      className="yolo-agent-card-menu-popover"
                       align="end"
                       sideOffset={8}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <ul className="smtcmp-agent-card-menu-list">
+                      <ul className="yolo-agent-card-menu-list">
                         <DropdownMenu.Item
                           asChild
                           onSelect={() => {
                             void handleDuplicateAssistant(assistant)
                           }}
                         >
-                          <li className="smtcmp-agent-card-menu-item">
-                            <span className="smtcmp-agent-card-menu-icon">
+                          <li className="yolo-agent-card-menu-item">
+                            <span className="yolo-agent-card-menu-icon">
                               <Copy size={16} />
                             </span>
                             {t('settings.agent.duplicate', 'Duplicate')}
@@ -512,8 +544,8 @@ export function AgentSection({ app }: AgentSectionProps) {
                             asChild
                             onSelect={() => handleDeleteAssistant(assistant)}
                           >
-                            <li className="smtcmp-agent-card-menu-item smtcmp-agent-card-menu-danger">
-                              <span className="smtcmp-agent-card-menu-icon">
+                            <li className="yolo-agent-card-menu-item yolo-agent-card-menu-danger">
+                              <span className="yolo-agent-card-menu-icon">
                                 <Trash2 size={16} />
                               </span>
                               {t('common.delete')}
@@ -526,18 +558,18 @@ export function AgentSection({ app }: AgentSectionProps) {
                 </DropdownMenu.Root>
               </div>
 
-              <div className="smtcmp-agent-meta-row">
-                <span className="smtcmp-agent-meta-item">
+              <div className="yolo-agent-meta-row">
+                <span className="yolo-agent-meta-item">
                   <Cpu size={12} />
                   {assistant.modelId || settings.chatModelId}
                 </span>
-                <span className="smtcmp-agent-meta-item">
+                <span className="yolo-agent-meta-item">
                   <Wrench size={12} />
                   {assistant.enableTools
-                    ? `${assistant.enabledToolNames?.length ?? 0} tools`
+                    ? `${getEnabledAssistantToolNames(assistant).length} tools`
                     : '0 tools'}
                 </span>
-                <span className="smtcmp-agent-meta-item">
+                <span className="yolo-agent-meta-item">
                   <BookOpen size={12} />
                   {`${
                     allSkillEntries.filter((skill) =>
@@ -553,7 +585,7 @@ export function AgentSection({ app }: AgentSectionProps) {
             </article>
           ))}
           <article
-            className="smtcmp-agent-create-card"
+            className="yolo-agent-create-card"
             role="button"
             tabIndex={0}
             onClick={() => handleOpenAssistantsModal(undefined, true)}
@@ -564,19 +596,19 @@ export function AgentSection({ app }: AgentSectionProps) {
               }
             }}
           >
-            <div className="smtcmp-agent-create-card-icon">
+            <div className="yolo-agent-create-card-icon">
               <Plus size={28} />
             </div>
-            <div className="smtcmp-agent-create-card-text">
+            <div className="yolo-agent-create-card-text">
               {t('settings.agent.newAgent', 'New agent')}
             </div>
           </article>
         </div>
       </section>
 
-      <section className="smtcmp-agent-block">
-        <div className="smtcmp-agent-block-head">
-          <div className="smtcmp-settings-sub-header">
+      <section className="yolo-agent-block">
+        <div className="yolo-agent-block-head">
+          <div className="yolo-settings-sub-header">
             {t('settings.agent.agentCapabilitiesBlockTitle')}
           </div>
         </div>
@@ -595,9 +627,9 @@ export function AgentSection({ app }: AgentSectionProps) {
         </div>
       </section>
 
-      <section className="smtcmp-agent-block">
-        <div className="smtcmp-agent-block-head">
-          <div className="smtcmp-settings-sub-header">
+      <section className="yolo-agent-block">
+        <div className="yolo-agent-block-head">
+          <div className="yolo-settings-sub-header">
             {t('settings.etc.notifications', 'Notifications')}
           </div>
         </div>

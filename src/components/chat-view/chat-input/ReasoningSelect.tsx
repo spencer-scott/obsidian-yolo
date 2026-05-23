@@ -10,74 +10,12 @@ import {
   getDefaultReasoningLevel,
   modelSupportsReasoning,
 } from '../../../types/reasoning'
-import {
-  getNodeBody,
-  getNodeDocument,
-  getNodeWindow,
-} from '../../../utils/dom/window-context'
+import { getNodeWindow } from '../../../utils/dom/window-context'
 import { YoloDropdownContent } from '../../common/popover'
+import { ReasoningPanel } from '../../common/ReasoningPanel'
+import { REASONING_OPTIONS } from '../../common/ReasoningSegmented'
 
 export type { ReasoningLevel } from '../../../types/reasoning'
-
-type ReasoningOption = {
-  value: ReasoningLevel
-  labelKey: string
-  labelFallback: string
-  descKey: string
-  descFallback: string
-}
-
-const LEVEL_META: Record<
-  ReasoningLevel,
-  {
-    labelKey: string
-    labelFallback: string
-    descKey: string
-    descFallback: string
-  }
-> = {
-  off: {
-    labelKey: 'reasoning.off',
-    labelFallback: 'Off',
-    descKey: 'reasoning.offDesc',
-    descFallback: 'No thinking, answer directly',
-  },
-  auto: {
-    labelKey: 'reasoning.auto',
-    labelFallback: 'Auto',
-    descKey: 'reasoning.autoDesc',
-    descFallback: 'Let the model decide thinking depth based on the prompt',
-  },
-  low: {
-    labelKey: 'reasoning.low',
-    labelFallback: 'Low',
-    descKey: 'reasoning.lowDesc',
-    descFallback: 'Lightweight thinking, faster response',
-  },
-  medium: {
-    labelKey: 'reasoning.medium',
-    labelFallback: 'Medium',
-    descKey: 'reasoning.mediumDesc',
-    descFallback: 'Balanced thinking depth',
-  },
-  high: {
-    labelKey: 'reasoning.high',
-    labelFallback: 'High',
-    descKey: 'reasoning.highDesc',
-    descFallback: 'Deep thinking, suited for complex problems',
-  },
-  'extra-high': {
-    labelKey: 'reasoning.extraHigh',
-    labelFallback: 'Extra high',
-    descKey: 'reasoning.extraHighDesc',
-    descFallback: 'Maximum thinking, for the toughest reasoning',
-  },
-}
-
-const REASONING_OPTIONS: ReasoningOption[] = REASONING_LEVELS.map((value) => ({
-  value,
-  ...LEVEL_META[value],
-}))
 
 export function supportsReasoning(model: ChatModel | null): boolean {
   return model !== null && modelSupportsReasoning(model)
@@ -114,7 +52,6 @@ export const ReasoningSelect = forwardRef<
     const { t } = useLanguage()
     const [isOpen, setIsOpen] = useState(false)
     const triggerRef = useRef<HTMLButtonElement | null>(null)
-    const resolvedContainer = container ?? getNodeBody(triggerRef.current)
     const segmentRefs = useRef<
       Record<ReasoningLevel, HTMLButtonElement | null>
     >(
@@ -148,29 +85,6 @@ export const ReasoningSelect = forwardRef<
       if (!target) return
       target.focus({ preventScroll: true })
     }, [safeValue])
-
-    const focusByDelta = useCallback(
-      (delta: number) => {
-        const values = REASONING_OPTIONS.map((option) => option.value)
-        const ownerDoc = getNodeDocument(triggerRef.current)
-        const focusedValue = values.find(
-          (v) =>
-            segmentRefs.current[v] !== null &&
-            segmentRefs.current[v] === ownerDoc.activeElement,
-        )
-        const baseIndex =
-          focusedValue !== undefined
-            ? values.indexOf(focusedValue)
-            : values.indexOf(safeValue)
-        const nextIndex = (baseIndex + delta + values.length) % values.length
-        const nextValue = values[nextIndex]
-        const target = segmentRefs.current[nextValue]
-        if (target) {
-          target.focus({ preventScroll: true })
-        }
-      },
-      [safeValue],
-    )
 
     useEffect(() => {
       if (!isOpen) return
@@ -211,33 +125,33 @@ export const ReasoningSelect = forwardRef<
     }
 
     const currentLabel = t(currentOption.labelKey, currentOption.labelFallback)
-    const currentDesc = t(currentOption.descKey, currentOption.descFallback)
 
     return (
       <DropdownMenu.Root open={isOpen} onOpenChange={handleOpenChange}>
         <DropdownMenu.Trigger
           ref={setTriggerRef}
-          className="smtcmp-chat-input-model-select smtcmp-reasoning-select"
+          className="yolo-chat-input-model-select yolo-reasoning-select"
           onKeyDown={handleTriggerKeyDown}
         >
-          <div className="smtcmp-reasoning-select__icon">
+          <div className="yolo-reasoning-select__icon">
             <Brain size={14} />
           </div>
-          <div className="smtcmp-chat-input-model-select__label smtcmp-chat-input-model-select__model-name">
+          <div className="yolo-chat-input-model-select__label yolo-chat-input-model-select__model-name">
             {currentLabel}
           </div>
-          <div className="smtcmp-chat-input-model-select__icon">
+          <div className="yolo-chat-input-model-select__icon">
             {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </div>
         </DropdownMenu.Trigger>
 
         <YoloDropdownContent
-          container={resolvedContainer}
+          container={container}
+          anchorRef={triggerRef}
           variant="default"
           minWidth={360}
           maxWidth={460}
           maxHeight={400}
-          className="smtcmp-reasoning-popover"
+          className="yolo-reasoning-popover"
           side={side}
           sideOffset={sideOffset}
           align={align}
@@ -251,73 +165,13 @@ export const ReasoningSelect = forwardRef<
             e.preventDefault()
             triggerRef.current?.focus({ preventScroll: true })
           }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-              event.preventDefault()
-              focusByDelta(1)
-            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-              event.preventDefault()
-              focusByDelta(-1)
-            }
-          }}
         >
-          <div className="smtcmp-reasoning-popover__header">
-            <Brain
-              size={14}
-              className="smtcmp-reasoning-popover__header-icon"
-            />
-            <span className="smtcmp-reasoning-popover__header-title">
-              {t('reasoning.selectReasoning', 'Select reasoning')}
-            </span>
-            <span className="smtcmp-reasoning-popover__header-current">
-              · {currentLabel}
-            </span>
-          </div>
-
-          <div
-            className="smtcmp-segmented smtcmp-segmented--pill smtcmp-reasoning-segmented"
-            role="radiogroup"
-            aria-label={t('reasoning.selectReasoning', 'Select reasoning')}
-            style={
-              {
-                '--smtcmp-segment-count': REASONING_OPTIONS.length,
-                '--smtcmp-segment-index': REASONING_OPTIONS.findIndex(
-                  (opt) => opt.value === safeValue,
-                ),
-              } as React.CSSProperties
-            }
-          >
-            <div className="smtcmp-segmented-glider" aria-hidden="true" />
-            {REASONING_OPTIONS.map((option) => {
-              const selected = option.value === safeValue
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  className={selected ? 'active' : ''}
-                  tabIndex={selected ? 0 : -1}
-                  ref={(element) => {
-                    segmentRefs.current[option.value] = element
-                  }}
-                  onClick={() => {
-                    onChange(option.value)
-                  }}
-                >
-                  {t(option.labelKey, option.labelFallback)}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="smtcmp-reasoning-popover__desc">
-            <span className="smtcmp-reasoning-popover__desc-label">
-              {currentLabel}
-            </span>
-            <span className="smtcmp-reasoning-popover__desc-sep"> — </span>
-            {currentDesc}
-          </div>
+          <ReasoningPanel
+            model={model}
+            value={safeValue}
+            onChange={onChange}
+            segmentRefs={segmentRefs}
+          />
         </YoloDropdownContent>
       </DropdownMenu.Root>
     )

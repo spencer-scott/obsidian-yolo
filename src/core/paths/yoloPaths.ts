@@ -3,6 +3,7 @@ import { normalizePath } from 'obsidian'
 export const DEFAULT_YOLO_BASE_DIR = 'YOLO'
 export const YOLO_SKILLS_SUBDIR = 'skills'
 export const YOLO_SKILLS_INDEX_FILE_NAME = 'Skills.md'
+export const YOLO_SNIPPETS_FILE_NAME = 'snippets.md'
 export const YOLO_JSON_DB_DIR_NAME = '.yolo_json_db'
 export const YOLO_VECTOR_DB_FILE_NAME = '.yolo_vector_db.tar.gz'
 export const YOLO_DATA_JSON_FILE_NAME = '.yolo_data.json'
@@ -63,6 +64,12 @@ export const getYoloSkillsIndexPath = (
   return normalizePath(
     `${getYoloSkillsDir(settings)}/${YOLO_SKILLS_INDEX_FILE_NAME}`,
   )
+}
+
+export const getYoloSnippetsPath = (
+  settings?: YoloSettingsLike | null,
+): string => {
+  return normalizePath(`${getYoloBaseDir(settings)}/${YOLO_SNIPPETS_FILE_NAME}`)
 }
 
 export const getYoloJsonDbRootDir = (

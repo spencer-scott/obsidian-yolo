@@ -146,6 +146,18 @@ function simulateSuccess(stdout: string, exitCode = 0) {
   })
 }
 
+function expectChildKillRequested(child: MockChild): void {
+  if (process.platform === 'win32') {
+    expect(taskkillCalls).toContainEqual({
+      args: ['/T', '/F', '/PID', String(child.pid)],
+    })
+    return
+  }
+
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion must reference the original method
+  expect(process.kill).toHaveBeenCalledWith(-child.pid, 'SIGTERM')
+}
+
 describe('runExternalAgent', () => {
   it('successful spawn returns stdout', async () => {
     const promise = runExternalAgent({
@@ -201,8 +213,7 @@ describe('runExternalAgent', () => {
 
     const result = (await promise) as RunExternalAgentResult
     expect(result.stdout).toBe('some output')
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion must reference the original method
-    expect(process.kill).toHaveBeenCalledWith(-mockChild.pid, 'SIGTERM')
+    expectChildKillRequested(mockChild)
   })
 
   it('timeout triggers kill', async () => {
@@ -229,8 +240,7 @@ describe('runExternalAgent', () => {
     })
 
     await promise
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest spy assertion
-    expect(process.kill).toHaveBeenCalledWith(-mockChild.pid, 'SIGTERM')
+    expectChildKillRequested(mockChild)
   }, 10000)
 
   it('output exceeding 1MB is head+tail truncated with truncated metadata', async () => {

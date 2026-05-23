@@ -1,17 +1,17 @@
 import { App } from 'obsidian'
 
 import { SettingsProvider } from '../../contexts/settings-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 import { ReactModal } from '../common/ReactModal'
 import { McpSection } from '../settings/sections/McpSection'
 
 type McpSectionComponentProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class McpSectionModal extends ReactModal<McpSectionComponentProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app: app,
       Component: McpSectionComponent,
@@ -21,7 +21,7 @@ export class McpSectionModal extends ReactModal<McpSectionComponentProps> {
       },
       plugin: plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 

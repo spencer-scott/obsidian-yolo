@@ -163,7 +163,7 @@ const StreamingMarkdown = memo(function StreamingMarkdown({
 
   return (
     <div
-      className={`markdown-rendered smtcmp-markdown-rendered smtcmp-streaming-markdown smtcmp-scale-${scale}`}
+      className={`markdown-rendered yolo-markdown-rendered yolo-streaming-markdown yolo-scale-${scale}`}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}

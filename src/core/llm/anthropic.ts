@@ -4,6 +4,7 @@ import {
   ToolChoice as AnthropicToolChoice,
   Base64ImageSource,
   ContentBlockParam,
+  DocumentBlockParam,
   ImageBlockParam,
   MessageCreateParamsNonStreaming,
   MessageCreateParamsStreaming,
@@ -34,7 +35,6 @@ import {
 } from '../../types/reasoning'
 import { getToolCallArgumentsObject } from '../../types/tool-call.types'
 import { parseImageDataUrl } from '../../utils/llm/image'
-import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 
 import { applyAnthropicPromptCache } from './anthropicPromptCache'
@@ -51,7 +51,7 @@ import {
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
+import { createTransportClients } from './transportClients'
 
 export class AnthropicProvider extends BaseLLMProvider<LLMProvider> {
   private browserClient: Anthropic
@@ -129,15 +129,16 @@ export class AnthropicProvider extends BaseLLMProvider<LLMProvider> {
       timeout: options?.requestPolicy?.timeoutMs,
       ...(defaultHeaders ? { defaultHeaders } : {}),
     }
-    this.browserClient = new Anthropic(clientOptions)
-    this.obsidianClient = new Anthropic({
-      ...clientOptions,
-      fetch: createObsidianFetch(),
-    })
-    this.nodeClient = new Anthropic({
-      ...clientOptions,
-      fetch: createDesktopNodeFetch(),
-    })
+    const clients = createTransportClients(
+      (transportFetch) =>
+        new Anthropic({
+          ...clientOptions,
+          fetch: transportFetch,
+        }),
+    )
+    this.browserClient = clients.browserClient
+    this.obsidianClient = clients.obsidianClient
+    this.nodeClient = clients.nodeClient
   }
 
   async generateResponse(
@@ -160,9 +161,11 @@ export class AnthropicProvider extends BaseLLMProvider<LLMProvider> {
       const payloadBase: MessageCreateParamsNonStreaming &
         Record<string, unknown> = {
         model: request.model,
-        messages: request.messages
-          .map((m) => this.parseRequestMessage(m))
-          .filter((m): m is MessageParam => m !== null),
+        messages: AnthropicProvider.mergeAdjacentUserMessages(
+          request.messages
+            .map((m) => this.parseRequestMessage(m))
+            .filter((m): m is MessageParam => m !== null),
+        ),
         system: systemMessage,
         tools: request.tools?.map((t) => AnthropicProvider.parseRequestTool(t)),
         tool_choice: request.tool_choice
@@ -285,9 +288,11 @@ https://github.com/glowingjade/obsidian-smart-composer/issues/286`,
       const payloadBase: MessageCreateParamsStreaming &
         Record<string, unknown> = {
         model: request.model,
-        messages: request.messages
-          .map((m) => this.parseRequestMessage(m))
-          .filter((m): m is MessageParam => m !== null),
+        messages: AnthropicProvider.mergeAdjacentUserMessages(
+          request.messages
+            .map((m) => this.parseRequestMessage(m))
+            .filter((m): m is MessageParam => m !== null),
+        ),
         system: systemMessage,
         tools: request.tools?.map((t) => AnthropicProvider.parseRequestTool(t)),
         tool_choice: request.tool_choice
@@ -491,12 +496,41 @@ https://github.com/glowingjade/obsidian-smart-composer/issues/286`,
     }
   }
 
+  // The Anthropic protocol requires strict role alternation (user / assistant).
+  // When an assistant turn returns multiple tool_use blocks, the next turn's
+  // tool results must be packed into a single user message's content[]; otherwise
+  // the API returns a 400 with "`tool_use` ids were found without `tool_result`
+  // blocks immediately after". This merges adjacent user messages after mapping.
+  protected static mergeAdjacentUserMessages(
+    messages: MessageParam[],
+  ): MessageParam[] {
+    const merged: MessageParam[] = []
+    for (const message of messages) {
+      const prev = merged[merged.length - 1]
+      if (prev && prev.role === 'user' && message.role === 'user') {
+        const prevContent = Array.isArray(prev.content)
+          ? prev.content
+          : [{ type: 'text' as const, text: prev.content }]
+        const nextContent = Array.isArray(message.content)
+          ? message.content
+          : [{ type: 'text' as const, text: message.content }]
+        merged[merged.length - 1] = {
+          role: 'user',
+          content: [...prevContent, ...nextContent],
+        }
+      } else {
+        merged.push(message)
+      }
+    }
+    return merged
+  }
+
   protected parseRequestMessage(message: RequestMessage): MessageParam | null {
     switch (message.role) {
       case 'user': {
         if (Array.isArray(message.content)) {
           const content = message.content.map(
-            (part): TextBlockParam | ImageBlockParam => {
+            (part): TextBlockParam | ImageBlockParam | DocumentBlockParam => {
               switch (part.type) {
                 case 'text':
                   return { type: 'text', text: part.text }
@@ -511,6 +545,19 @@ https://github.com/glowingjade/obsidian-smart-composer/issues/286`,
                       data: base64Data,
                       media_type: mimeType as Base64ImageSource['media_type'],
                       type: 'base64',
+                    },
+                  }
+                }
+                case 'document': {
+                  // Native PDF support via Anthropic's document block. The
+                  // 'pdf' modality gate upstream guarantees this only reaches
+                  // models that advertise native PDF support.
+                  return {
+                    type: 'document',
+                    source: {
+                      type: 'base64',
+                      media_type: part.mediaType,
+                      data: part.data,
                     },
                   }
                 }

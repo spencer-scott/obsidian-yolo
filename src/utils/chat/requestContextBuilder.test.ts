@@ -13,7 +13,7 @@ jest.mock('../llm/image', () => ({
   tFileToImageDataUrl: jest.fn(async () => 'data:image/png;base64,fake'),
 }))
 
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 import type { ChatUserMessage } from '../../types/chat'
 import type { ChatModel } from '../../types/chat-model.types'
 import type { ContentPart, RequestMessage } from '../../types/llm/request'
@@ -144,7 +144,7 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
       mentionContextMode: 'light',
     },
     skills: {},
-  } as unknown as SmartComposerSettings
+  } as unknown as YoloSettings
 
   it('builds unified mentioned file context with outlines for files, current file, and folder files', async () => {
     const explicitFile = createMockFile('notes/explicit.md')
@@ -347,7 +347,7 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
           includeCurrentFileContent: true,
           mentionContextMode: 'full',
         },
-      } as unknown as SmartComposerSettings,
+      } as unknown as YoloSettings,
     )
 
     const result = await builder.compileUserMessagePrompt({
@@ -362,8 +362,12 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
     expect(textContent).toContain(
       '## Mentioned Vault Files (full content already provided below)',
     )
+    expect(textContent).toContain('- `notes/explicit.md` (2 lines)')
     expect(textContent).toContain(
-      'Use this provided content first. Only call file tools if you need another file or want to verify the latest contents.',
+      'Do NOT call any file-reading tool (e.g. read_file) to re-read them',
+    )
+    expect(textContent).toContain(
+      '### `notes/explicit.md` (full content, 2 lines)',
     )
     expect(textContent).toContain(
       '```notes/explicit.md\n1|# Explicit\n2|Body\n```',
@@ -373,6 +377,72 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
       '- `docs/from-folder.md`\n  - L1 ## Folder Heading',
     )
     expect(textContent).not.toContain('Folder body')
+  })
+
+  it('omits the full-content section when all mentioned files fail to read', async () => {
+    const explicitFile = createMockFile('notes/unreadable.md')
+
+    const app = createMockApp({
+      files: [explicitFile],
+      fileContents: new Map(),
+    })
+    ;(app.vault.cachedRead as jest.Mock).mockImplementation(async () => {
+      throw new Error('forced read failure')
+    })
+
+    const builder = new RequestContextBuilder(
+      app as never,
+      {
+        ...settings,
+        chatOptions: {
+          includeCurrentFileContent: true,
+          mentionContextMode: 'full',
+        },
+      } as unknown as YoloSettings,
+    )
+
+    const result = await builder.compileUserMessagePrompt({
+      message: createUserMessage([{ type: 'file', file: explicitFile }]),
+    })
+
+    const textContent = getTextContent(result.promptContent)
+
+    expect(textContent).not.toContain(
+      '## Mentioned Vault Files (full content already provided below)',
+    )
+    expect(textContent).not.toContain('### `notes/unreadable.md`')
+  })
+
+  it('reports zero lines for empty files in full mode', async () => {
+    const emptyFile = createMockFile('notes/empty.md')
+
+    const app = createMockApp({
+      files: [emptyFile],
+      fileContents: new Map([[emptyFile.path, '']]),
+    })
+
+    const builder = new RequestContextBuilder(
+      app as never,
+      {
+        ...settings,
+        chatOptions: {
+          includeCurrentFileContent: true,
+          mentionContextMode: 'full',
+        },
+      } as unknown as YoloSettings,
+    )
+
+    const result = await builder.compileUserMessagePrompt({
+      message: createUserMessage([{ type: 'file', file: emptyFile }]),
+    })
+
+    const textContent = getTextContent(result.promptContent)
+
+    expect(textContent).toContain('- `notes/empty.md` (0 lines)')
+    expect(textContent).toContain(
+      '### `notes/empty.md` (full content, 0 lines)',
+    )
+    expect(textContent).toContain('```notes/empty.md\n\n```')
   })
 })
 
@@ -387,7 +457,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
       mentionContextMode: 'light',
     },
     skills: {},
-  } as unknown as SmartComposerSettings
+  } as unknown as YoloSettings
 
   const emptyArgs = createCompleteToolCallArguments({ value: {} })
 
@@ -984,7 +1054,9 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     // Build 34 messages (17 user + 17 assistant alternating), first user is the one we track
-    const historyMessages: Parameters<typeof builder.generateRequestMessages>[0]['messages'] = []
+    const historyMessages: Parameters<
+      typeof builder.generateRequestMessages
+    >[0]['messages'] = []
     for (let i = 0; i < 34; i++) {
       if (i % 2 === 0) {
         historyMessages.push({
@@ -1029,6 +1101,176 @@ describe('RequestContextBuilder generateRequestMessages', () => {
   })
 })
 
+describe('RequestContextBuilder project instructions injection', () => {
+  function makeApp(rootFiles: Map<string, string>) {
+    return {
+      metadataCache: { getFileCache: jest.fn(() => null) },
+      vault: {
+        adapter: {
+          exists: jest.fn().mockResolvedValue(false),
+          mkdir: jest.fn().mockResolvedValue(undefined),
+          read: jest.fn().mockResolvedValue(''),
+          write: jest.fn().mockResolvedValue(undefined),
+        },
+        cachedRead: jest.fn(async (file: { path: string }) => {
+          return rootFiles.get(file.path) ?? ''
+        }),
+        getAbstractFileByPath: jest.fn((path: string) => {
+          if (!rootFiles.has(path)) return null
+          const file = Object.assign(new TFile(), { path })
+          ;(
+            file as unknown as { parent: InstanceType<typeof TFolder> }
+          ).parent = Object.assign(new TFolder(), { path: '', parent: null })
+          return file
+        }),
+        getRoot: jest.fn(() =>
+          Object.assign(new TFolder(), { path: '', parent: null }),
+        ),
+        getFileByPath: jest.fn(() => null),
+        getFolderByPath: jest.fn(() => null),
+        getMarkdownFiles: jest.fn(() => []),
+      },
+    }
+  }
+
+  const baseSettings = {
+    systemPrompt: '',
+    currentAssistantId: undefined,
+    assistants: [],
+    chatOptions: {
+      includeCurrentFileContent: true,
+      mentionContextMode: 'light',
+    },
+    skills: {},
+  } as unknown as YoloSettings
+
+  async function buildSystemContent(
+    app: ReturnType<typeof makeApp>,
+    settings: YoloSettings,
+  ): Promise<string> {
+    const builder = new RequestContextBuilder(app as never, settings)
+    const requestMessages = await builder.generateRequestMessages({
+      messages: [
+        {
+          role: 'user',
+          id: 'user-1',
+          content: null,
+          promptContent: 'hi',
+          mentionables: [],
+        },
+      ],
+      model: {
+        provider: 'openai',
+        model: 'gpt-test',
+        name: 'gpt-test',
+      } as never,
+      conversationId: 'conv-pi',
+    })
+    const system = requestMessages.find((m) => m.role === 'system')
+    expect(system).toBeDefined()
+    return typeof system!.content === 'string' ? system!.content : ''
+  }
+
+  it('does not inject project instructions by default (no assistant selected)', async () => {
+    const app = makeApp(
+      new Map([
+        ['AGENTS.md', 'rule from agents'],
+        ['CLAUDE.md', 'rule from claude'],
+      ]),
+    )
+    const content = await buildSystemContent(app, baseSettings)
+    expect(content).not.toContain('## Project instructions: AGENTS.md')
+    expect(content).not.toContain('## Project instructions: CLAUDE.md')
+  })
+
+  it('injects AGENTS.md and CLAUDE.md when current assistant enables it explicitly', async () => {
+    const app = makeApp(
+      new Map([
+        ['AGENTS.md', 'rule from agents'],
+        ['CLAUDE.md', 'rule from claude'],
+      ]),
+    )
+    const settings = {
+      ...baseSettings,
+      currentAssistantId: 'a-1',
+      assistants: [
+        {
+          id: 'a-1',
+          name: 'Enabled',
+          systemPrompt: '',
+          enableProjectInstructions: true,
+        },
+      ],
+    } as unknown as YoloSettings
+    const content = await buildSystemContent(app, settings)
+    expect(content).toContain('## Project instructions: AGENTS.md')
+    expect(content).toContain('rule from agents')
+    expect(content).toContain('## Project instructions: CLAUDE.md')
+    expect(content).toContain('rule from claude')
+    // Project instructions should appear after the base behavior section,
+    // not as the first thing in the system message.
+    const projectIdx = content.indexOf('project instructions in the vault')
+    expect(projectIdx).toBeGreaterThan(0)
+  })
+
+  it('omits project instructions when current assistant disables it explicitly', async () => {
+    const app = makeApp(new Map([['CLAUDE.md', 'rule from claude']]))
+    const settings = {
+      ...baseSettings,
+      currentAssistantId: 'a-1',
+      assistants: [
+        {
+          id: 'a-1',
+          name: 'Disabled',
+          systemPrompt: '',
+          enableProjectInstructions: false,
+        },
+      ],
+    } as unknown as YoloSettings
+    const content = await buildSystemContent(app, settings)
+    expect(content).not.toContain('## Project instructions: CLAUDE.md')
+    expect(content).not.toContain('rule from claude')
+  })
+
+  it('defaults to disabled when currentAssistantId points to a non-existent assistant', async () => {
+    const app = makeApp(new Map([['CLAUDE.md', 'rule from claude']]))
+    const settings = {
+      ...baseSettings,
+      currentAssistantId: 'missing-id',
+      assistants: [
+        {
+          id: 'other-id',
+          name: 'Other',
+          systemPrompt: '',
+          enableProjectInstructions: true,
+        },
+      ],
+    } as unknown as YoloSettings
+    const content = await buildSystemContent(app, settings)
+    expect(content).not.toContain('## Project instructions: CLAUDE.md')
+    expect(content).not.toContain('rule from claude')
+  })
+
+  it('defaults to disabled when assistant exists but enableProjectInstructions is undefined', async () => {
+    const app = makeApp(new Map([['CLAUDE.md', 'rule from claude']]))
+    const settings = {
+      ...baseSettings,
+      currentAssistantId: 'a-1',
+      assistants: [{ id: 'a-1', name: 'Default', systemPrompt: '' }],
+    } as unknown as YoloSettings
+    const content = await buildSystemContent(app, settings)
+    expect(content).not.toContain('## Project instructions: CLAUDE.md')
+  })
+
+  it('omits project instructions section when neither file exists', async () => {
+    const app = makeApp(new Map())
+    const content = await buildSystemContent(app, baseSettings)
+    expect(content).not.toContain('## Project instructions: AGENTS.md')
+    expect(content).not.toContain('## Project instructions: CLAUDE.md')
+    expect(content).not.toContain('project instructions in the vault')
+  })
+})
+
 describe('RequestContextBuilder generateRequestMessages currentFile merging', () => {
   const baseSettings = {
     systemPrompt: '',
@@ -1039,7 +1281,7 @@ describe('RequestContextBuilder generateRequestMessages currentFile merging', ()
       mentionContextMode: 'light',
     },
     skills: {},
-  } as unknown as SmartComposerSettings
+  } as unknown as YoloSettings
 
   function makeApp() {
     return {
@@ -1278,5 +1520,212 @@ describe('stripUnsupportedImages', () => {
       type: 'text',
       text: '[Image omitted: model does not support vision]',
     })
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────────
+// parseToolMessage document hoisting
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('parseToolMessage document hoisting', () => {
+  const emptyArgs = createCompleteToolCallArguments({ value: {} })
+
+  const mockApp = {
+    vault: {
+      adapter: {
+        exists: jest.fn().mockResolvedValue(false),
+        mkdir: jest.fn().mockResolvedValue(undefined),
+        read: jest.fn().mockResolvedValue(''),
+        write: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+  }
+
+  const mockSettings = {
+    systemPrompt: '',
+    currentAssistantId: undefined,
+    assistants: [],
+    yolo: { baseDir: 'YOLO' },
+    chatOptions: {
+      includeCurrentFileContent: false,
+      mentionContextMode: 'light',
+    },
+    skills: {},
+    // A PDF-capable model so prepareDocumentsForModel doesn't strip document parts.
+    chatModels: [
+      {
+        id: 'pdf-provider/pdf-model',
+        providerId: 'pdf-provider',
+        model: 'pdf-model',
+        modalities: ['text', 'vision', 'pdf'],
+      },
+    ],
+  } as unknown as YoloSettings
+
+  // Use this model ID when building request messages so the PDF modality gate passes.
+  const PDF_MODEL_ID = 'pdf-provider/pdf-model'
+
+  /**
+   * Build a minimal conversation with one assistant turn (with tool calls),
+   * one tool response turn carrying the given contentParts, and a final user
+   * message. Returns the generated request messages.
+   */
+  const buildMessagesWithToolResponse = async (
+    toolName: string,
+    contentParts: ContentPart[],
+  ) => {
+    const builder = new RequestContextBuilder(mockApp as never, mockSettings)
+    return builder.generateRequestMessages({
+      messages: [
+        {
+          role: 'user',
+          id: 'user-1',
+          content: null,
+          promptContent: 'read some file',
+          mentionables: [],
+        },
+        {
+          role: 'assistant',
+          id: 'asst-1',
+          content: 'ok',
+          toolCallRequests: [
+            {
+              id: 'tc-1',
+              name: toolName,
+              arguments: emptyArgs,
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          id: 'tool-1',
+          toolCalls: [
+            {
+              request: {
+                id: 'tc-1',
+                name: toolName,
+                arguments: emptyArgs,
+              },
+              response: {
+                status: ToolCallResponseStatus.Success,
+                data: {
+                  type: 'text',
+                  text: 'tool result text',
+                  contentParts,
+                },
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          id: 'user-2',
+          content: null,
+          promptContent: 'follow-up',
+          mentionables: [],
+        },
+      ],
+      hasTools: true,
+      hasMemoryTools: false,
+      // Use a PDF-capable model so prepareDocumentsForModel passes document parts through.
+      model: {
+        id: PDF_MODEL_ID,
+        providerId: 'pdf-provider',
+        model: 'pdf-model',
+        name: 'pdf-model',
+        modalities: ['text', 'vision', 'pdf'],
+      } as never,
+      conversationId: 'conv-doc-hoist',
+    })
+  }
+
+  it('hoists document part from tool response into follow-up user message', async () => {
+    const documentPart: ContentPart = {
+      type: 'document',
+      mediaType: 'application/pdf',
+      name: 'report.pdf (pages 1–3)',
+      data: 'base64data',
+      pageCount: 3,
+    }
+
+    const messages = await buildMessagesWithToolResponse(
+      'yolo_local__fs_read',
+      [documentPart],
+    )
+
+    // There should be a user message with the document part and a header label.
+    const userMessages = messages.filter((m) => m.role === 'user')
+    const hoistMsg = userMessages.find(
+      (m) =>
+        Array.isArray(m.content) &&
+        m.content.some((p) => p.type === 'document'),
+    )
+    expect(hoistMsg).toBeDefined()
+    const content = hoistMsg!.content as ContentPart[]
+    const headerPart = content.find((p) => p.type === 'text')
+    expect(headerPart?.type === 'text' && headerPart.text).toContain(
+      'PDF attachments from tool call',
+    )
+    expect(headerPart?.type === 'text' && headerPart.text).toContain(
+      'yolo_local__fs_read',
+    )
+    const docPart = content.find((p) => p.type === 'document')
+    expect(docPart).toEqual(documentPart)
+  })
+
+  it('hoists image_url part alone → header is "Images from tool call"', async () => {
+    const imagePart: ContentPart = {
+      type: 'image_url',
+      image_url: { url: 'data:image/png;base64,AAA' },
+    }
+
+    const messages = await buildMessagesWithToolResponse(
+      'yolo_local__fs_read',
+      [imagePart],
+    )
+
+    const userMessages = messages.filter((m) => m.role === 'user')
+    const hoistMsg = userMessages.find(
+      (m) =>
+        Array.isArray(m.content) &&
+        m.content.some((p) => p.type === 'image_url'),
+    )
+    expect(hoistMsg).toBeDefined()
+    const content = hoistMsg!.content as ContentPart[]
+    const headerPart = content.find((p) => p.type === 'text')
+    expect(headerPart?.type === 'text' && headerPart.text).toContain(
+      'Images from tool call',
+    )
+  })
+
+  it('mixed image + document → header is "Attachments from tool call"', async () => {
+    const imagePart: ContentPart = {
+      type: 'image_url',
+      image_url: { url: 'data:image/png;base64,BBB' },
+    }
+    const documentPart: ContentPart = {
+      type: 'document',
+      mediaType: 'application/pdf',
+      name: 'file.pdf',
+      data: 'base64',
+    }
+
+    const messages = await buildMessagesWithToolResponse(
+      'yolo_local__fs_read',
+      [imagePart, documentPart],
+    )
+
+    const userMessages = messages.filter((m) => m.role === 'user')
+    const hoistMsg = userMessages.find(
+      (m) =>
+        Array.isArray(m.content) &&
+        m.content.some((p) => p.type === 'image_url' || p.type === 'document'),
+    )
+    expect(hoistMsg).toBeDefined()
+    const content = hoistMsg!.content as ContentPart[]
+    const headerPart = content.find((p) => p.type === 'text')
+    expect(headerPart?.type === 'text' && headerPart.text).toContain(
+      'Attachments from tool call',
+    )
   })
 })

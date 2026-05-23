@@ -32,7 +32,7 @@ import { LanguageProvider, useLanguage } from '../../contexts/language-context'
 import { PluginProvider, usePlugin } from '../../contexts/plugin-context'
 import { SettingsProvider, useSettings } from '../../contexts/settings-context'
 import { getChatModelClient } from '../../core/llm/manager'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 import { MentionableFile, MentionableFolder } from '../../types/mentionable'
 import {
   deserializeMentionable,
@@ -470,7 +470,7 @@ function SmartSpacePanelBody({
         settings: plugin.settings,
         modelId: continuationModelId,
       })
-      return model.toolType === 'gemini'
+      return model.builtinToolProvider === 'gemini'
     } catch {
       return false
     }
@@ -531,7 +531,7 @@ function SmartSpacePanelBody({
           instruction: action.instruction,
           icon: (
             <IconComponent
-              className="smtcmp-smart-space-item-icon-svg"
+              className="yolo-smart-space-item-icon-svg"
               size={14}
             />
           ),
@@ -599,10 +599,7 @@ function SmartSpacePanelBody({
               'continue',
               'chat.customContinueSections.suggestions.items.continue.label',
               'chat.customContinueSections.suggestions.items.continue.instruction',
-              <Sparkles
-                className="smtcmp-smart-space-item-icon-svg"
-                size={14}
-              />,
+              <Sparkles className="yolo-smart-space-item-icon-svg" size={14} />,
             ),
           ],
         ),
@@ -611,31 +608,31 @@ function SmartSpacePanelBody({
             'summarize',
             'chat.customContinueSections.writing.items.summarize.label',
             'chat.customContinueSections.writing.items.summarize.instruction',
-            <FileText className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <FileText className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'todo',
             'chat.customContinueSections.writing.items.todo.label',
             'chat.customContinueSections.writing.items.todo.instruction',
-            <ListTodo className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <ListTodo className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'flowchart',
             'chat.customContinueSections.writing.items.flowchart.label',
             'chat.customContinueSections.writing.items.flowchart.instruction',
-            <Workflow className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <Workflow className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'table',
             'chat.customContinueSections.writing.items.table.label',
             'chat.customContinueSections.writing.items.table.instruction',
-            <Table className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <Table className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'freewrite',
             'chat.customContinueSections.writing.items.freewrite.label',
             'chat.customContinueSections.writing.items.freewrite.instruction',
-            <PenLine className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <PenLine className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
         ]),
         makeSection('thinking', 'chat.customContinueSections.thinking.title', [
@@ -643,23 +640,20 @@ function SmartSpacePanelBody({
             'brainstorm',
             'chat.customContinueSections.thinking.items.brainstorm.label',
             'chat.customContinueSections.thinking.items.brainstorm.instruction',
-            <Lightbulb
-              className="smtcmp-smart-space-item-icon-svg"
-              size={14}
-            />,
+            <Lightbulb className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'analyze',
             'chat.customContinueSections.thinking.items.analyze.label',
             'chat.customContinueSections.thinking.items.analyze.instruction',
-            <Brain className="smtcmp-smart-space-item-icon-svg" size={14} />,
+            <Brain className="yolo-smart-space-item-icon-svg" size={14} />,
           ),
           makeItem(
             'dialogue',
             'chat.customContinueSections.thinking.items.dialogue.label',
             'chat.customContinueSections.thinking.items.dialogue.instruction',
             <MessageCircle
-              className="smtcmp-smart-space-item-icon-svg"
+              className="yolo-smart-space-item-icon-svg"
               size={14}
             />,
           ),
@@ -991,21 +985,21 @@ function SmartSpacePanelBody({
   const isInputEmpty = instructionText.length === 0 && mentionables.length === 0
 
   return (
-    <div className="smtcmp-smart-space-panel" ref={resolvedContainerRef}>
+    <div className="yolo-smart-space-panel" ref={resolvedContainerRef}>
       {!isSubmitting ? (
         <>
-          <div className="smtcmp-smart-space-input-card" ref={inputCardRef}>
+          <div className="yolo-smart-space-input-card" ref={inputCardRef}>
             <div
-              className={`smtcmp-smart-space-header${
+              className={`yolo-smart-space-header${
                 isMultilineInput ? ' is-multiline' : ''
               }${isInputEmpty ? ' is-empty' : ''}`}
             >
-              <div className="smtcmp-smart-space-avatar">
+              <div className="yolo-smart-space-avatar">
                 <Sparkles size={14} />
               </div>
-              <div className="smtcmp-smart-space-input-wrapper">
+              <div className="yolo-smart-space-input-wrapper">
                 <div
-                  className={`smtcmp-smart-space-input${isSubmitting ? ' is-disabled' : ''}${
+                  className={`yolo-smart-space-input${isSubmitting ? ' is-disabled' : ''}${
                     isMultilineInput ? ' is-multiline' : ''
                   }${isInputEmpty ? ' is-empty' : ''}`}
                   onKeyDownCapture={handleInputKeyDown}
@@ -1013,7 +1007,7 @@ function SmartSpacePanelBody({
                   aria-disabled={isSubmitting ? 'true' : undefined}
                 >
                   {isInputEmpty && (
-                    <div className="smtcmp-smart-space-input-placeholder">
+                    <div className="yolo-smart-space-input-placeholder">
                       {t(
                         'chat.customContinuePromptPlaceholder',
                         'Ask AI (@ for files, # for quick actions)...',
@@ -1035,21 +1029,21 @@ function SmartSpacePanelBody({
                     mentionMenuContainerRef={inputCardRef}
                     mentionMenuPlacement={mentionMenuPlacement}
                     autoFocus
-                    contentClassName="smtcmp-obsidian-textarea smtcmp-content-editable smtcmp-smart-space-content-editable"
+                    contentClassName="yolo-obsidian-textarea yolo-content-editable yolo-smart-space-content-editable"
                   />
                 </div>
                 {(instructionText.length > 0 ||
                   mentionables.length > 0 ||
                   isSubmitConfirmPending) && (
-                  <div className="smtcmp-smart-space-input-hint">
+                  <div className="yolo-smart-space-input-hint">
                     {isSubmitConfirmPending
                       ? t('chat.customContinueConfirmHint', 'Press Enter again to confirm')
                       : t('chat.customContinueHint', 'Press Enter to submit')}
                   </div>
                 )}
               </div>
-              <div className="smtcmp-smart-space-controls">
-                <div className="smtcmp-smart-space-model-select">
+              <div className="yolo-smart-space-controls">
+                <div className="yolo-smart-space-model-select">
                   <ModelSelect
                     ref={modelSelectRef}
                     modelId={selectedModelId}
@@ -1117,11 +1111,11 @@ function SmartSpacePanelBody({
                   />
                 </div>
                 {hasGeminiTools && (
-                  <div className="smtcmp-smart-space-tools">
+                  <div className="yolo-smart-space-tools">
                     <button
                       ref={webSearchButtonRef}
                       type="button"
-                      className={`smtcmp-smart-space-tool-button ${
+                      className={`yolo-smart-space-tool-button ${
                         useWebSearch ? 'active' : ''
                       }`}
                       onClick={() => {
@@ -1165,7 +1159,7 @@ function SmartSpacePanelBody({
                     <button
                       ref={urlContextButtonRef}
                       type="button"
-                      className={`smtcmp-smart-space-tool-button ${
+                      className={`yolo-smart-space-tool-button ${
                         useUrlContext ? 'active' : ''
                       }`}
                       onClick={() => {
@@ -1212,17 +1206,13 @@ function SmartSpacePanelBody({
             </div>
           </div>
           {error && (
-            <div
-              className="smtcmp-smart-space-error"
-              role="alert"
-              ref={errorRef}
-            >
+            <div className="yolo-smart-space-error" role="alert" ref={errorRef}>
               {error}
             </div>
           )}
           {shouldShowQuickActions && isQuickActionsLayoutReady && (
             <div
-              className={`smtcmp-smart-space-section-card is-floating smtcmp-smart-space-section-card--${quickActionsPlacement}${
+              className={`yolo-smart-space-section-card is-floating yolo-smart-space-section-card--${quickActionsPlacement}${
                 isKeyboardNavigationActive ? ' is-keyboard-nav' : ''
               }`}
               onPointerMove={handleQuickActionsPointerMove}
@@ -1233,18 +1223,15 @@ function SmartSpacePanelBody({
                 maxHeight: quickActionsMaxHeight,
               }}
             >
-              <div className="smtcmp-smart-space-section-list">
+              <div className="yolo-smart-space-section-list">
                 {(() => {
                   let itemIndex = -1
                   return sections.map((section) => (
-                    <div
-                      className="smtcmp-smart-space-section"
-                      key={section.id}
-                    >
-                      <div className="smtcmp-smart-space-section-title">
+                    <div className="yolo-smart-space-section" key={section.id}>
+                      <div className="yolo-smart-space-section-title">
                         {section.title}
                       </div>
-                      <div className="smtcmp-smart-space-section-items">
+                      <div className="yolo-smart-space-section-items">
                         {section.items.map((item) => {
                           itemIndex += 1
                           const currentIndex = itemIndex
@@ -1252,7 +1239,7 @@ function SmartSpacePanelBody({
                             <button
                               key={item.id}
                               type="button"
-                              className="smtcmp-smart-space-item"
+                              className="yolo-smart-space-item"
                               onClick={() =>
                                 void handleSubmit(item.instruction)
                               }
@@ -1268,10 +1255,10 @@ function SmartSpacePanelBody({
                                 itemRefs.current[currentIndex] = element
                               }}
                             >
-                              <span className="smtcmp-smart-space-item-icon">
+                              <span className="yolo-smart-space-item-icon">
                                 {item.icon}
                               </span>
-                              <span className="smtcmp-smart-space-item-label">
+                              <span className="yolo-smart-space-item-label">
                                 {item.label}
                               </span>
                             </button>
@@ -1310,7 +1297,7 @@ export class SmartSpaceWidget extends WidgetType {
 
   constructor(
     private readonly options: {
-      plugin: SmartComposerPlugin
+      plugin: YoloPlugin
       editor: Editor
       view: EditorView
       onClose: () => void
@@ -1326,7 +1313,7 @@ export class SmartSpaceWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const anchor = document.createElement('span')
-    anchor.className = 'smtcmp-smart-space-inline-anchor'
+    anchor.className = 'yolo-smart-space-inline-anchor'
     anchor.setAttribute('aria-hidden', 'true')
     this.anchor = anchor
 
@@ -1386,7 +1373,7 @@ export class SmartSpaceWidget extends WidgetType {
       const host = overlayRoot.parentElement
       overlayRoot.remove()
       SmartSpaceWidget.overlayRoot = null
-      host?.classList.remove('smtcmp-smart-space-overlay-host')
+      host?.classList.remove('yolo-smart-space-overlay-host')
     }
     this.anchor = null
   }
@@ -1397,7 +1384,7 @@ export class SmartSpaceWidget extends WidgetType {
       SmartSpaceWidget.overlayRoot.parentElement !== host
     ) {
       SmartSpaceWidget.overlayRoot.parentElement?.classList.remove(
-        'smtcmp-smart-space-overlay-host',
+        'yolo-smart-space-overlay-host',
       )
       SmartSpaceWidget.overlayRoot.remove()
       SmartSpaceWidget.overlayRoot = null
@@ -1406,9 +1393,9 @@ export class SmartSpaceWidget extends WidgetType {
     if (SmartSpaceWidget.overlayRoot) return SmartSpaceWidget.overlayRoot
 
     const root = document.createElement('div')
-    root.className = 'smtcmp-smart-space-overlay-root'
+    root.className = 'yolo-smart-space-overlay-root'
     host.appendChild(root)
-    host.classList.add('smtcmp-smart-space-overlay-host')
+    host.classList.add('yolo-smart-space-overlay-host')
     SmartSpaceWidget.overlayRoot = root
     return root
   }
@@ -1446,7 +1433,7 @@ export class SmartSpaceWidget extends WidgetType {
 
     const overlayRoot = SmartSpaceWidget.getOverlayRoot(overlayHost)
     const overlayContainer = document.createElement('div')
-    overlayContainer.className = 'smtcmp-smart-space-overlay'
+    overlayContainer.className = 'yolo-smart-space-overlay'
     overlayRoot.appendChild(overlayContainer)
     this.overlayContainer = overlayContainer
 
@@ -1591,7 +1578,7 @@ export class SmartSpaceWidget extends WidgetType {
 
     updateDynamicStyleClass(
       this.overlayContainer,
-      'smtcmp-smart-space-overlay-pos',
+      'yolo-smart-space-overlay-pos',
       {
         width: maxPanelWidth,
         left: Math.round(left),

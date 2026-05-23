@@ -10,9 +10,8 @@ import {
   getDefaultRequestTransportModeForPresetType,
 } from './types/provider.types'
 
-export const CHAT_VIEW_TYPE = 'smtcmp-chat-view'
+export const CHAT_VIEW_TYPE = 'yolo-chat-view'
 export const DEFAULT_UNTITLED_CONVERSATION_TITLE = 'New Conversation'
-export const PLUGIN_ID = 'obsidian-smart-composer'
 
 // Default model ids (with provider prefix)
 export const DEFAULT_CHAT_MODEL_ID = 'openai/gpt-5'
@@ -46,7 +45,7 @@ const REQUEST_TRANSPORT_MODE_SETTING = {
     node: 'Desktop Node fetch',
   },
   description:
-    'Auto: try browser fetch first, then desktop Node fetch, and finally Obsidian requestUrl on CORS/network errors. Obsidian mode buffers streaming responses. Node mode uses desktop-only Node fetch for real streaming.',
+    'Auto: on desktop tries Node fetch first, then browser fetch, and finally Obsidian requestUrl on CORS/network errors; on mobile tries browser fetch then Obsidian requestUrl. Obsidian mode buffers streaming responses. Node mode uses desktop-only Node fetch for real streaming.',
 }
 
 // Surfaced dynamically when a provider's apiType is 'anthropic'
@@ -116,7 +115,7 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [],
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
   },
   groq: {
     label: 'Groq',
@@ -230,6 +229,94 @@ export const PROVIDER_PRESET_INFO = {
       },
       REQUEST_TRANSPORT_MODE_SETTING,
     ],
+  },
+  zhipu: {
+    label: 'Zhipu',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: true,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  doubao: {
+    label: 'Doubao',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: true,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  siliconflow: {
+    label: 'SiliconFlow',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: true,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  stepfun: {
+    label: 'StepFun',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  minimax: {
+    label: 'MiniMax',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: true,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  hunyuan: {
+    label: 'Hunyuan',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  xai: {
+    label: 'xAI',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  'together-ai': {
+    label: 'Together AI',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: true,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  cerebras: {
+    label: 'Cerebras',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  sambanova: {
+    label: 'SambaNova',
+    defaultProviderId: null,
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+  },
+  xiaomimimo: {
+    label: 'Xiaomi MiMo',
+    defaultProviderId: 'xiaomimimo',
+    requireApiKey: true,
+    requireBaseUrl: false,
+    supportEmbedding: false,
+    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
   },
   'openai-compatible': {
     label: 'OpenAI Compatible',
@@ -357,6 +444,11 @@ export const DEFAULT_PROVIDERS: readonly LLMProvider[] = [
     apiType: getDefaultApiTypeForPresetType('openrouter'),
     id: PROVIDER_PRESET_INFO.openrouter.defaultProviderId,
   },
+  {
+    presetType: 'xiaomimimo',
+    apiType: getDefaultApiTypeForPresetType('xiaomimimo'),
+    id: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+  },
 ]
 
 /**
@@ -426,7 +518,7 @@ export const DEFAULT_CHAT_MODELS: readonly ChatModel[] = [
     model: 'gemini-2.5-pro',
     enable: false,
     reasoningType: 'gemini',
-    toolType: 'gemini',
+    builtinToolProvider: 'gemini',
   },
   {
     providerId: PROVIDER_PRESET_INFO['gemini-oauth'].defaultProviderId,
@@ -434,7 +526,7 @@ export const DEFAULT_CHAT_MODELS: readonly ChatModel[] = [
     model: 'gemini-2.5-flash',
     enable: false,
     reasoningType: 'gemini',
-    toolType: 'gemini',
+    builtinToolProvider: 'gemini',
   },
   {
     providerId: PROVIDER_PRESET_INFO['gemini-oauth'].defaultProviderId,
@@ -442,7 +534,7 @@ export const DEFAULT_CHAT_MODELS: readonly ChatModel[] = [
     model: 'gemini-2.5-flash-lite',
     enable: false,
     reasoningType: 'gemini',
-    toolType: 'gemini',
+    builtinToolProvider: 'gemini',
   },
   {
     providerId: PROVIDER_PRESET_INFO['qwen-oauth'].defaultProviderId,
@@ -553,6 +645,41 @@ export const DEFAULT_CHAT_MODELS: readonly ChatModel[] = [
     id: 'deepseek/deepseek-reasoner',
     model: 'deepseek-reasoner',
     enable: false,
+  },
+  {
+    providerId: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+    id: 'xiaomimimo/mimo-v2.5-pro',
+    model: 'mimo-v2.5-pro',
+    enable: false,
+    reasoningType: 'openai',
+  },
+  {
+    providerId: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+    id: 'xiaomimimo/mimo-v2.5',
+    model: 'mimo-v2.5',
+    enable: false,
+    reasoningType: 'openai',
+  },
+  {
+    providerId: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+    id: 'xiaomimimo/mimo-v2-pro',
+    model: 'mimo-v2-pro',
+    enable: false,
+    reasoningType: 'openai',
+  },
+  {
+    providerId: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+    id: 'xiaomimimo/mimo-v2-omni',
+    model: 'mimo-v2-omni',
+    enable: false,
+    reasoningType: 'openai',
+  },
+  {
+    providerId: PROVIDER_PRESET_INFO.xiaomimimo.defaultProviderId,
+    id: 'xiaomimimo/mimo-v2-flash',
+    model: 'mimo-v2-flash',
+    enable: false,
+    reasoningType: 'openai',
   },
 ]
 

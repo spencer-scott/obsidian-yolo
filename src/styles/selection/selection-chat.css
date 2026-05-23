@@ -3,11 +3,11 @@
    ============================================ */
 
 /* Overlay root container */
-.smtcmp-selection-chat-overlay-host {
+.yolo-selection-chat-overlay-host {
   position: relative;
 }
 
-.smtcmp-selection-chat-overlay-root {
+.yolo-selection-chat-overlay-root {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -16,7 +16,7 @@
   z-index: 1;
 }
 
-.smtcmp-selection-chat-overlay {
+.yolo-selection-chat-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -51,7 +51,7 @@
 }
 
 /* Selection Indicator - small floating capsule */
-.smtcmp-selection-indicator {
+.yolo-selection-indicator {
   position: absolute;
   display: flex;
   align-items: center;
@@ -72,26 +72,26 @@
     transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.smtcmp-selection-indicator.visible {
+.yolo-selection-indicator.visible {
   opacity: 1;
   transform: scale(1);
 }
 
-.smtcmp-selection-indicator:hover {
+.yolo-selection-indicator:hover {
   background: var(--background-primary);
   border-color: var(--interactive-accent-hover);
   box-shadow: var(--shadow-s);
   transform: scale(1.05);
 }
 
-.smtcmp-selection-indicator svg {
+.yolo-selection-indicator svg {
   width: 14px;
   height: 14px;
   color: var(--h1-color, var(--interactive-accent));
 }
 
 /* Selection Actions Menu */
-.smtcmp-selection-menu {
+.yolo-selection-menu {
   position: absolute;
   min-width: 200px;
   max-width: 280px;
@@ -102,13 +102,13 @@
   transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.smtcmp-selection-menu.visible {
+.yolo-selection-menu.visible {
   pointer-events: auto;
   opacity: 1;
   transform: translateY(0) scale(1);
 }
 
-.smtcmp-selection-menu-content {
+.yolo-selection-menu-content {
   background: var(--background-primary);
   border: 1px solid
     color-mix(in srgb, var(--interactive-accent) 30%, transparent);
@@ -122,7 +122,7 @@
   gap: 4px;
 }
 
-.smtcmp-selection-menu-item {
+.yolo-selection-menu-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -142,9 +142,9 @@
   font-size: var(--font-ui-small);
 }
 
-.smtcmp-selection-menu-item:hover,
-.smtcmp-selection-menu-item:focus,
-.smtcmp-selection-menu-item:focus-visible {
+.yolo-selection-menu-item:hover,
+.yolo-selection-menu-item:focus,
+.yolo-selection-menu-item:focus-visible {
   background: color-mix(
     in srgb,
     var(--background-modifier-hover) 40%,
@@ -158,11 +158,11 @@
   outline: none;
 }
 
-.smtcmp-selection-menu-item:active {
+.yolo-selection-menu-item:active {
   transform: scale(0.97);
 }
 
-.smtcmp-selection-menu-item-icon {
+.yolo-selection-menu-item-icon {
   width: 24px;
   height: 24px;
   border-radius: 999px;
@@ -178,12 +178,12 @@
   flex-shrink: 0;
 }
 
-.smtcmp-selection-menu-item-icon svg {
+.yolo-selection-menu-item-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.smtcmp-selection-menu-item-label {
+.yolo-selection-menu-item-label {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;

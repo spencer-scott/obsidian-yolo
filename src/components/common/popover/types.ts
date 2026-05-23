@@ -43,6 +43,14 @@ export const resolveYoloPopoverStyle = (
   const maxH = toCssLength(size.maxHeight)
   if (min !== undefined) out.minWidth = min
   if (max !== undefined) out.maxWidth = max
-  if (maxH !== undefined) out.maxHeight = maxH
+  if (maxH !== undefined) {
+    // Radix Popover / DropdownMenu inject `--radix-*-content-available-height`
+    // representing the viewport space on the chosen side of the trigger. Clamp
+    // the requested cap by that so the surface never overflows the viewport
+    // (which would let the outer `overflow: hidden` cut off the scrollbar of
+    // inner scroll regions). Whichever primitive is active sets its own var;
+    // the other resolves to the fallback chain end and is ignored.
+    out.maxHeight = `min(${maxH}, var(--radix-popover-content-available-height, var(--radix-dropdown-menu-content-available-height, ${maxH})))`
+  }
   return out
 }

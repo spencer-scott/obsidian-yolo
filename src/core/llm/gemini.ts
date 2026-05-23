@@ -1,13 +1,13 @@
-import { GoogleGenAI } from '@google/genai'
 import type {
   Content as GeminiContent,
   FunctionCall as GeminiFunctionCall,
-  GenerateContentConfig as GeminiGenerateContentConfig,
-  GenerateContentParameters as GeminiGenerateContentParams,
+  FunctionDeclaration as GeminiFunctionDeclaration,
   GenerateContentResponse as GeminiGenerateContentResponse,
   Part as GeminiPart,
   Tool as GeminiTool,
+  ToolConfig as GeminiToolConfig,
 } from '@google/genai'
+import { Platform } from 'obsidian'
 import { v4 as uuidv4 } from 'uuid'
 
 import { ChatModel } from '../../types/chat-model.types'
@@ -27,7 +27,7 @@ import {
   ToolCall,
   ToolCallDelta,
 } from '../../types/llm/response'
-import { LLMProvider } from '../../types/provider.types'
+import { LLMProvider, RequestTransportMode } from '../../types/provider.types'
 import {
   REASONING_META,
   resolveRequestReasoningLevel,
@@ -37,25 +37,35 @@ import {
   getToolCallArgumentsObject,
 } from '../../types/tool-call.types'
 import { parseImageDataUrl } from '../../utils/llm/image'
+import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 
 import { BaseLLMProvider } from './base'
 import {
   LLMAPIKeyInvalidException,
   LLMAPIKeyNotSetException,
-  LLMRateLimitExceededException,
 } from './exception'
-import { ModelRequestPolicy, runWithModelRequestPolicy } from './requestPolicy'
+import {
+  type GeminiFetchRequest,
+  type GeminiTransportContext,
+  geminiGenerateViaFetch,
+  geminiJsonFetch,
+  geminiStreamViaBufferedFetch,
+  geminiStreamViaFetch,
+} from './geminiFetchTransport'
+import { ModelRequestPolicy } from './requestPolicy'
+import {
+  type AutoPromotedTransportMode,
+  createRequestTransportMemoryKey,
+  resolveRequestTransportMode,
+  runWithRequestTransport,
+  runWithRequestTransportForStream,
+} from './requestTransport'
+import { createBrowserFetch, createDesktopNodeFetch } from './sdkFetch'
 
-type GeminiStreamGenerator = Awaited<
-  ReturnType<
-    InstanceType<typeof GoogleGenAI>['models']['generateContentStream']
-  >
->
-type GeminiStreamChunk =
-  GeminiStreamGenerator extends AsyncGenerator<infer Chunk> ? Chunk : never
-type GeminiRequestConfig = GeminiGenerateContentConfig & {
-  abortSignal?: AbortSignal
+type GeminiStreamChunk = GeminiGenerateContentResponse
+type GeminiEmbedResponse = {
+  embedding?: { values?: number[] }
 }
 type GeminiFunctionCallWithMetadata = GeminiFunctionCall & {
   thoughtSignature?: string
@@ -63,6 +73,10 @@ type GeminiFunctionCallWithMetadata = GeminiFunctionCall & {
 type GeminiReplayPart = GeminiPart & {
   thoughtSignature?: string
 }
+
+const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com'
+const GEMINI_API_VERSION = 'v1beta'
+const PROVIDER_LABEL = 'Gemini'
 
 /**
  * TODO: Consider future migration from '@google/generative-ai' to '@google/genai' (https://github.com/googleapis/js-genai)
@@ -109,36 +123,141 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
     'image/heif',
   ] as const
 
-  private client: GoogleGenAI
-  private apiKey: string
+  private readonly apiKey: string
+  private readonly baseUrl: string
+  private readonly customHeaders: Record<string, string> | undefined
   private readonly requestPolicy?: ModelRequestPolicy
+  private readonly browserFetch = createBrowserFetch()
+  private readonly obsidianFetch = createObsidianFetch()
+  private readonly nodeFetch = createDesktopNodeFetch()
+  private requestTransportMode: RequestTransportMode
+  private readonly requestTransportMemoryKey: string
+  private readonly transportContext: GeminiTransportContext
+  private readonly onAutoPromoteTransportMode?: (
+    mode: AutoPromotedTransportMode,
+  ) => void
+
+  private promoteTransportMode = (mode: AutoPromotedTransportMode) => {
+    if (this.requestTransportMode === mode) {
+      return
+    }
+    this.provider.additionalSettings = {
+      ...(this.provider.additionalSettings ?? {}),
+      requestTransportMode: mode,
+    }
+    this.requestTransportMode = mode
+    this.onAutoPromoteTransportMode?.(mode)
+  }
 
   constructor(
     provider: LLMProvider,
     options?: {
+      onAutoPromoteTransportMode?: (mode: AutoPromotedTransportMode) => void
       requestPolicy?: ModelRequestPolicy
     },
   ) {
     super(provider)
     this.requestPolicy = options?.requestPolicy
-
-    const baseUrl = provider.baseUrl
+    this.onAutoPromoteTransportMode = options?.onAutoPromoteTransportMode
+    this.apiKey = provider.apiKey ?? ''
+    this.baseUrl = provider.baseUrl
       ? GeminiProvider.normalizeBaseUrl(provider.baseUrl)
-      : undefined
-    const defaultHeaders = toProviderHeadersRecord(provider.customHeaders)
-    const httpOptions =
-      baseUrl || defaultHeaders
-        ? {
-            ...(baseUrl ? { baseUrl } : {}),
-            ...(defaultHeaders ? { headers: defaultHeaders } : {}),
-          }
+      : DEFAULT_GEMINI_BASE_URL
+    this.customHeaders = toProviderHeadersRecord(provider.customHeaders)
+    this.requestTransportMemoryKey = createRequestTransportMemoryKey({
+      providerType: provider.presetType,
+      providerId: provider.id,
+      baseUrl: this.baseUrl,
+    })
+    this.requestTransportMode = resolveRequestTransportMode({
+      additionalSettings: provider.additionalSettings,
+      hasCustomBaseUrl: Boolean(provider.baseUrl),
+      memoryKey: this.requestTransportMemoryKey,
+    })
+    this.transportContext = {
+      providerLabel: PROVIDER_LABEL,
+      requestPolicy: this.requestPolicy,
+    }
+    if (!Platform.isDesktop && this.requestTransportMode === 'node') {
+      // Node transport requires Electron's main process; gracefully degrade.
+      this.requestTransportMode = 'obsidian'
+    }
+  }
+
+  private buildHeaders(): Headers {
+    return new Headers({
+      'Content-Type': 'application/json',
+      'x-goog-api-key': this.apiKey,
+      ...(this.customHeaders ?? {}),
+    })
+  }
+
+  private buildUrl(model: string, action: string, query?: string): string {
+    const modelPath = GeminiProvider.normalizeModelPath(model)
+    const query_ = query ? `?${query}` : ''
+    return `${this.baseUrl}/${GEMINI_API_VERSION}/${modelPath}:${action}${query_}`
+  }
+
+  private buildRestBody(
+    request: LLMRequestNonStreaming | LLMRequestStreaming,
+    model: ChatModel,
+    options?: LLMOptions,
+  ): string {
+    const systemMessages = request.messages.filter((m) => m.role === 'system')
+    const systemInstructionText =
+      systemMessages.length > 0
+        ? systemMessages.map((m) => m.content).join('\n')
         : undefined
 
-    this.client = new GoogleGenAI({
-      apiKey: provider.apiKey ?? '',
-      httpOptions,
-    })
-    this.apiKey = provider.apiKey ?? ''
+    const generationConfig: Record<string, unknown> = {
+      ...(request.max_tokens !== undefined && request.max_tokens !== null
+        ? { maxOutputTokens: request.max_tokens }
+        : {}),
+      ...(typeof request.temperature === 'number'
+        ? { temperature: request.temperature }
+        : {}),
+    }
+
+    const level = resolveRequestReasoningLevel(model, request.reasoningLevel)
+    if (level !== undefined) {
+      const isGemini3 = /gemini-3/i.test(request.model)
+      if (level === 'auto') {
+        // omit
+      } else if (level === 'off') {
+        generationConfig.thinkingConfig = isGemini3
+          ? { thinkingLevel: 'minimal', includeThoughts: false }
+          : { thinkingBudget: 0, includeThoughts: false }
+      } else if (isGemini3) {
+        generationConfig.thinkingConfig = {
+          thinkingLevel: level === 'extra-high' ? 'high' : level,
+          includeThoughts: true,
+        }
+      } else {
+        generationConfig.thinkingConfig = {
+          thinkingBudget: REASONING_META[level].budget,
+          includeThoughts: true,
+        }
+      }
+    }
+
+    const prepared = GeminiProvider.prepareTools(request, model, options)
+
+    const restBody: Record<string, unknown> = {
+      contents: GeminiProvider.buildRequestContents(request.messages),
+      ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {}),
+      ...(prepared ? { tools: prepared.tools } : {}),
+      ...(prepared?.toolConfig ? { toolConfig: prepared.toolConfig } : {}),
+      ...(systemInstructionText
+        ? {
+            systemInstruction: {
+              role: 'user',
+              parts: [{ text: systemInstructionText }],
+            },
+          }
+        : {}),
+    }
+
+    return JSON.stringify(this.applyCustomModelParameters(model, restBody))
   }
 
   async generateResponse(
@@ -152,99 +271,45 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
       )
     }
 
-    const systemMessages = request.messages.filter((m) => m.role === 'system')
-    const systemInstruction: string | undefined =
-      systemMessages.length > 0
-        ? systemMessages.map((m) => m.content).join('\n')
-        : undefined
-
     try {
-      const config: GeminiRequestConfig = {
-        maxOutputTokens: request.max_tokens ?? undefined,
-        temperature: request.temperature ?? undefined,
-      }
-      const level = resolveRequestReasoningLevel(model, request.reasoningLevel)
-      if (level !== undefined) {
-        const isGemini3 = /gemini-3/i.test(request.model)
-        if (level === 'auto') {
-          // Provider default: omit thinkingConfig
-        } else if (level === 'off') {
-          if (isGemini3) {
-            config.thinkingConfig = {
-              thinkingLevel: 'minimal',
-              includeThoughts: false,
-            } as GeminiRequestConfig['thinkingConfig']
-          } else {
-            config.thinkingConfig = {
-              thinkingBudget: 0,
-              includeThoughts: false,
-            }
-          }
-        } else if (isGemini3) {
-          config.thinkingConfig = {
-            thinkingLevel: level === 'extra-high' ? 'high' : level,
-            includeThoughts: true,
-          } as GeminiRequestConfig['thinkingConfig']
-        } else {
-          config.thinkingConfig = {
-            thinkingBudget: REASONING_META[level].budget,
-            includeThoughts: true,
-          }
-        }
-      }
-      if (options?.signal) {
-        config.abortSignal = options.signal
+      const fetchRequest: GeminiFetchRequest = {
+        url: this.buildUrl(request.model, 'generateContent'),
+        headers: this.buildHeaders(),
+        body: this.buildRestBody(request, model, options),
       }
 
-      // Prepare tools including Gemini native tools
-      const tools = this.prepareTools(request, model, options)
-
-      const contents = GeminiProvider.buildRequestContents(request.messages)
-
-      const shouldIncludeConfig =
-        (tools?.length ?? 0) > 0 ||
-        Object.values(config).some((value) => value !== undefined) ||
-        Boolean(systemInstruction) ||
-        Boolean(options?.signal)
-
-      const payloadBase: GeminiGenerateContentParams = {
-        model: request.model,
-        contents,
-        ...(shouldIncludeConfig
-          ? {
-              config: {
-                ...config,
-                ...(tools ? { tools } : {}),
-                ...(systemInstruction ? { systemInstruction } : {}),
-              },
-            }
-          : {}),
-      }
-
-      const payload = this.applyCustomModelParameters(
-        model,
-        payloadBase as GeminiGenerateContentParams & Record<string, unknown>,
-      )
-
-      const result = await runWithModelRequestPolicy({
-        requestPolicy: this.requestPolicy,
-        signal: options?.signal,
-        run: (signal) =>
-          this.client.models.generateContent({
-            ...payload,
-            config: {
-              ...(payload.config ?? {}),
-              abortSignal: signal,
-            },
+      return await runWithRequestTransport({
+        mode: this.requestTransportMode,
+        memoryKey: this.requestTransportMemoryKey,
+        onAutoPromoteTransportMode: this.promoteTransportMode,
+        runBrowser: () =>
+          geminiGenerateViaFetch({
+            fetchImpl: this.browserFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal: options?.signal,
+            parse: GeminiProvider.parseNonStreamingResponse,
+            context: this.transportContext,
+          }),
+        runObsidian: () =>
+          geminiGenerateViaFetch({
+            fetchImpl: this.obsidianFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal: options?.signal,
+            parse: GeminiProvider.parseNonStreamingResponse,
+            context: this.transportContext,
+          }),
+        runNode: () =>
+          geminiGenerateViaFetch({
+            fetchImpl: this.nodeFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal: options?.signal,
+            parse: GeminiProvider.parseNonStreamingResponse,
+            context: this.transportContext,
           }),
       })
-
-      const messageId = crypto.randomUUID()
-      return GeminiProvider.parseNonStreamingResponse(
-        result,
-        request.model,
-        messageId,
-      )
     } catch (error) {
       const message = GeminiProvider.getErrorMessage(error)
       const isInvalidApiKey =
@@ -273,106 +338,50 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
       )
     }
 
-    const systemMessages = request.messages.filter((m) => m.role === 'system')
-    const systemInstruction: string | undefined =
-      systemMessages.length > 0
-        ? systemMessages.map((m) => m.content).join('\n')
-        : undefined
+    if (options?.signal?.aborted) {
+      throw GeminiProvider.createAbortError()
+    }
 
     try {
-      if (options?.signal?.aborted) {
-        throw GeminiProvider.createAbortError()
-      }
-      const config: GeminiRequestConfig = {
-        maxOutputTokens: request.max_tokens ?? undefined,
-        temperature: request.temperature ?? undefined,
-      }
-      const streamLevel = resolveRequestReasoningLevel(
-        model,
-        request.reasoningLevel,
-      )
-      if (streamLevel !== undefined) {
-        const isGemini3 = /gemini-3/i.test(request.model)
-        if (streamLevel === 'auto') {
-          // omit
-        } else if (streamLevel === 'off') {
-          if (isGemini3) {
-            config.thinkingConfig = {
-              thinkingLevel: 'minimal',
-              includeThoughts: false,
-            } as GeminiRequestConfig['thinkingConfig']
-          } else {
-            config.thinkingConfig = {
-              thinkingBudget: 0,
-              includeThoughts: false,
-            }
-          }
-        } else if (isGemini3) {
-          config.thinkingConfig = {
-            thinkingLevel: streamLevel === 'extra-high' ? 'high' : streamLevel,
-            includeThoughts: true,
-          } as GeminiRequestConfig['thinkingConfig']
-        } else {
-          config.thinkingConfig = {
-            thinkingBudget: REASONING_META[streamLevel].budget,
-            includeThoughts: true,
-          }
-        }
-      }
-      if (options?.signal) {
-        config.abortSignal = options.signal
+      const fetchRequest: GeminiFetchRequest = {
+        url: this.buildUrl(request.model, 'streamGenerateContent', 'alt=sse'),
+        headers: this.buildHeaders(),
+        body: this.buildRestBody(request, model, options),
       }
 
-      // Prepare tools including Gemini native tools
-      const tools = this.prepareTools(request, model, options)
-
-      const contents = GeminiProvider.buildRequestContents(request.messages)
-
-      const shouldIncludeConfig =
-        (tools?.length ?? 0) > 0 ||
-        Object.values(config).some((value) => value !== undefined) ||
-        Boolean(systemInstruction) ||
-        Boolean(options?.signal)
-
-      const payloadBase: GeminiGenerateContentParams = {
-        model: request.model,
-        contents,
-        ...(shouldIncludeConfig
-          ? {
-              config: {
-                ...config,
-                ...(tools ? { tools } : {}),
-                ...(systemInstruction ? { systemInstruction } : {}),
-              },
-            }
-          : {}),
-      }
-
-      const payload = this.applyCustomModelParameters(
-        model,
-        payloadBase as GeminiGenerateContentParams & Record<string, unknown>,
-      )
-
-      const stream = await runWithModelRequestPolicy({
-        requestPolicy: this.requestPolicy,
+      return await runWithRequestTransportForStream({
+        mode: this.requestTransportMode,
+        memoryKey: this.requestTransportMemoryKey,
+        onAutoPromoteTransportMode: this.promoteTransportMode,
         signal: options?.signal,
-        run: (signal) =>
-          this.client.models.generateContentStream({
-            ...payload,
-            config: {
-              ...(payload.config ?? {}),
-              abortSignal: signal,
-            },
+        createBrowserStream: (signal) =>
+          geminiStreamViaFetch({
+            fetchImpl: this.browserFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal,
+            parse: GeminiProvider.parseStreamingResponseChunk,
+            context: this.transportContext,
+          }),
+        createObsidianStream: (signal) =>
+          geminiStreamViaBufferedFetch({
+            fetchImpl: this.obsidianFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal,
+            parse: GeminiProvider.parseStreamingResponseChunk,
+            context: this.transportContext,
+          }),
+        createNodeStream: (signal) =>
+          geminiStreamViaFetch({
+            fetchImpl: this.nodeFetch,
+            request: fetchRequest,
+            model: request.model,
+            signal,
+            parse: GeminiProvider.parseStreamingResponseChunk,
+            context: this.transportContext,
           }),
       })
-
-      const messageId = crypto.randomUUID()
-      return this.streamResponseGenerator(
-        stream,
-        request.model,
-        messageId,
-        options?.signal,
-      )
     } catch (error) {
       const message = GeminiProvider.getErrorMessage(error)
       const isInvalidApiKey =
@@ -422,49 +431,6 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
         return singleChunk(nonStream)
       }
       throw GeminiProvider.toError(error)
-    }
-  }
-
-  private async *streamResponseGenerator(
-    stream: AsyncIterable<GeminiStreamChunk>,
-    model: string,
-    messageId: string,
-    signal?: AbortSignal,
-  ): AsyncIterable<LLMResponseStreaming> {
-    const iterator = stream[Symbol.asyncIterator]()
-    let abortListener: (() => void) | null = null
-    try {
-      if (signal) {
-        if (signal.aborted) {
-          throw GeminiProvider.createAbortError()
-        }
-        const onAbort = () => {
-          if (typeof iterator.return === 'function') {
-            void iterator.return()
-          }
-        }
-        signal.addEventListener('abort', onAbort, { once: true })
-        abortListener = onAbort
-      }
-      while (true) {
-        if (signal?.aborted) {
-          throw GeminiProvider.createAbortError()
-        }
-        const { value, done } = await iterator.next()
-        if (done) break
-        if (signal?.aborted) {
-          throw GeminiProvider.createAbortError()
-        }
-        yield GeminiProvider.parseStreamingResponseChunk(
-          value,
-          model,
-          messageId,
-        )
-      }
-    } finally {
-      if (abortListener && signal) {
-        signal.removeEventListener('abort', abortListener)
-      }
     }
   }
 
@@ -547,6 +513,18 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
                 inlineData: {
                   data: base64Data,
                   mimeType,
+                },
+              } as GeminiReplayPart,
+            ]
+          }
+          if (part.type === 'document') {
+            // Gemini accepts native PDF input via inlineData with the
+            // application/pdf mimeType (≈258 tokens/page billing).
+            return [
+              {
+                inlineData: {
+                  data: part.data,
+                  mimeType: part.mediaType,
                 },
               } as GeminiReplayPart,
             ]
@@ -667,11 +645,11 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
     }
   }
 
-  static parseNonStreamingResponse(
+  static parseNonStreamingResponse = (
     response: GeminiGenerateContentResponse,
     model: string,
     messageId: string,
-  ): LLMResponseNonStreaming {
+  ): LLMResponseNonStreaming => {
     const parts = response.candidates?.[0]?.content?.parts ?? []
     const { contentText, reasoningText } =
       GeminiProvider.extractTextSegments(parts)
@@ -719,12 +697,6 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
         ? buildGeminiUsage(response.usageMetadata)
         : undefined,
     }
-  }
-
-  private static isGeminiContent(
-    content: GeminiContent | null,
-  ): content is GeminiContent {
-    return content !== null
   }
 
   private static mapFunctionCall(
@@ -784,17 +756,6 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
     return null
   }
 
-  private static isHttpError(
-    error: unknown,
-  ): error is { status: number; message?: string } {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'status' in error &&
-      typeof (error as { status?: unknown }).status === 'number'
-    )
-  }
-
   private static toError(error: unknown): Error {
     if (error instanceof Error) {
       return error
@@ -812,11 +773,11 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
     }
   }
 
-  static parseStreamingResponseChunk(
+  static parseStreamingResponseChunk = (
     chunk: GeminiStreamChunk,
     model: string,
     messageId: string,
-  ): LLMResponseStreaming {
+  ): LLMResponseStreaming => {
     const parts = chunk.candidates?.[0]?.content?.parts ?? []
     const { contentText: contentPiece, reasoningText: reasoningPiece } =
       GeminiProvider.extractTextSegments(parts)
@@ -1101,99 +1062,138 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
       )
     }
 
+    const fetchRequest: GeminiFetchRequest = {
+      url: this.buildUrl(model, 'embedContent'),
+      headers: this.buildHeaders(),
+      body: JSON.stringify({
+        content: { parts: [{ text }] },
+      }),
+    }
+
     try {
-      const res = await this.client.models.embedContent({
-        model,
-        contents: text,
+      const result = await runWithRequestTransport({
+        mode: this.requestTransportMode,
+        memoryKey: this.requestTransportMemoryKey,
+        onAutoPromoteTransportMode: this.promoteTransportMode,
+        runBrowser: () =>
+          geminiJsonFetch<GeminiEmbedResponse>({
+            fetchImpl: this.browserFetch,
+            request: fetchRequest,
+            context: this.transportContext,
+          }),
+        runObsidian: () =>
+          geminiJsonFetch<GeminiEmbedResponse>({
+            fetchImpl: this.obsidianFetch,
+            request: fetchRequest,
+            context: this.transportContext,
+          }),
+        runNode: () =>
+          geminiJsonFetch<GeminiEmbedResponse>({
+            fetchImpl: this.nodeFetch,
+            request: fetchRequest,
+            context: this.transportContext,
+          }),
       })
-      // Support both shapes
-      const values =
-        ('embedding' in res &&
-        res.embedding &&
-        typeof res.embedding === 'object' &&
-        Array.isArray((res.embedding as { values?: number[] }).values)
-          ? (res.embedding as { values?: number[] }).values
-          : res.embeddings?.[0]?.values) ?? null
+      const values = result.embedding?.values
       if (!values) {
         throw new Error('Gemini embedding response did not include values.')
       }
       return values
     } catch (error) {
-      if (GeminiProvider.isHttpError(error) && error.status === 429) {
-        throw new LLMRateLimitExceededException(
-          'Gemini API rate limit exceeded. Please try again later.',
-        )
-      }
       throw GeminiProvider.toError(error)
     }
   }
 
-  private prepareTools(
+  static prepareTools(
     request: LLMRequestNonStreaming | LLMRequestStreaming,
     model: ChatModel,
     options?: LLMOptions,
-  ): GeminiTool[] | undefined {
+  ): { tools: GeminiTool[]; toolConfig?: GeminiToolConfig } | undefined {
     const tools: GeminiTool[] = []
 
-    // Add Gemini native tools if enabled
-    if (options?.geminiTools) {
-      const geminiTools = options.geminiTools
-
-      // Add Google Search tool
-      if (geminiTools.useWebSearch) {
-        tools.push({ googleSearch: {} })
-      }
-
-      // Add URL Context tool
-      if (geminiTools.useUrlContext) {
-        tools.push({ urlContext: {} })
-      }
+    // Activation sources (OR-combined, dedup so each tool lands at most once):
+    //   1. Conversation override (chat input bar) → `options.geminiTools.*`
+    //   2. Model-level toggle (model settings)    → `builtinTools.gemini.*`
+    const modelLevelGemini =
+      model.builtinToolProvider === 'gemini'
+        ? model.builtinTools?.gemini
+        : undefined
+    const useWebSearch =
+      (options?.geminiTools?.useWebSearch ?? false) ||
+      modelLevelGemini?.webSearch?.enabled === true
+    const useUrlContext =
+      (options?.geminiTools?.useUrlContext ?? false) ||
+      modelLevelGemini?.urlContext?.enabled === true
+    if (useWebSearch) {
+      tools.push({ googleSearch: {} })
+    }
+    if (useUrlContext) {
+      tools.push({ urlContext: {} })
     }
 
-    // Add function calling tools if provided
+    // Merge all function calling tools into a single `functionDeclarations`
+    // entry to match Gemini's canonical request format.
     if (request.tools && request.tools.length > 0) {
-      tools.push(
-        ...request.tools.map((tool) => GeminiProvider.parseRequestTool(tool)),
-      )
+      tools.push({
+        functionDeclarations: request.tools.map((tool) =>
+          GeminiProvider.parseRequestFunctionDeclaration(tool),
+        ),
+      })
     }
 
-    return tools.length > 0 ? tools : undefined
+    if (tools.length === 0) {
+      return undefined
+    }
+
+    const hasBuiltinTool = useWebSearch || useUrlContext
+    return {
+      tools,
+      ...(hasBuiltinTool
+        ? { toolConfig: { includeServerSideToolInvocations: true } }
+        : {}),
+    }
   }
 
-  private static removeAdditionalProperties(schema: unknown): unknown {
-    // TODO: Remove this function when Gemini supports additionalProperties field in JSON schema
+  // Normalize arbitrary JSON Schema (mostly from third-party MCP tools) into
+  // the subset Gemini actually accepts. Currently:
+  //   - drop `additionalProperties` (Gemini rejects it)
+  //   - for `type: 'array'` without `items`, inject a fallback `items` so the
+  //     request passes Gemini's strict validation. `string` is the safest
+  //     placeholder — it's a degraded representation, not the original schema.
+  // Extend with new branches only when Gemini reports a concrete failure.
+  static sanitizeSchemaForGemini(schema: unknown): unknown {
     if (typeof schema !== 'object' || schema === null) {
       return schema
     }
 
     if (Array.isArray(schema)) {
-      return schema.map((item) => this.removeAdditionalProperties(item))
+      return schema.map((item) => this.sanitizeSchemaForGemini(item))
     }
 
     const rest = { ...(schema as Record<string, unknown>) }
     delete rest.additionalProperties
 
+    if (rest.type === 'array' && !('items' in rest)) {
+      rest.items = { type: 'string' }
+    }
+
     return Object.fromEntries(
       Object.entries(rest).map(([key, value]) => [
         key,
-        this.removeAdditionalProperties(value),
+        this.sanitizeSchemaForGemini(value),
       ]),
     )
   }
 
-  private static parseRequestTool(tool: RequestTool): GeminiTool {
-    const cleanedSchema = this.removeAdditionalProperties(
-      tool.function.parameters,
-    )
+  private static parseRequestFunctionDeclaration(
+    tool: RequestTool,
+  ): GeminiFunctionDeclaration {
+    const cleanedSchema = this.sanitizeSchemaForGemini(tool.function.parameters)
 
     return {
-      functionDeclarations: [
-        {
-          name: tool.function.name,
-          description: tool.function.description,
-          parametersJsonSchema: cleanedSchema,
-        },
-      ],
+      name: tool.function.name,
+      description: tool.function.description,
+      parametersJsonSchema: cleanedSchema,
     }
   }
 
@@ -1201,12 +1201,19 @@ export class GeminiProvider extends BaseLLMProvider<LLMProvider> {
     const trimmed = raw.replace(/\/+$/, '')
     try {
       const url = new URL(trimmed)
-      // Avoid double version segments when SDK appends /v1beta or /v1.
+      // Avoid double version segments since we always append /v1beta ourselves.
       url.pathname = url.pathname.replace(/\/?(v1beta|v1alpha1|v1)(\/)?$/, '')
       return url.toString().replace(/\/+$/, '')
     } catch {
       // Fallback for non-standard schemes: just strip trailing version pieces.
       return trimmed.replace(/\/?(v1beta|v1alpha1|v1)(\/)?$/, '')
     }
+  }
+
+  private static normalizeModelPath(model: string): string {
+    if (model.startsWith('models/') || model.startsWith('tunedModels/')) {
+      return model
+    }
+    return `models/${model}`
   }
 }

@@ -1,7 +1,7 @@
 export type ParsedTagContent =
   | { type: 'string'; content: string }
   | {
-      type: 'smtcmp_block'
+      type: 'yolo_block'
       content: string
       language?: string
       filename?: string
@@ -15,7 +15,7 @@ export type ParsedTagContent =
 
 type TagMatch =
   | {
-      type: 'smtcmp_block'
+      type: 'yolo_block'
       start: number
       openEnd: number
       closeStart: number
@@ -30,13 +30,13 @@ type TagMatch =
       closeEnd: number
     }
 
-const SMTCMP_OPEN_TAG_PATTERN = /<smtcmp_block\b[^>]*>/g
+const YOLO_BLOCK_OPEN_TAG_PATTERN = /<yolo_block\b[^>]*>/g
 const THINK_OPEN_TAG_PATTERN = /<think>/g
 const ATTRIBUTE_PATTERN = /([A-Za-z0-9_-]+)="([^"]*)"/g
-const SMTCMP_CLOSE_TAG = '</smtcmp_block>'
+const YOLO_BLOCK_CLOSE_TAG = '</yolo_block>'
 const THINK_CLOSE_TAG = '</think>'
 
-const isStandaloneSmtcmpOpenTag = ({
+const isStandaloneYoloBlockOpenTag = ({
   input,
   start,
   end,
@@ -51,7 +51,7 @@ const isStandaloneSmtcmpOpenTag = ({
   const before = input.slice(lineStart, start)
   const after = input.slice(end, lineEnd)
   return (
-    /^[ \t]*$/.test(before) && /^[ \t]*(?:<\/smtcmp_block>)?[ \t]*$/.test(after)
+    /^[ \t]*$/.test(before) && /^[ \t]*(?:<\/yolo_block>)?[ \t]*$/.test(after)
   )
 }
 
@@ -68,7 +68,7 @@ const parseAttributes = (tagText: string): Record<string, string> => {
   return attrs
 }
 
-const findNextStandaloneSmtcmpOpen = (
+const findNextStandaloneYoloBlockOpen = (
   input: string,
   fromIndex: number,
 ): {
@@ -76,14 +76,14 @@ const findNextStandaloneSmtcmpOpen = (
   openEnd: number
   attrs: Record<string, string>
 } | null => {
-  SMTCMP_OPEN_TAG_PATTERN.lastIndex = fromIndex
+  YOLO_BLOCK_OPEN_TAG_PATTERN.lastIndex = fromIndex
 
-  let match = SMTCMP_OPEN_TAG_PATTERN.exec(input)
+  let match = YOLO_BLOCK_OPEN_TAG_PATTERN.exec(input)
   while (match) {
     const start = match.index
     const openEnd = start + match[0].length
-    if (!isStandaloneSmtcmpOpenTag({ input, start, end: openEnd })) {
-      match = SMTCMP_OPEN_TAG_PATTERN.exec(input)
+    if (!isStandaloneYoloBlockOpenTag({ input, start, end: openEnd })) {
+      match = YOLO_BLOCK_OPEN_TAG_PATTERN.exec(input)
       continue
     }
 
@@ -97,7 +97,7 @@ const findNextStandaloneSmtcmpOpen = (
   return null
 }
 
-const findMatchingSmtcmpCloseTag = ({
+const findMatchingYoloBlockCloseTag = ({
   input,
   fromIndex,
 }: {
@@ -108,8 +108,8 @@ const findMatchingSmtcmpCloseTag = ({
   let searchIndex = fromIndex
 
   while (searchIndex < input.length) {
-    const nextOpen = findNextStandaloneSmtcmpOpen(input, searchIndex)
-    const nextCloseStart = input.indexOf(SMTCMP_CLOSE_TAG, searchIndex)
+    const nextOpen = findNextStandaloneYoloBlockOpen(input, searchIndex)
+    const nextCloseStart = input.indexOf(YOLO_BLOCK_CLOSE_TAG, searchIndex)
 
     if (nextCloseStart === -1) {
       return null
@@ -120,10 +120,10 @@ const findMatchingSmtcmpCloseTag = ({
       if (depth === 0) {
         return {
           start: nextCloseStart,
-          end: nextCloseStart + SMTCMP_CLOSE_TAG.length,
+          end: nextCloseStart + YOLO_BLOCK_CLOSE_TAG.length,
         }
       }
-      searchIndex = nextCloseStart + SMTCMP_CLOSE_TAG.length
+      searchIndex = nextCloseStart + YOLO_BLOCK_CLOSE_TAG.length
       continue
     }
 
@@ -134,22 +134,22 @@ const findMatchingSmtcmpCloseTag = ({
   return null
 }
 
-const findNextSmtcmpBlock = (
+const findNextYoloBlock = (
   input: string,
   fromIndex: number,
-): Extract<TagMatch, { type: 'smtcmp_block' }> | null => {
-  const nextOpen = findNextStandaloneSmtcmpOpen(input, fromIndex)
+): Extract<TagMatch, { type: 'yolo_block' }> | null => {
+  const nextOpen = findNextStandaloneYoloBlockOpen(input, fromIndex)
   if (!nextOpen) {
     return null
   }
 
-  const close = findMatchingSmtcmpCloseTag({
+  const close = findMatchingYoloBlockCloseTag({
     input,
     fromIndex: nextOpen.openEnd,
   })
 
   return {
-    type: 'smtcmp_block',
+    type: 'yolo_block',
     start: nextOpen.start,
     openEnd: nextOpen.openEnd,
     closeStart: close?.start ?? input.length,
@@ -184,21 +184,21 @@ const findNextThinkBlock = (
 }
 
 const findNextTag = (input: string, fromIndex: number): TagMatch | null => {
-  const nextSmtcmp = findNextSmtcmpBlock(input, fromIndex)
+  const nextYoloBlock = findNextYoloBlock(input, fromIndex)
   const nextThink = findNextThinkBlock(input, fromIndex)
 
-  if (!nextSmtcmp) {
+  if (!nextYoloBlock) {
     return nextThink
   }
   if (!nextThink) {
-    return nextSmtcmp
+    return nextYoloBlock
   }
 
-  return nextSmtcmp.start < nextThink.start ? nextSmtcmp : nextThink
+  return nextYoloBlock.start < nextThink.start ? nextYoloBlock : nextThink
 }
 
 /**
- * Parses text containing <smtcmp_block> and <think> tags into structured content
+ * Parses text containing <yolo_block> and <think> tags into structured content
  */
 export function parseTagContents(input: string): ParsedTagContent[] {
   const parsedResult: ParsedTagContent[] = []
@@ -221,9 +221,9 @@ export function parseTagContents(input: string): ParsedTagContent[] {
       })
     }
 
-    if (nextTag.type === 'smtcmp_block') {
+    if (nextTag.type === 'yolo_block') {
       parsedResult.push({
-        type: 'smtcmp_block',
+        type: 'yolo_block',
         content: input.slice(nextTag.openEnd, nextTag.closeStart),
         language: nextTag.attrs.language,
         filename: nextTag.attrs.filename,
@@ -246,7 +246,7 @@ export function parseTagContents(input: string): ParsedTagContent[] {
 
   const normalizedBlocks: ParsedTagContent[] = []
   parsedResult.forEach((block) => {
-    if (block.type !== 'smtcmp_block') {
+    if (block.type !== 'yolo_block') {
       normalizedBlocks.push(block)
       return
     }
@@ -260,23 +260,23 @@ export function parseTagContents(input: string): ParsedTagContent[] {
     const hasThinkBlock = nestedBlocks.some(
       (nestedBlock) => nestedBlock.type === 'think',
     )
-    const nestedSmtcmpBlocks = nestedBlocks.filter(
+    const nestedYoloBlocks = nestedBlocks.filter(
       (
         nestedBlock,
-      ): nestedBlock is Extract<ParsedTagContent, { type: 'smtcmp_block' }> =>
-        nestedBlock.type === 'smtcmp_block',
+      ): nestedBlock is Extract<ParsedTagContent, { type: 'yolo_block' }> =>
+        nestedBlock.type === 'yolo_block',
     )
 
     if (
       hasNonWhitespaceText ||
       hasThinkBlock ||
-      nestedSmtcmpBlocks.length === 0
+      nestedYoloBlocks.length === 0
     ) {
       normalizedBlocks.push(block)
       return
     }
 
-    normalizedBlocks.push(...nestedSmtcmpBlocks)
+    normalizedBlocks.push(...nestedYoloBlocks)
   })
 
   normalizedBlocks.forEach((block) => {

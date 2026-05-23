@@ -1,12 +1,18 @@
+import type { AssistantToolPreference } from '../../types/assistant.types'
 import type { RequestTool } from '../../types/llm/request'
 import type { McpTool } from '../../types/mcp.types'
+import type { LLMProviderApiType } from '../../types/provider.types'
 import {
+  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileToolServerName,
 } from '../mcp/localFileTools'
 import { McpManager } from '../mcp/mcpManager'
 import { parseToolName } from '../mcp/tool-name-utils'
+
+import { getAssistantToolDisclosureMode } from './tool-preferences'
+import { buildToolStub } from './tool-stub'
 
 const LOCAL_MEMORY_TOOL_NAMES = new Set([
   'memory_ops',
@@ -24,6 +30,18 @@ const isOpenSkillToolName = (toolName: string): boolean => {
     )
   } catch {
     return toolName === 'open_skill'
+  }
+}
+
+export const isLoadToolSchemasToolName = (toolName: string): boolean => {
+  try {
+    const parsed = parseToolName(toolName)
+    return (
+      parsed.serverName === getLocalFileToolServerName() &&
+      parsed.toolName === LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME
+    )
+  } catch {
+    return toolName === LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME
   }
 }
 
@@ -127,11 +145,17 @@ export const selectAllowedTools = ({
   allowedToolNames,
   allowedSkillIds,
   allowedSkillNames,
+  toolPreferences,
+  apiType,
+  enableToolDisclosure = true,
 }: {
   availableTools: McpTool[]
   allowedToolNames?: string[]
   allowedSkillIds?: string[]
   allowedSkillNames?: string[]
+  toolPreferences?: Record<string, AssistantToolPreference>
+  apiType?: LLMProviderApiType | null
+  enableToolDisclosure?: boolean
 }): {
   filteredTools: McpTool[]
   hasTools: boolean
@@ -146,14 +170,41 @@ export const selectAllowedTools = ({
     ? new Set(allowedSkillNames.map((name) => name.toLowerCase()))
     : undefined
 
-  const filteredTools = availableTools.filter((tool) =>
-    isToolAllowed({
+  const filteredTools = availableTools.filter((tool) => {
+    if (!enableToolDisclosure && isLoadToolSchemasToolName(tool.name)) {
+      return false
+    }
+
+    return isToolAllowed({
       toolName: tool.name,
       allowedToolNames: normalizedAllowedToolNames,
       allowedSkillIds: normalizedAllowedSkillIds,
       allowedSkillNames: normalizedAllowedSkillNames,
-    }),
-  )
+    })
+  })
+  const assistantLike = {
+    toolPreferences,
+    enabledToolNames: normalizedAllowedToolNames
+      ? [...normalizedAllowedToolNames]
+      : undefined,
+  }
+  // All allowed tools — including on-demand stubs — are registered in the
+  // request's `tools` field for the entire conversation so the prompt-cache
+  // prefix stays frozen. On-demand tools start as stubs (name + short
+  // description + permissive schema) and stay stubs even after their full
+  // schema has been disclosed via load_tool_schemas: schemas now ride the messages
+  // stream (tool_result + compaction registry) instead of the tools field.
+  const requestToolDefinitions: McpTool[] = filteredTools.map((tool) => {
+    const disclosureMode = isLoadToolSchemasToolName(tool.name)
+      ? 'always'
+      : getAssistantToolDisclosureMode(assistantLike, tool.name, {
+          enableToolDisclosure,
+        })
+    if (disclosureMode === 'on_demand') {
+      return buildToolStub(tool, apiType)
+    }
+    return tool
+  })
 
   return {
     filteredTools,
@@ -161,6 +212,6 @@ export const selectAllowedTools = ({
     hasMemoryTools: filteredTools.some((tool) =>
       isMemoryToolAvailable(tool.name),
     ),
-    requestTools: buildRequestTools(filteredTools),
+    requestTools: buildRequestTools(requestToolDefinitions),
   }
 }

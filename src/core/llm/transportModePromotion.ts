@@ -1,7 +1,7 @@
 import { Notice, getLanguage } from 'obsidian'
 
 import { type Language, createTranslationFunction } from '../../i18n'
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 
 import type { AutoPromotedTransportMode } from './requestTransport'
 
@@ -20,8 +20,8 @@ export const promoteProviderTransportModeToObsidian = async ({
   providerId,
   mode,
 }: {
-  getSettings: () => SmartComposerSettings
-  setSettings: (newSettings: SmartComposerSettings) => void | Promise<void>
+  getSettings: () => YoloSettings
+  setSettings: (newSettings: YoloSettings) => void | Promise<void>
   providerId: string
   mode: AutoPromotedTransportMode
 }): Promise<void> => {

@@ -10,14 +10,21 @@ describe('RagIndexService', () => {
     jest.useRealTimers()
   })
 
-  it('restores interrupted transient runs as retry scheduled on initialize', async () => {
+  it('restores an interrupted rebuild as a sync resume', async () => {
+    // Even when the prior run was a rebuild, recovery downgrades to sync so the
+    // reconcile loop skips chunks already in the DB instead of truncating.
+    // Users who really want a fresh rebuild trigger it explicitly from the UI.
     const saved: Record<string, string> = {
-      smtcmp_rag_index_run: JSON.stringify({
+      yolo_rag_index_run: JSON.stringify({
         runId: 'old-run',
         status: 'running',
         mode: 'rebuild',
         trigger: 'manual',
         retryPolicy: 'transient',
+        completedFiles: 30,
+        totalFiles: 200,
+        completedChunks: 600,
+        totalChunks: 4000,
       }),
     }
 
@@ -40,14 +47,52 @@ describe('RagIndexService', () => {
       status: 'retry_scheduled',
       failureKind: 'transient',
       retryPolicy: 'transient',
-      mode: 'rebuild',
+      mode: 'sync',
       trigger: 'manual',
+      // Progress is preserved so the UI can show "Indexed X / Y".
+      completedFiles: 30,
+      totalFiles: 200,
+      completedChunks: 600,
+      totalChunks: 4000,
+    })
+  })
+
+  it('restores an interrupted sync as sync (idempotent)', async () => {
+    const saved: Record<string, string> = {
+      yolo_rag_index_run: JSON.stringify({
+        runId: 'old-run',
+        status: 'running',
+        mode: 'sync',
+        trigger: 'auto',
+        retryPolicy: 'transient',
+      }),
+    }
+
+    const service = new RagIndexService({
+      app: {
+        loadLocalStorage: jest.fn((key: string) => saved[key] ?? null),
+        saveLocalStorage: jest.fn((key: string, value: string) => {
+          saved[key] = value
+        }),
+      } as never,
+      getRagEngine: jest.fn(),
+      activityRegistry: new BackgroundActivityRegistry(),
+      isRagEnabled: () => true,
+      t: (_key, fallback) => fallback ?? '',
+    })
+
+    await service.initialize()
+
+    expect(service.getSnapshot()).toMatchObject({
+      status: 'retry_scheduled',
+      mode: 'sync',
+      trigger: 'auto',
     })
   })
 
   it('restores interrupted non-retryable runs as failed on initialize', async () => {
     const saved: Record<string, string> = {
-      smtcmp_rag_index_run: JSON.stringify({
+      yolo_rag_index_run: JSON.stringify({
         runId: 'old-run',
         status: 'running',
         mode: 'sync',

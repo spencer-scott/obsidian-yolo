@@ -144,17 +144,17 @@ export function FolderSelectionList({
   }
 
   return (
-    <div className="smtcmp-folder-selection">
-      <div className="smtcmp-folder-selection-toolbar">
-        <div className="smtcmp-folder-selection-title">
+    <div className="yolo-folder-selection">
+      <div className="yolo-folder-selection-toolbar">
+        <div className="yolo-folder-selection-title">
           {title ?? t('settings.rag.selectedFolders', 'Selected folders')}
         </div>
-        <div className="smtcmp-folder-selection-actions">
+        <div className="yolo-folder-selection-actions">
           <button
             aria-label={t('common.add', 'Add')}
             title={t('common.add', 'Add')}
             onClick={() => handleAdd()}
-            className="smtcmp-folder-selection-btn"
+            className="yolo-folder-selection-btn"
           >
             +
           </button>
@@ -162,19 +162,16 @@ export function FolderSelectionList({
             aria-label={t('common.clear', 'Clear')}
             title={t('common.clear', 'Clear')}
             onClick={() => handleClear()}
-            className="smtcmp-folder-selection-btn"
+            className="yolo-folder-selection-btn"
           >
             {t('common.clear', 'Clear')}
           </button>
         </div>
       </div>
 
-      <div
-        onClick={onContainerClick}
-        className="smtcmp-folder-selection-picker"
-      >
+      <div onClick={onContainerClick} className="yolo-folder-selection-picker">
         {items.length === 0 ? (
-          <div className="smtcmp-folder-selection-empty">
+          <div className="yolo-folder-selection-empty">
             {placeholder ??
               (allowFiles
                 ? t(
@@ -187,7 +184,7 @@ export function FolderSelectionList({
                   ))}
           </div>
         ) : (
-          <div className="smtcmp-folder-selection-list">
+          <div className="yolo-folder-selection-list">
             {items.map((p, idx) => (
               <div
                 key={`${p}__${idx}`}
@@ -196,10 +193,10 @@ export function FolderSelectionList({
                 onDragOver={onDragOver(idx)}
                 onDrop={onDrop(idx)}
                 onDragEnd={onDragEnd}
-                className="smtcmp-folder-selection-chip"
+                className="yolo-folder-selection-chip"
               >
-                <span className="smtcmp-folder-selection-chip-handle">⋮⋮</span>
-                <span className="smtcmp-folder-selection-chip-path">
+                <span className="yolo-folder-selection-chip-handle">⋮⋮</span>
+                <span className="yolo-folder-selection-chip-path">
                   {p === '' ? '/' : p}
                 </span>
                 <span
@@ -217,7 +214,7 @@ export function FolderSelectionList({
                       handleRemove(idx)
                     }
                   }}
-                  className="smtcmp-folder-selection-chip-remove"
+                  className="yolo-folder-selection-chip-remove"
                 >
                   ×
                 </span>

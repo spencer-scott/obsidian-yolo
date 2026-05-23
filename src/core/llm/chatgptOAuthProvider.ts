@@ -10,6 +10,7 @@ import {
   LLMOptions,
   LLMRequestNonStreaming,
   LLMRequestStreaming,
+  RequestTool,
 } from '../../types/llm/request'
 import {
   LLMResponseNonStreaming,
@@ -20,7 +21,7 @@ import {
   REASONING_META,
   resolveRequestReasoningLevel,
 } from '../../types/reasoning'
-import { createObsidianFetch } from '../../utils/llm/obsidian-fetch'
+import { getBuiltinProviderTools } from '../../utils/llm/model-tools'
 import { toProviderHeadersRecord } from '../../utils/llm/provider-headers'
 import { getChatGPTOAuthService } from '../auth/chatgptOAuthRuntime'
 
@@ -35,7 +36,32 @@ import {
   runWithRequestTransport,
   runWithRequestTransportForStream,
 } from './requestTransport'
-import { createDesktopNodeFetch } from './sdkFetch'
+import { createTransportClients } from './transportClients'
+
+/**
+ * Forward only the OpenAI-shaped hosted `web_search` family on this ChatGPT
+ * OAuth transport — the adapter remaps it to `web_search_preview`. Other
+ * built-in families (OpenRouter / Grok / Gemini) target different endpoints
+ * and silently no-op here so a stale cross-provider config never changes
+ * user intent.
+ */
+function injectChatgptHostedTools<
+  RequestType extends LLMRequestNonStreaming | LLMRequestStreaming,
+>(request: RequestType, model: ChatModel): RequestType {
+  const hostedTools = getBuiltinProviderTools(model).filter(
+    (t) => t.type === 'web_search',
+  )
+  if (hostedTools.length === 0) {
+    return request
+  }
+  return {
+    ...request,
+    tools: [
+      ...(request.tools ?? []),
+      ...(hostedTools as unknown as RequestTool[]),
+    ],
+  }
+}
 
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex'
 const CODEX_API_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses'
@@ -87,9 +113,10 @@ export class ChatGPTOAuthProvider extends BaseLLMProvider<LLMProvider> {
         fetch: this.createAuthorizedFetch(customFetch),
       })
 
-    this.browserClient = createClient(globalThis.fetch)
-    this.obsidianClient = createClient(createObsidianFetch())
-    this.nodeClient = createClient(createDesktopNodeFetch())
+    const clients = createTransportClients(createClient)
+    this.browserClient = clients.browserClient
+    this.obsidianClient = clients.obsidianClient
+    this.nodeClient = clients.nodeClient
   }
 
   async generateResponse(
@@ -98,7 +125,7 @@ export class ChatGPTOAuthProvider extends BaseLLMProvider<LLMProvider> {
     options?: LLMOptions,
   ): Promise<LLMResponseNonStreaming> {
     const level = resolveRequestReasoningLevel(model, request.reasoningLevel)
-    let formattedRequest = request
+    let formattedRequest = injectChatgptHostedTools(request, model)
     if (
       level !== undefined &&
       level !== 'auto' &&
@@ -106,11 +133,8 @@ export class ChatGPTOAuthProvider extends BaseLLMProvider<LLMProvider> {
     ) {
       formattedRequest = {
         ...formattedRequest,
-        reasoning_effort:
-          level === 'off'
-            ? 'low'
-            : (REASONING_META[level]
-                .effort as LLMRequestNonStreaming['reasoning_effort']),
+        reasoning_effort: REASONING_META[level]
+          .effort as LLMRequestNonStreaming['reasoning_effort'],
       }
     }
 
@@ -154,7 +178,7 @@ export class ChatGPTOAuthProvider extends BaseLLMProvider<LLMProvider> {
     options?: LLMOptions,
   ): Promise<AsyncIterable<LLMResponseStreaming>> {
     const level = resolveRequestReasoningLevel(model, request.reasoningLevel)
-    let formattedRequest = request
+    let formattedRequest = injectChatgptHostedTools(request, model)
     if (
       level !== undefined &&
       level !== 'auto' &&
@@ -162,11 +186,8 @@ export class ChatGPTOAuthProvider extends BaseLLMProvider<LLMProvider> {
     ) {
       formattedRequest = {
         ...formattedRequest,
-        reasoning_effort:
-          level === 'off'
-            ? 'low'
-            : (REASONING_META[level]
-                .effort as LLMRequestStreaming['reasoning_effort']),
+        reasoning_effort: REASONING_META[level]
+          .effort as LLMRequestStreaming['reasoning_effort'],
       }
     }
 

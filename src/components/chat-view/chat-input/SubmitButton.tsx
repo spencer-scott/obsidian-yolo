@@ -1,22 +1,70 @@
-import { CornerDownLeftIcon } from 'lucide-react'
+import { ArrowUp, Square } from 'lucide-react'
 
 import { useLanguage } from '../../../contexts/language-context'
 
-export function SubmitButton({ onClick }: { onClick: () => void }) {
-  const { t } = useLanguage()
+type SubmitButtonProps = {
+  onClick: () => void
+  /**
+   * True while a conversation run is in flight. The button takes one of two
+   * forms depending on whether the input has content:
+   * - empty input → stop button (clicking aborts the run)
+   * - non-empty input → send button (clicking enqueues the message for
+   *   injection at the next safe boundary)
+   */
+  isGenerating?: boolean
+  onAbort?: () => void
+  /**
+   * True when the input is empty. While idle this disables the send button;
+   * while generating this is what makes the button render as a stop button
+   * instead of a queueing-send button.
+   */
+  disabled?: boolean
+}
 
+export function SubmitButton({
+  onClick,
+  isGenerating = false,
+  onAbort,
+  disabled = false,
+}: SubmitButtonProps) {
+  const { t } = useLanguage()
+  const sendLabel = t('chat.sendMessage', 'Chat')
+  const queueLabel = t(
+    'chat.queueMessage.tooltip',
+    'Queue message, will continue after the current turn completes',
+  )
+  const stopLabel = t('chat.stopGeneration', 'Stop generation')
+
+  if (isGenerating && disabled) {
+    return (
+      <button
+        type="button"
+        className="yolo-chat-user-input-submit-button-circle is-stop"
+        onClick={() => onAbort?.()}
+        aria-label={stopLabel}
+        title={stopLabel}
+      >
+        <Square size={12} fill="currentColor" strokeWidth={0} />
+      </button>
+    )
+  }
+
+  const label = isGenerating ? queueLabel : sendLabel
   return (
     <button
       type="button"
-      className="smtcmp-chat-user-input-submit-button"
-      onClick={onClick}
+      className={`yolo-chat-user-input-submit-button-circle${
+        isGenerating ? ' is-queueing' : ''
+      }`}
+      disabled={!isGenerating && disabled}
+      onClick={() => {
+        if (!isGenerating && disabled) return
+        onClick()
+      }}
+      aria-label={label}
+      title={label}
     >
-      <div className="smtcmp-chat-user-input-submit-button-icons">
-        <CornerDownLeftIcon size={12} />
-      </div>
-      <div className="smtcmp-chat-user-input-submit-button-label">
-        {t('chat.sendMessage', 'Chat')}
-      </div>
+      <ArrowUp size={16} strokeWidth={2.5} />
     </button>
   )
 }

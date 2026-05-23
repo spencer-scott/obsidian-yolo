@@ -9,5 +9,6 @@ module.exports = {
   modulePathIgnorePatterns: ['<rootDir>/Reference/', '<rootDir>/.opencode/'],
   moduleNameMapper: {
     '^obsidian$': '<rootDir>/__mocks__/obsidian.ts',
+    '^virtual:.*$': '<rootDir>/__mocks__/virtual.ts',
   },
 }

@@ -91,16 +91,16 @@ export function AgentWorkspaceScopeEditor({
   }
 
   return (
-    <div className="smtcmp-agent-workspace">
-      <div className="smtcmp-agent-workspace-toggle-row">
-        <div className="smtcmp-agent-workspace-toggle-main">
-          <div className="smtcmp-agent-workspace-toggle-title">
+    <div className="yolo-agent-workspace">
+      <div className="yolo-agent-workspace-toggle-row">
+        <div className="yolo-agent-workspace-toggle-main">
+          <div className="yolo-agent-workspace-toggle-title">
             {t(
               'settings.agent.workspace.enableTitle',
               'Restrict directory access',
             )}
           </div>
-          <div className="smtcmp-agent-workspace-toggle-desc">
+          <div className="yolo-agent-workspace-toggle-desc">
             {t(
               'settings.agent.workspace.enableDesc',
               'When off, this agent can access the entire vault. When on, the rules below apply.',
@@ -179,20 +179,20 @@ function ScopeGroup({
 }: ScopeGroupProps) {
   return (
     <div
-      className={`smtcmp-agent-workspace-group smtcmp-agent-workspace-group--${variant}${
+      className={`yolo-agent-workspace-group yolo-agent-workspace-group--${variant}${
         disabled ? ' is-disabled' : ''
       }`}
     >
-      <div className="smtcmp-agent-workspace-group-head">
-        <span className="smtcmp-agent-workspace-badge">
+      <div className="yolo-agent-workspace-group-head">
+        <span className="yolo-agent-workspace-badge">
           {variant === 'include' ? <Check size={11} /> : <X size={11} />}
           <span>{badge}</span>
         </span>
-        <div className="smtcmp-agent-workspace-group-title">{title}</div>
-        <div className="smtcmp-agent-workspace-group-desc">{description}</div>
+        <div className="yolo-agent-workspace-group-title">{title}</div>
+        <div className="yolo-agent-workspace-group-desc">{description}</div>
         <button
           type="button"
-          className="smtcmp-agent-workspace-add"
+          className="yolo-agent-workspace-add"
           onClick={() => onAdd()}
           disabled={disabled}
         >
@@ -201,17 +201,14 @@ function ScopeGroup({
         </button>
       </div>
       {items.length === 0 ? (
-        <div className="smtcmp-agent-workspace-empty">{emptyHint}</div>
+        <div className="yolo-agent-workspace-empty">{emptyHint}</div>
       ) : (
-        <div className="smtcmp-agent-workspace-rows">
+        <div className="yolo-agent-workspace-rows">
           {items.map((path, idx) => {
             const kind = getPathKind(vault, path)
             return (
-              <div
-                key={`${path}__${idx}`}
-                className="smtcmp-agent-workspace-row"
-              >
-                <span className="smtcmp-agent-workspace-row-icon">
+              <div key={`${path}__${idx}`} className="yolo-agent-workspace-row">
+                <span className="yolo-agent-workspace-row-icon">
                   {kind === 'folder' ? (
                     <Folder size={14} />
                   ) : (
@@ -219,15 +216,15 @@ function ScopeGroup({
                   )}
                 </span>
                 <span
-                  className="smtcmp-agent-workspace-row-path"
+                  className="yolo-agent-workspace-row-path"
                   title={path || '/'}
                 >
                   {path === '' ? '/' : path}
                 </span>
-                <span className="smtcmp-agent-workspace-row-kind">{kind}</span>
+                <span className="yolo-agent-workspace-row-kind">{kind}</span>
                 <button
                   type="button"
-                  className="smtcmp-agent-workspace-row-remove"
+                  className="yolo-agent-workspace-row-remove"
                   onClick={() => onRemove(idx)}
                   disabled={disabled}
                   aria-label="remove"

@@ -1,4 +1,4 @@
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 
 import { BedrockProvider } from './bedrockProvider'
 import { GeminiProvider } from './gemini'
@@ -8,7 +8,7 @@ import { MoonshotProvider } from './moonshotProvider'
 import { OpenAICompatibleProvider } from './openaiCompatibleProvider'
 import { QwenOAuthProvider } from './qwenOAuthProvider'
 
-const createSettings = (): SmartComposerSettings =>
+const createSettings = (): YoloSettings =>
   ({
     providers: [
       {
@@ -52,7 +52,7 @@ const createSettings = (): SmartComposerSettings =>
       streamFallbackRecoveryEnabled: true,
       primaryRequestTimeoutMs: 12000,
     },
-  }) as unknown as SmartComposerSettings
+  }) as unknown as YoloSettings
 
 describe('getProviderClient', () => {
   it('routes native Bedrock providers to BedrockProvider', () => {

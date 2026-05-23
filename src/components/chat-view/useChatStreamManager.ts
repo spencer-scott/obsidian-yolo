@@ -44,6 +44,7 @@ import { ErrorModal } from '../modals/ErrorModal'
 import { ChatMode } from './chat-input/ChatModeSelect'
 import { resolveWorkspaceScopeForRuntimeInput } from './chat-runtime-inputs'
 import { resolveChatModeRuntime } from './chat-runtime-profiles'
+import type { ContextBreakdownInputs } from './useContextBreakdown'
 
 type UseChatStreamManagerParams = {
   setChatMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>
@@ -86,20 +87,30 @@ const buildRunSummary = ({
   status,
   messages,
 }: AgentConversationState): AgentConversationRunSummary => {
-  const isWaitingApproval = messages.some(
-    (message) =>
-      message.role === 'tool' &&
-      message.toolCalls.some(
-        (toolCall) =>
-          toolCall.response.status === ToolCallResponseStatus.PendingApproval,
-      ),
-  )
+  let hasApproval = false
+  let hasAwaitingUser = false
+  for (const message of messages) {
+    if (message.role !== 'tool') continue
+    for (const toolCall of message.toolCalls) {
+      if (toolCall.response.status === ToolCallResponseStatus.PendingApproval) {
+        hasApproval = true
+      } else if (
+        toolCall.response.status === ToolCallResponseStatus.AwaitingUserInput
+      ) {
+        hasAwaitingUser = true
+      }
+      if (hasApproval && hasAwaitingUser) break
+    }
+    if (hasApproval && hasAwaitingUser) break
+  }
+  const isWaitingApproval = hasApproval || hasAwaitingUser
 
   return {
     conversationId,
     status,
     isRunning: status === 'running' && !isWaitingApproval,
     isWaitingApproval,
+    isWaitingUserInput: hasAwaitingUser,
   }
 }
 
@@ -109,6 +120,9 @@ export type UseChatStreamManager = {
     messages: ChatMessage[],
   ) => Promise<ChatConversationCompaction | null>
   currentConversationRunSummary: AgentConversationRunSummary
+  buildContextBreakdownInputs: (
+    messages: ChatMessage[],
+  ) => Promise<ContextBreakdownInputs | null>
   submitChatMutation: UseMutationResult<
     { aborted: boolean },
     Error,
@@ -300,11 +314,15 @@ export function useChatStreamManager({
         const hasWaitingApproval = activeSummaries.some(
           (summary) => summary.isWaitingApproval,
         )
+        const hasWaitingUserInput = activeSummaries.some(
+          (summary) => summary.isWaitingUserInput,
+        )
         setCurrentConversationRunSummary({
           conversationId: currentConversationId,
           status: hasWaitingApproval ? 'running' : 'running',
           isRunning: activeSummaries.some((summary) => summary.isRunning),
           isWaitingApproval: hasWaitingApproval,
+          isWaitingUserInput: hasWaitingUserInput,
         })
       }
     },
@@ -365,6 +383,14 @@ export function useChatStreamManager({
         })
       }
     }
+
+    // Reset summary on conversation switch — syncConversationState below
+    // bails out early for fresh/idle conversations and would otherwise leave
+    // stale flags (e.g. isWaitingUserInput) from the previous conversation
+    // bleeding into the new one's input-box guards.
+    setCurrentConversationRunSummary(
+      agentService.getConversationRunSummary(currentConversationId),
+    )
 
     syncConversationState(agentService.getState(currentConversationId))
 
@@ -511,7 +537,7 @@ export function useChatStreamManager({
         retainLatestToolBoundary: false,
       })
 
-      const nextCompaction = buildManualCompactionState({
+      const nextCompaction = await buildManualCompactionState({
         messages,
         summary,
         summaryModelId: resolvedCompactionClient.model.id,
@@ -521,6 +547,9 @@ export function useChatStreamManager({
         return null
       }
 
+      const manualEstimateProvider = settings.providers.find(
+        (provider) => provider.id === effectiveModel.providerId,
+      )
       try {
         nextCompaction.estimatedNextContextTokens =
           await estimateContinuationRequestContextTokens({
@@ -532,7 +561,10 @@ export function useChatStreamManager({
             compaction: nextCompaction,
             enableTools: effectiveEnableTools,
             includeBuiltinTools: effectiveIncludeBuiltinTools,
+            apiType: manualEstimateProvider?.apiType ?? null,
             allowedToolNames: effectiveAllowedToolNames,
+            enableToolDisclosure: settings.mcp.enableToolDisclosure,
+            toolPreferences: chatModeRuntime.toolPreferences,
             allowedSkillIds,
             allowedSkillNames,
             contextualInjections: buildChatContextualInjections({
@@ -710,8 +742,10 @@ export function useChatStreamManager({
           compaction: effectiveCompactionForRequest,
           compactionProviderClient: resolvedCompactionClient.providerClient,
           compactionModel: resolvedCompactionClient.model,
+          apiType: currentProvider?.apiType ?? null,
           reasoningLevel,
           allowedToolNames: chatModeRuntime.allowedToolNames,
+          enableToolDisclosure: settings.mcp.enableToolDisclosure,
           toolPreferences: chatModeRuntime.toolPreferences,
           workspaceScope:
             resolveWorkspaceScopeForRuntimeInput(selectedAssistant),
@@ -815,6 +849,7 @@ export function useChatStreamManager({
                 requestMessages,
                 providerClient: branchResolvedClient.providerClient,
                 model: branchModel,
+                apiType: branchProvider?.apiType ?? null,
                 conversationId,
                 branchId,
                 sourceUserMessageId: lastMessage.id,
@@ -888,10 +923,116 @@ export function useChatStreamManager({
     },
   })
 
+  /**
+   * Build the input bag for the per-bucket context-breakdown estimator. Mirrors
+   * the resolution done in `compactConversation` / submit so the popover sees
+   * exactly what the next request would send. Returns null if no model can be
+   * resolved or no messages exist (popover surfaces this as an error state).
+   */
+  const buildContextBreakdownInputs = useCallback(
+    async (messages: ChatMessage[]): Promise<ContextBreakdownInputs | null> => {
+      if (messages.length === 0) {
+        return null
+      }
+
+      const effectiveAssistantId =
+        assistantIdOverride ?? settings.currentAssistantId
+      const selectedAssistant = effectiveAssistantId
+        ? (settings.assistants || []).find(
+            (assistant) => assistant.id === effectiveAssistantId,
+          ) || null
+        : null
+      const requestedModelId =
+        modelId || selectedAssistant?.modelId || settings.chatModelId
+
+      let resolvedClient: ReturnType<typeof getChatModelClient>
+      try {
+        resolvedClient = getChatModelClient({
+          settings,
+          modelId: requestedModelId,
+          onAutoPromoteTransportMode: handleAutoPromoteTransportMode,
+        })
+      } catch (error) {
+        if (
+          error instanceof LLMModelNotFoundException &&
+          settings.chatModels.length > 0
+        ) {
+          resolvedClient = getChatModelClient({
+            settings,
+            modelId: settings.chatModels[0].id,
+            onAutoPromoteTransportMode: handleAutoPromoteTransportMode,
+          })
+        } else {
+          return null
+        }
+      }
+
+      const effectiveModel = resolvedClient.model
+      const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
+      const enabledSkillEntries = selectedAssistant
+        ? listLiteSkillEntries(app, { settings }).filter((skill) =>
+            isSkillEnabledForAssistant({
+              assistant: selectedAssistant,
+              skillId: skill.id,
+              disabledSkillIds,
+            }),
+          )
+        : []
+      const chatModeRuntime = resolveChatModeRuntime({
+        mode: chatMode,
+        assistant: selectedAssistant,
+        assistantEnabledToolNames:
+          getEnabledAssistantToolNames(selectedAssistant),
+      })
+      const provider = settings.providers.find(
+        (p) => p.id === effectiveModel.providerId,
+      )
+
+      const mcpManager = await getMcpManager()
+      return {
+        requestContextBuilder,
+        mcpManager,
+        model: effectiveModel,
+        messages,
+        conversationId: currentConversationId ?? '',
+        compaction,
+        enableTools: chatModeRuntime.loopConfig.enableTools,
+        includeBuiltinTools: chatModeRuntime.loopConfig.includeBuiltinTools,
+        apiType: provider?.apiType ?? null,
+        allowedToolNames: chatModeRuntime.allowedToolNames,
+        enableToolDisclosure: settings.mcp.enableToolDisclosure,
+        toolPreferences: chatModeRuntime.toolPreferences,
+        allowedSkillIds: enabledSkillEntries.map((s) => s.id),
+        allowedSkillNames: enabledSkillEntries.map((s) => s.name),
+        contextualInjections: buildChatContextualInjections({
+          includeCurrentFileContent:
+            settings.chatOptions.includeCurrentFileContent,
+          currentFile: currentFileOverride,
+          currentFileViewState,
+        }),
+      }
+    },
+    [
+      app,
+      assistantIdOverride,
+      chatMode,
+      compaction,
+      currentConversationId,
+      currentFileOverride,
+      currentFileViewState,
+      getMcpManager,
+      handleAutoPromoteTransportMode,
+      modelId,
+      requestContextBuilder,
+      settings,
+    ],
+  )
+
   return {
     abortConversationRun,
     currentConversationRunSummary,
     compactConversation,
     submitChatMutation,
+    buildContextBreakdownInputs,
   }
 }

@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
 
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 
 import { ChatViewNavigator } from './chatViewNavigator'
 
@@ -72,7 +72,7 @@ describe('ChatViewNavigator', () => {
         workspace,
       },
       getChatLeafSessionManager: () => sessionManager,
-    } as unknown as SmartComposerPlugin
+    } as unknown as YoloPlugin
   }
 
   beforeEach(() => {
@@ -112,6 +112,7 @@ describe('ChatViewNavigator', () => {
         source: 'selection-pinned',
       },
       'Explain this',
+      { assistantId: undefined },
     )
     expect(view.setMainInputText).not.toHaveBeenCalled()
     expect(view.focusMainInput).not.toHaveBeenCalled()
@@ -146,6 +147,7 @@ describe('ChatViewNavigator', () => {
       '',
       {
         submit: true,
+        assistantId: undefined,
       },
     )
     expect(view.setMainInputText).not.toHaveBeenCalled()

@@ -509,8 +509,8 @@ export default function ApplyViewRoot({
 
   return (
     <div
-      id={useRootId ? 'smtcmp-apply-view' : undefined}
-      className="smtcmp-apply-view-root"
+      id={useRootId ? 'yolo-apply-view' : undefined}
+      className="yolo-apply-view-root"
     >
       {showHeader && (
         <div className="view-header">
@@ -527,8 +527,8 @@ export default function ApplyViewRoot({
           <div className="cm-editor">
             <div className="cm-scroller" ref={scrollerRef}>
               <div className="cm-sizer">
-                <div className="smtcmp-apply-content">
-                  <div className="inline-title smtcmp-inline-title">
+                <div className="yolo-apply-content">
+                  <div className="inline-title yolo-inline-title">
                     {state?.file?.name
                       ? state.file.name.replace(/\.[^/.]+$/, '')
                       : ''}
@@ -574,20 +574,20 @@ export default function ApplyViewRoot({
       </div>
 
       {!isSelectionFocusMode && (
-        <div className="smtcmp-apply-toolbar smtcmp-apply-toolbar-bottom">
-          <div className="smtcmp-apply-toolbar-pill">
-            <div className="smtcmp-apply-toolbar-nav">
+        <div className="yolo-apply-toolbar yolo-apply-toolbar-bottom">
+          <div className="yolo-apply-toolbar-pill">
+            <div className="yolo-apply-toolbar-nav">
               <button
                 type="button"
                 onClick={goToPreviousDiff}
-                className="smtcmp-toolbar-icon-btn"
+                className="yolo-toolbar-icon-btn"
                 title={t('applyView.prevChange', 'Previous change')}
                 aria-label={t('applyView.prevChange', 'Previous change')}
                 disabled={modifiedBlockIndices.length === 0}
               >
-                <span className="smtcmp-toolbar-icon">↑</span>
+                <span className="yolo-toolbar-icon">↑</span>
               </button>
-              <span className="smtcmp-apply-progress">
+              <span className="yolo-apply-progress">
                 {modifiedBlockIndices.length === 0
                   ? '0/0'
                   : `${currentDiffIndex + 1}/${modifiedBlockIndices.length}`}
@@ -595,19 +595,19 @@ export default function ApplyViewRoot({
               <button
                 type="button"
                 onClick={goToNextDiff}
-                className="smtcmp-toolbar-icon-btn"
+                className="yolo-toolbar-icon-btn"
                 title={t('applyView.nextChange', 'Next change')}
                 aria-label={t('applyView.nextChange', 'Next change')}
                 disabled={modifiedBlockIndices.length === 0}
               >
-                <span className="smtcmp-toolbar-icon">↓</span>
+                <span className="yolo-toolbar-icon">↓</span>
               </button>
             </div>
-            <div className="smtcmp-apply-toolbar-actions">
+            <div className="yolo-apply-toolbar-actions">
               <button
                 type="button"
                 onClick={acceptAllIncoming}
-                className="smtcmp-toolbar-btn smtcmp-accept"
+                className="yolo-toolbar-btn yolo-accept"
                 title={t(
                   isRevertReviewMode
                     ? 'applyView.keepAllChanges'
@@ -623,7 +623,7 @@ export default function ApplyViewRoot({
               <button
                 type="button"
                 onClick={acceptAllCurrent}
-                className="smtcmp-toolbar-btn smtcmp-exclude"
+                className="yolo-toolbar-btn yolo-exclude"
                 title={t(
                   isRevertReviewMode
                     ? 'applyView.revertAllChanges'
@@ -723,13 +723,13 @@ const DiffBlockView = forwardRef<
 
     if (part.type === 'unchanged') {
       return (
-        <div className="smtcmp-diff-block">
-          <div className="smtcmp-diff-block-content">
+        <div className="yolo-diff-block">
+          <div className="yolo-diff-block-content">
             <ApplyMarkdownContent
               content={part.value}
               component={pluginComponent}
               sourcePath={sourcePath}
-              className="smtcmp-apply-markdown"
+              className="yolo-apply-markdown"
             />
           </div>
         </div>
@@ -767,7 +767,7 @@ const DiffBlockView = forwardRef<
 
       return (
         <div
-          className={`smtcmp-diff-block-container${isActive ? ' is-active' : ''}${
+          className={`yolo-diff-block-container${isActive ? ' is-active' : ''}${
             isSelectionTarget ? ' is-selection-focus-target' : ''
           }`}
           ref={ref}
@@ -775,10 +775,10 @@ const DiffBlockView = forwardRef<
           {isDecided ? (
             // Show resolved content only
             <>
-              <div className="smtcmp-diff-block smtcmp-diff-block--resolved">
-                <div className="smtcmp-diff-block-content">
+              <div className="yolo-diff-block yolo-diff-block--resolved">
+                <div className="yolo-diff-block-content">
                   {decisionStatusText && (
-                    <div className="smtcmp-apply-decision-status">
+                    <div className="yolo-apply-decision-status">
                       {decisionStatusText}
                     </div>
                   )}
@@ -786,7 +786,7 @@ const DiffBlockView = forwardRef<
                     content={getDecisionPreview() ?? ''}
                     component={pluginComponent}
                     sourcePath={sourcePath}
-                    className="smtcmp-apply-markdown smtcmp-apply-markdown-preview"
+                    className="yolo-apply-markdown yolo-apply-markdown-preview"
                   />
                 </div>
               </div>
@@ -794,7 +794,7 @@ const DiffBlockView = forwardRef<
           ) : (
             // Show original diff view with actions
             <>
-              <div className="smtcmp-diff-block smtcmp-diff-block--inline">
+              <div className="yolo-diff-block yolo-diff-block--inline">
                 {inlineParagraphs.length > 0 ? (
                   inlineParagraphs.map((paragraph, paragraphIndex) => {
                     const paragraphContent = paragraph.isEmpty
@@ -809,29 +809,29 @@ const DiffBlockView = forwardRef<
                     return (
                       <div
                         key={`${paragraphIndex}-${paragraph.isEmpty ? 'empty' : 'content'}`}
-                        className={`smtcmp-apply-paragraph${
+                        className={`yolo-apply-paragraph${
                           paragraph.isEmpty ? ' is-empty' : ''
                         }${paragraph.hasChanges ? ' has-changes' : ''}${
                           isActive ? ' is-active' : ''
                         }`}
                       >
-                        <div className="smtcmp-diff-block-content">
+                        <div className="yolo-diff-block-content">
                           {paragraph.isEmpty ? (
-                            <div className="smtcmp-apply-empty-line" />
+                            <div className="yolo-apply-empty-line" />
                           ) : (
                             <ApplyMarkdownContent
                               content={paragraphContent}
                               component={pluginComponent}
                               sourcePath={sourcePath}
-                              className="smtcmp-apply-markdown smtcmp-apply-inline-markdown"
+                              className="yolo-apply-markdown yolo-apply-inline-markdown"
                             />
                           )}
                         </div>
                         {showActionsForParagraph && (
-                          <span className="smtcmp-apply-paragraph-indicator" />
+                          <span className="yolo-apply-paragraph-indicator" />
                         )}
                         {showActionsForParagraph && (
-                          <div className="smtcmp-diff-block-actions">
+                          <div className="yolo-diff-block-actions">
                             <button
                               type="button"
                               onClick={
@@ -839,12 +839,12 @@ const DiffBlockView = forwardRef<
                                   ? onAcceptSelectionIncoming
                                   : onAcceptIncoming
                               }
-                              className="smtcmp-apply-action smtcmp-apply-action-accept"
+                              className="yolo-apply-action yolo-apply-action-accept"
                               title={acceptIncomingLabel}
                               aria-label={acceptIncomingLabel}
                             >
                               <span
-                                className="smtcmp-apply-action-icon"
+                                className="yolo-apply-action-icon"
                                 aria-hidden="true"
                               >
                                 ✓
@@ -857,12 +857,12 @@ const DiffBlockView = forwardRef<
                                   ? onAcceptSelectionCurrent
                                   : onAcceptCurrent
                               }
-                              className="smtcmp-apply-action smtcmp-apply-action-reject"
+                              className="yolo-apply-action yolo-apply-action-reject"
                               title={acceptCurrentLabel}
                               aria-label={acceptCurrentLabel}
                             >
                               <span
-                                className="smtcmp-apply-action-icon"
+                                className="yolo-apply-action-icon"
                                 aria-hidden="true"
                               >
                                 ×
@@ -875,21 +875,21 @@ const DiffBlockView = forwardRef<
                   })
                 ) : (
                   <div
-                    className={`smtcmp-apply-paragraph has-changes${
+                    className={`yolo-apply-paragraph has-changes${
                       isActive ? ' is-active' : ''
                     }`}
                   >
-                    <div className="smtcmp-diff-block-content">
+                    <div className="yolo-diff-block-content">
                       <ApplyMarkdownContent
                         content={inlineMarkdown}
                         component={pluginComponent}
                         sourcePath={sourcePath}
-                        className="smtcmp-apply-markdown smtcmp-apply-inline-markdown"
+                        className="yolo-apply-markdown yolo-apply-inline-markdown"
                       />
                     </div>
-                    <span className="smtcmp-apply-paragraph-indicator" />
+                    <span className="yolo-apply-paragraph-indicator" />
                     {(!isSelectionFocusMode || isSelectionTarget) && (
-                      <div className="smtcmp-diff-block-actions">
+                      <div className="yolo-diff-block-actions">
                         <button
                           type="button"
                           onClick={
@@ -897,12 +897,12 @@ const DiffBlockView = forwardRef<
                               ? onAcceptSelectionIncoming
                               : onAcceptIncoming
                           }
-                          className="smtcmp-apply-action smtcmp-apply-action-accept"
+                          className="yolo-apply-action yolo-apply-action-accept"
                           title={acceptIncomingLabel}
                           aria-label={acceptIncomingLabel}
                         >
                           <span
-                            className="smtcmp-apply-action-icon"
+                            className="yolo-apply-action-icon"
                             aria-hidden="true"
                           >
                             ✓
@@ -915,12 +915,12 @@ const DiffBlockView = forwardRef<
                               ? onAcceptSelectionCurrent
                               : onAcceptCurrent
                           }
-                          className="smtcmp-apply-action smtcmp-apply-action-reject"
+                          className="yolo-apply-action yolo-apply-action-reject"
                           title={acceptCurrentLabel}
                           aria-label={acceptCurrentLabel}
                         >
                           <span
-                            className="smtcmp-apply-action-icon"
+                            className="yolo-apply-action-icon"
                             aria-hidden="true"
                           >
                             ×
@@ -970,7 +970,7 @@ function ApplyMarkdownContent({
   return (
     <div
       ref={containerRef}
-      className={`markdown-rendered smtcmp-markdown-rendered ${className ?? ''}`}
+      className={`markdown-rendered yolo-markdown-rendered ${className ?? ''}`}
     />
   )
 }
@@ -984,10 +984,10 @@ function inlineTokensToMarkdown(tokens: InlineDiffToken[]): string {
     .map((token) => {
       const text = escapeHtml(token.text)
       if (token.type === 'add') {
-        return `<span class="smtcmp-inline-diff smtcmp-inline-diff-add">${text}</span>`
+        return `<span class="yolo-inline-diff yolo-inline-diff-add">${text}</span>`
       }
       if (token.type === 'del') {
-        return `<span class="smtcmp-inline-diff smtcmp-inline-diff-del">${text}</span>`
+        return `<span class="yolo-inline-diff yolo-inline-diff-del">${text}</span>`
       }
       return text
     })

@@ -533,6 +533,14 @@ export class BedrockProvider extends BaseLLMProvider<LLMProvider> {
             },
           }
         }
+        case 'document':
+          // Bedrock Converse exposes native PDF support, but we don't currently
+          // advertise the 'pdf' modality on bedrock-apiType providers — text
+          // fallback runs upstream. Reaching here means the user opted in
+          // manually without a corresponding adapter implementation.
+          throw new Error(
+            "Bedrock adapter received a native PDF document part — disable the 'pdf' input modality on this model.",
+          )
       }
     })
   }

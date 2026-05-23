@@ -1,4 +1,4 @@
-import { SettingMigration, SmartComposerSettings } from '../setting.types'
+import { SettingMigration, YoloSettings } from '../setting.types'
 
 // Legacy defaults for v17->v18 migration (before schema v19 changes)
 const LEGACY_TAB_COMPLETION_DEFAULTS = {
@@ -21,7 +21,7 @@ export const migrateFrom17To18: SettingMigration['migrate'] = (data) => {
 
   const continuationOptionsRaw = newData.continuationOptions
   const continuationOptions:
-    | SmartComposerSettings['continuationOptions']
+    | YoloSettings['continuationOptions']
     | Record<string, unknown>
     | undefined =
     continuationOptionsRaw && typeof continuationOptionsRaw === 'object'

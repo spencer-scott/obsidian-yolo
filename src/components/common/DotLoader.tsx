@@ -15,7 +15,7 @@ export default function DotLoader({
   if (variant === 'dots') {
     return (
       <span
-        className={`smtcmp-dot-loader-minimal ${className}`.trim()}
+        className={`yolo-dot-loader-minimal ${className}`.trim()}
         aria-label="Loading"
       >
         <span />
@@ -27,13 +27,13 @@ export default function DotLoader({
 
   return (
     <div
-      className={`smtcmp-thinking-loader ${className}`.trim()}
+      className={`yolo-thinking-loader ${className}`.trim()}
       aria-label="Loading"
     >
-      <div className="smtcmp-thinking-icon">
-        <Sparkles className="smtcmp-thinking-icon-svg" size={20} />
+      <div className="yolo-thinking-icon">
+        <Sparkles className="yolo-thinking-icon-svg" size={20} />
       </div>
-      <div className="smtcmp-thinking-text">{text}</div>
+      <div className="yolo-thinking-text">{text}</div>
     </div>
   )
 }

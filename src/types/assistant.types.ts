@@ -35,9 +35,16 @@ export type AssistantToolApprovalMode = z.infer<
   typeof assistantToolApprovalModeSchema
 >
 
+export const assistantToolDisclosureModeSchema = z.enum(['always', 'on_demand'])
+
+export type AssistantToolDisclosureMode = z.infer<
+  typeof assistantToolDisclosureModeSchema
+>
+
 export const assistantToolPreferenceSchema = z.object({
   enabled: z.boolean().optional(),
   approvalMode: assistantToolApprovalModeSchema.optional(),
+  disclosureMode: assistantToolDisclosureModeSchema.optional(),
 })
 
 export type AssistantToolPreference = z.infer<
@@ -74,6 +81,7 @@ export const assistantSchema = z.object({
     .record(z.string(), assistantSkillPreferenceSchema)
     .optional(),
   workspaceScope: assistantWorkspaceScopeSchema.optional(),
+  enableProjectInstructions: z.boolean().optional(),
   createdAt: z.number().optional(),
   updatedAt: z.number().optional(),
 })

@@ -1,12 +1,12 @@
 import { App } from 'obsidian'
 import React from 'react'
 
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ContinuationSection } from '../sections/ContinuationSection'
 
 type EditorTabProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export function EditorTab({ app }: EditorTabProps) {

@@ -23,9 +23,9 @@ const ChatSidebarTabs: React.FC<ChatSidebarTabsProps> = ({
   const chatProps = useMemo(() => initialChatProps, [initialChatProps])
 
   return (
-    <div className="smtcmp-sidebar-root">
-      <div className="smtcmp-sidebar-panels">
-        <div className="smtcmp-sidebar-pane is-active" aria-hidden={false}>
+    <div className="yolo-sidebar-root">
+      <div className="yolo-sidebar-panels">
+        <div className="yolo-sidebar-pane is-active" aria-hidden={false}>
           <Chat
             ref={chatRef}
             {...(chatProps ?? {})}

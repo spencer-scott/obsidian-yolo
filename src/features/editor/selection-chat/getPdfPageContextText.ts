@@ -17,6 +17,7 @@
 
 import type { App, TFile } from 'obsidian'
 
+import { loadPdfjs } from '../../../utils/pdf/pdfjsLoader'
 import { pageItemsToText } from '../../../utils/pdf/pdfPages'
 
 export type PdfPageContextOptions = {
@@ -57,8 +58,7 @@ export async function getPdfPageContextText(
   let pageText: string
   try {
     const buf = await app.vault.adapter.readBinary(file.path)
-    await import('pdfjs-dist/build/pdf.worker.mjs')
-    const pdfjs = await import('pdfjs-dist')
+    const pdfjs = await loadPdfjs()
     const loadingTask = pdfjs.getDocument({
       data: new Uint8Array(buf),
       useWorkerFetch: false,

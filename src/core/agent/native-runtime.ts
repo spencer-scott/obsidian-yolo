@@ -12,7 +12,9 @@ import {
   ToolCallRequest,
   ToolCallResponseStatus,
 } from '../../types/tool-call.types'
+import { runWithLLMDebugTrace } from '../llm/debugCapture'
 
+import { composeAgentInjections } from './agent-injections'
 import {
   buildCompactedConversationState,
   createConversationCompactionSummary,
@@ -96,16 +98,19 @@ export class NativeAgentRuntime implements AgentRuntime {
     const toolGateway = new AgentToolGateway(input.mcpManager, {
       toolsEnabled: this.loopConfig.enableTools,
       allowedToolNames: input.allowedToolNames,
+      enableToolDisclosure: input.enableToolDisclosure,
       toolPreferences: input.toolPreferences,
       workspaceScope: input.workspaceScope,
       allowedSkillIds: input.allowedSkillIds,
       allowedSkillNames: input.allowedSkillNames,
+      apiType: input.apiType,
     })
     const worker = createAgentLoopWorker()
     const runId = uuidv4()
 
     let pendingToolMessageId: string | null = null
     let pendingToolCallCount = 0
+    let currentDebugTraceId: string | undefined
     let runSettled = false
     let workerTaskQueue = Promise.resolve()
     let abortListener: (() => void) | null = null
@@ -125,6 +130,16 @@ export class NativeAgentRuntime implements AgentRuntime {
                   return
                 }
 
+                if (input.drainPendingUserMessages) {
+                  const injected = input.drainPendingUserMessages()
+                  if (injected.length > 0) {
+                    for (const injectedMessage of injected) {
+                      this.messages.push(injectedMessage)
+                    }
+                    this.notifySubscribers()
+                  }
+                }
+
                 const llmTurnExecutor = new AgentLlmTurnExecutor({
                   providerClient: input.providerClient,
                   model: input.model,
@@ -138,13 +153,19 @@ export class NativeAgentRuntime implements AgentRuntime {
                   compaction: this.compactionState,
                   enableTools: this.loopConfig.enableTools,
                   includeBuiltinTools: this.loopConfig.includeBuiltinTools,
+                  apiType: input.apiType,
                   allowedToolNames: input.allowedToolNames,
+                  enableToolDisclosure: input.enableToolDisclosure,
+                  toolPreferences: input.toolPreferences,
                   allowedSkillIds: input.allowedSkillIds,
                   allowedSkillNames: input.allowedSkillNames,
                   abortSignal,
                   reasoningLevel: input.reasoningLevel,
                   requestParams: input.requestParams,
-                  contextualInjections: input.contextualInjections,
+                  contextualInjections: composeAgentInjections({
+                    baseInjections: input.contextualInjections,
+                    messages: [...requestMessages, ...this.messages],
+                  }),
                   geminiTools: input.geminiTools,
                   onAssistantMessage: (assistantMessage) => {
                     this.upsertAssistantMessage(assistantMessage)
@@ -155,6 +176,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                 const turnResult = await llmTurnExecutor.run()
                 pendingToolMessageId = null
                 pendingToolCallCount = turnResult.toolCallRequests.length
+                currentDebugTraceId = turnResult.debugTraceId
 
                 worker.postMessage({
                   type: 'llm_result',
@@ -189,17 +211,22 @@ export class NativeAgentRuntime implements AgentRuntime {
                 this.messages.push(initialToolMessage)
                 this.notifySubscribers()
 
-                const completedToolMessage =
-                  await toolGateway.executeAutoToolCalls({
-                    toolMessage: initialToolMessage,
-                    conversationId: input.conversationId,
-                    conversationMessages: [
-                      ...requestMessages,
-                      ...this.messages,
-                    ],
-                    signal: abortSignal,
-                    chatModelId: input.model.id,
-                  })
+                const completedToolMessage = await runWithLLMDebugTrace(
+                  currentDebugTraceId,
+                  () =>
+                    toolGateway.executeAutoToolCalls({
+                      toolMessage: initialToolMessage,
+                      conversationId: input.conversationId,
+                      conversationMessages: [
+                        ...requestMessages,
+                        ...this.messages,
+                      ],
+                      conversationCompaction: this.compactionState,
+                      signal: abortSignal,
+                      chatModelId: input.model.id,
+                      debugTraceId: currentDebugTraceId,
+                    }),
+                )
 
                 this.replaceToolMessage(completedToolMessage)
                 this.notifySubscribers()
@@ -231,12 +258,14 @@ export class NativeAgentRuntime implements AgentRuntime {
                       providerClient: input.compactionProviderClient,
                       model: input.compactionModel,
                       messages: conversationMessages,
+                      debugTraceId: currentDebugTraceId,
                     })
-                    const nextCompaction = buildCompactedConversationState({
-                      messages: conversationMessages,
-                      summary,
-                      summaryModelId: input.compactionModel.id,
-                    })
+                    const nextCompaction =
+                      await buildCompactedConversationState({
+                        messages: conversationMessages,
+                        summary,
+                        summaryModelId: input.compactionModel.id,
+                      })
                     if (nextCompaction) {
                       try {
                         nextCompaction.estimatedNextContextTokens =
@@ -250,10 +279,16 @@ export class NativeAgentRuntime implements AgentRuntime {
                             enableTools: this.loopConfig.enableTools,
                             includeBuiltinTools:
                               this.loopConfig.includeBuiltinTools,
+                            apiType: input.apiType,
                             allowedToolNames: input.allowedToolNames,
+                            enableToolDisclosure: input.enableToolDisclosure,
+                            toolPreferences: input.toolPreferences,
                             allowedSkillIds: input.allowedSkillIds,
                             allowedSkillNames: input.allowedSkillNames,
-                            contextualInjections: input.contextualInjections,
+                            contextualInjections: composeAgentInjections({
+                              baseInjections: input.contextualInjections,
+                              messages: conversationMessages,
+                            }),
                           })
                       } catch (error) {
                         console.warn(
@@ -392,7 +427,9 @@ export class NativeAgentRuntime implements AgentRuntime {
       ],
       enableTools: false,
       includeBuiltinTools: false,
+      apiType: input.apiType,
       allowedToolNames: input.allowedToolNames,
+      toolPreferences: input.toolPreferences,
       allowedSkillIds: input.allowedSkillIds,
       allowedSkillNames: input.allowedSkillNames,
       abortSignal,

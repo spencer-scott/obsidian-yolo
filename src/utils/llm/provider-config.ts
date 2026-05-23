@@ -1,4 +1,4 @@
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 import { ChatModel } from '../../types/chat-model.types'
 import { EmbeddingModel } from '../../types/embedding-model.types'
 import { LLMProvider, RequestTransportMode } from '../../types/provider.types'
@@ -6,21 +6,21 @@ import { LLMProvider, RequestTransportMode } from '../../types/provider.types'
 import { isBedrockMantleProvider, isNativeBedrockProvider } from './bedrock'
 
 export function getProviderById(
-  settings: Pick<SmartComposerSettings, 'providers'>,
+  settings: Pick<YoloSettings, 'providers'>,
   providerId: string,
 ): LLMProvider | undefined {
   return settings.providers.find((provider) => provider.id === providerId)
 }
 
 export function resolveChatModelProvider(
-  settings: Pick<SmartComposerSettings, 'providers'>,
+  settings: Pick<YoloSettings, 'providers'>,
   model: Pick<ChatModel, 'providerId'>,
 ): LLMProvider | undefined {
   return getProviderById(settings, model.providerId)
 }
 
 export function resolveEmbeddingModelProvider(
-  settings: Pick<SmartComposerSettings, 'providers'>,
+  settings: Pick<YoloSettings, 'providers'>,
   model: Pick<EmbeddingModel, 'providerId'>,
 ): LLMProvider | undefined {
   return getProviderById(settings, model.providerId)

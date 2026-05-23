@@ -64,9 +64,15 @@ export type MentionableImage = {
 export type MentionablePDF = {
   type: 'pdf'
   name: string
-  data: string // extracted plain text (pages joined)
+  // Base64-encoded original PDF bytes. Canonical source-of-truth for native PDF
+  // adapters (Gemini / Anthropic). Optional only for legacy mentionables
+  // serialized before native PDF support — those carry text in `data` instead.
+  rawData?: string
+  // Legacy field: pre-extracted plain text (pages joined). For new uploads this
+  // stays undefined until something needs the text fallback. Kept as `data`
+  // (rather than renamed) so old chat history deserializes unchanged.
+  data?: string
   pageCount?: number
-  truncated?: boolean
 }
 export type MentionableModel = {
   type: 'model'

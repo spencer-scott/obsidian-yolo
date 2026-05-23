@@ -5,11 +5,11 @@ import {
   DEFAULT_TAB_COMPLETION_SYSTEM_PROMPT,
   DEFAULT_TAB_COMPLETION_TRIGGERS,
 } from './setting.types'
-import { parseSmartComposerSettings } from './settings'
+import { parseYoloSettings } from './settings'
 
-describe('parseSmartComposerSettings', () => {
+describe('parseYoloSettings', () => {
   it('should return default values for empty input', () => {
-    const result = parseSmartComposerSettings({})
+    const result = parseYoloSettings({})
     expect(result.version).toBe(SETTINGS_SCHEMA_VERSION)
 
     expect(result.providers).toEqual([])
@@ -36,6 +36,7 @@ describe('parseSmartComposerSettings', () => {
     })
 
     expect(result.mcp.servers).toEqual([])
+    expect(result.mcp.enableToolDisclosure).toBe(false)
     expect(result.yolo).toEqual({ baseDir: 'YOLO' })
 
     expect(result.chatOptions).toMatchObject({
@@ -44,10 +45,9 @@ describe('parseSmartComposerSettings', () => {
       mentionContextMode: 'light',
       chatInputHeight: undefined,
       chatApplyMode: 'review-required',
-      chatMode: 'chat',
+      chatMode: 'agent',
       agentModeWarningConfirmed: false,
       reasoningLevelByModelId: {},
-      tabTitleFollowsConversation: true,
     })
 
     expect(result.notificationOptions).toMatchObject({
@@ -77,7 +77,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('migrates applyModelId to chatTitleModelId for legacy settings', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: 38,
       providers: [
         {
@@ -108,19 +108,8 @@ describe('parseSmartComposerSettings', () => {
     expect(result.chatTitleModelId).toBe('openai/gpt-4.1-mini')
   })
 
-  it('defaults tabTitleFollowsConversation to true for legacy chat options', () => {
-    const result = parseSmartComposerSettings({
-      version: SETTINGS_SCHEMA_VERSION,
-      chatOptions: {
-        includeCurrentFileContent: true,
-      },
-    })
-
-    expect(result.chatOptions.tabTitleFollowsConversation).toBe(true)
-  })
-
   it('migrates version 41 settings to include qwen oauth defaults', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: 41,
       providers: [
         {
@@ -158,7 +147,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('migrates legacy rag auto update interval 24 hours to 0', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: 43,
       ragOptions: {
         autoUpdateEnabled: true,
@@ -176,7 +165,7 @@ describe('parseSmartComposerSettings', () => {
   // that drop was wiping providers across devices. Unknown presets must now
   // degrade to `openai-compatible` and stay in the list.
   it('preserves providers with unknown presetType by coercing to openai-compatible', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: SETTINGS_SCHEMA_VERSION,
       providers: [
         {
@@ -207,7 +196,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('normalizes legacy kimi providers without clearing the provider list', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: SETTINGS_SCHEMA_VERSION,
       providers: [
         {
@@ -240,7 +229,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('drops orphan chat and embedding models when their providers are missing', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: SETTINGS_SCHEMA_VERSION,
       providers: [
         {
@@ -316,7 +305,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('clears invalid model references when no valid models remain after parsing', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: SETTINGS_SCHEMA_VERSION,
       providers: [
         {
@@ -360,7 +349,7 @@ describe('parseSmartComposerSettings', () => {
   })
 
   it('deduplicates embedding models with the same provider and model', () => {
-    const result = parseSmartComposerSettings({
+    const result = parseYoloSettings({
       version: SETTINGS_SCHEMA_VERSION,
       providers: [
         {

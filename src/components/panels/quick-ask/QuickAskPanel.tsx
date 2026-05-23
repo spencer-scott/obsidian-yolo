@@ -43,7 +43,7 @@ import type {
 } from '../../../features/editor/quick-ask/quickAsk.types'
 import { QUICK_ASK_CURSOR_MARKER } from '../../../features/editor/quick-ask/quickAskController'
 import { useChatHistory } from '../../../hooks/useChatHistory'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import type { ApplyViewState } from '../../../types/apply-view.types'
 import { Assistant } from '../../../types/assistant.types'
 import {
@@ -70,7 +70,6 @@ import {
 import { groupAssistantAndToolMessages } from '../../../utils/chat/message-groups'
 import { RequestContextBuilder } from '../../../utils/chat/requestContextBuilder'
 import { buildMessageTimelineItems } from '../../../utils/chat/timeline'
-import { getNodeBody } from '../../../utils/dom/window-context'
 import { readTFileContent } from '../../../utils/obsidian'
 import AssistantToolMessageGroupItem from '../../chat-view/AssistantToolMessageGroupItem'
 import type { ChatUserInputRef } from '../../chat-view/chat-input/ChatUserInput'
@@ -150,7 +149,7 @@ type QuickAskRunStatus =
  * editor methods.
  */
 type QuickAskPanelPropsBase = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   contextText: string
   fileTitle: string
   sourceFilePath?: string
@@ -159,6 +158,7 @@ type QuickAskPanelPropsBase = {
   initialMode?: QuickAskLaunchMode
   initialInput?: string
   autoSend?: boolean
+  initialAssistantId?: string
   onClose: () => void
   containerRef?: React.RefObject<HTMLDivElement>
   onOverlayStateChange?: (isOverlayActive: boolean) => void
@@ -195,6 +195,7 @@ export function QuickAskPanel({
   initialMode,
   initialInput,
   autoSend,
+  initialAssistantId,
   onClose,
   containerRef,
   onOverlayStateChange,
@@ -226,8 +227,17 @@ export function QuickAskPanel({
   const currentAssistantId = settings.quickAskAssistantId
 
   // State
+  // initialAssistantId (e.g. from a selection chat shortcut) is a one-shot
+  // override and takes precedence over the persisted quickAskAssistantId, but
+  // we do NOT write it back to settings — the user's persisted preference is
+  // preserved for future Quick Ask sessions. If the override does not match a
+  // known assistant (e.g. it was deleted), fall back to the persisted choice.
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(
     () => {
+      const overrideAssistant = initialAssistantId
+        ? assistants.find((a) => a.id === initialAssistantId)
+        : null
+      if (overrideAssistant) return overrideAssistant
       if (currentAssistantId) {
         return assistants.find((a) => a.id === currentAssistantId) || null
       }
@@ -1091,6 +1101,7 @@ export function QuickAskPanel({
             mcpManager,
             abortSignal: abortController.signal,
             allowedToolNames: chatModeRuntime.allowedToolNames,
+            enableToolDisclosure: settings.mcp.enableToolDisclosure,
             toolPreferences: chatModeRuntime.toolPreferences,
             allowedSkillIds,
             allowedSkillNames,
@@ -1747,10 +1758,10 @@ export function QuickAskPanel({
   )
   const hideScrollbarWhileFollowing =
     isStreaming && isAutoFollowEnabled && hasMessages
-  const quickAskChatShellClassName = 'smtcmp-quick-ask-chat-shell'
+  const quickAskChatShellClassName = 'yolo-quick-ask-chat-shell'
   const quickAskChatAreaClassName = useMemo(
     () =>
-      `smtcmp-chat-messages smtcmp-quick-ask-chat-area smtcmp-quick-ask-chat-area--shared${hideScrollbarWhileFollowing ? ' smtcmp-quick-ask-chat-area--hide-scrollbar' : ''}`,
+      `yolo-chat-messages yolo-quick-ask-chat-area yolo-quick-ask-chat-area--shared${hideScrollbarWhileFollowing ? ' yolo-quick-ask-chat-area--hide-scrollbar' : ''}`,
     [hideScrollbarWhileFollowing],
   )
   const latestTimelineAssistantToolGroupKey = useMemo(() => {
@@ -1839,19 +1850,19 @@ export function QuickAskPanel({
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
-    document.body.classList.add('smtcmp-quick-ask-global-interaction')
+    document.body.classList.add('yolo-quick-ask-global-interaction')
     document.body.setCssProps({
-      '--smtcmp-quick-ask-global-cursor': 'grabbing',
-      '--smtcmp-quick-ask-global-user-select': 'none',
+      '--yolo-quick-ask-global-cursor': 'grabbing',
+      '--yolo-quick-ask-global-user-select': 'none',
     })
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
-      document.body.classList.remove('smtcmp-quick-ask-global-interaction')
+      document.body.classList.remove('yolo-quick-ask-global-interaction')
       document.body.setCssProps({
-        '--smtcmp-quick-ask-global-cursor': '',
-        '--smtcmp-quick-ask-global-user-select': '',
+        '--yolo-quick-ask-global-cursor': '',
+        '--yolo-quick-ask-global-user-select': '',
       })
     }
   }, [isDragging, containerRef, onDragOffset])
@@ -1924,19 +1935,19 @@ export function QuickAskPanel({
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
-    document.body.classList.add('smtcmp-quick-ask-global-interaction')
+    document.body.classList.add('yolo-quick-ask-global-interaction')
     document.body.setCssProps({
-      '--smtcmp-quick-ask-global-cursor': cursor,
-      '--smtcmp-quick-ask-global-user-select': 'none',
+      '--yolo-quick-ask-global-cursor': cursor,
+      '--yolo-quick-ask-global-user-select': 'none',
     })
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
-      document.body.classList.remove('smtcmp-quick-ask-global-interaction')
+      document.body.classList.remove('yolo-quick-ask-global-interaction')
       document.body.setCssProps({
-        '--smtcmp-quick-ask-global-cursor': '',
-        '--smtcmp-quick-ask-global-user-select': '',
+        '--yolo-quick-ask-global-cursor': '',
+        '--yolo-quick-ask-global-user-select': '',
       })
     }
   }, [hasMessages, isResizing, containerRef, onDragOffset, onResize])
@@ -2044,7 +2055,7 @@ export function QuickAskPanel({
         return (
           <div
             data-user-message-id={messageOrGroup.id}
-            className={`smtcmp-quick-ask-user-message${focusedUserMessageId === messageOrGroup.id ? ' smtcmp-quick-ask-user-message--editing' : ''}`}
+            className={`yolo-quick-ask-user-message${focusedUserMessageId === messageOrGroup.id ? ' yolo-quick-ask-user-message--editing' : ''}`}
           >
             <UserMessageItem
               message={messageOrGroup}
@@ -2145,7 +2156,7 @@ export function QuickAskPanel({
         return (
           <div
             ref={bottomAnchorRef}
-            className="smtcmp-chat-bottom-anchor"
+            className="yolo-chat-bottom-anchor"
             aria-hidden="true"
           />
         )
@@ -2178,7 +2189,7 @@ export function QuickAskPanel({
 
   return (
     <div
-      className={`smtcmp-quick-ask-panel ${hasMessages ? 'has-messages' : ''} ${isResizedEmptyState ? 'is-resized-empty' : ''} ${isDragging ? 'is-dragging' : ''} ${isResizing ? 'is-resizing' : ''}`}
+      className={`yolo-quick-ask-panel ${hasMessages ? 'has-messages' : ''} ${isResizedEmptyState ? 'is-resized-empty' : ''} ${isDragging ? 'is-dragging' : ''} ${isResizing ? 'is-resizing' : ''}`}
       ref={containerRef ?? undefined}
       style={
         panelSize
@@ -2197,7 +2208,7 @@ export function QuickAskPanel({
     >
       <button
         type="button"
-        className="smtcmp-quick-ask-close-button"
+        className="yolo-quick-ask-close-button"
         onClick={onClose}
         aria-label={t('quickAsk.close', 'Close')}
       >
@@ -2206,17 +2217,17 @@ export function QuickAskPanel({
 
       <div
         ref={dragHandleRef}
-        className="smtcmp-quick-ask-drag-handle"
+        className="yolo-quick-ask-drag-handle"
         onMouseDown={handleDragStart}
       >
-        <div className="smtcmp-quick-ask-drag-indicator" />
+        <div className="yolo-quick-ask-drag-indicator" />
       </div>
 
       {/* Top: Input row */}
       {(!isStreaming || shouldShowInlineRunStatus) && (
-        <div className="smtcmp-quick-ask-input-row" ref={inputRowRef}>
+        <div className="yolo-quick-ask-input-row" ref={inputRowRef}>
           <div
-            className={`smtcmp-quick-ask-input ${isStreaming ? 'is-disabled' : ''}`}
+            className={`yolo-quick-ask-input ${isStreaming ? 'is-disabled' : ''}`}
           >
             {!isStreaming && (
               <LexicalContentEditable
@@ -2237,18 +2248,18 @@ export function QuickAskPanel({
                 onMentionNodeMutation={handleMentionNodeMutation}
                 mentionMenuPlacement={mentionMenuPlacement}
                 autoFocus
-                contentClassName="smtcmp-obsidian-textarea smtcmp-content-editable smtcmp-quick-ask-content-editable"
+                contentClassName="yolo-obsidian-textarea yolo-content-editable yolo-quick-ask-content-editable"
               />
             )}
             {inputText.length === 0 && !isStreaming && (
-              <div className="smtcmp-quick-ask-input-placeholder">
+              <div className="yolo-quick-ask-input-placeholder">
                 {t('quickAsk.inputPlaceholder', 'Ask a question...')}
               </div>
             )}
             {shouldShowInlineRunStatus && (
-              <div className="smtcmp-quick-ask-run-status" aria-live="polite">
+              <div className="yolo-quick-ask-run-status" aria-live="polite">
                 <span
-                  className="smtcmp-quick-ask-run-status-dot"
+                  className="yolo-quick-ask-run-status-dot"
                   aria-hidden="true"
                 />
                 <span>{runStatusLabel}</span>
@@ -2279,9 +2290,9 @@ export function QuickAskPanel({
       )}
 
       {/* Bottom toolbar (Cursor style): assistant selector left, actions right */}
-      <div className="smtcmp-quick-ask-toolbar">
+      <div className="yolo-quick-ask-toolbar">
         {/* Left: Assistant selector */}
-        <div className="smtcmp-quick-ask-toolbar-left">
+        <div className="yolo-quick-ask-toolbar-left">
           <DropdownMenu.Root
             open={isAssistantMenuOpen}
             onOpenChange={setIsAssistantMenuOpen}
@@ -2290,7 +2301,7 @@ export function QuickAskPanel({
               <button
                 type="button"
                 ref={assistantTriggerRef}
-                className="smtcmp-quick-ask-assistant-trigger"
+                className="yolo-quick-ask-assistant-trigger"
                 onKeyDown={(event) => {
                   if (!isAssistantMenuOpen) {
                     if (event.key === 'ArrowUp') {
@@ -2312,11 +2323,11 @@ export function QuickAskPanel({
                 }}
               >
                 {selectedAssistant && (
-                  <span className="smtcmp-quick-ask-assistant-icon">
+                  <span className="yolo-quick-ask-assistant-icon">
                     {renderAssistantIcon(selectedAssistant.icon, 14)}
                   </span>
                 )}
-                <span className="smtcmp-quick-ask-assistant-name">
+                <span className="yolo-quick-ask-assistant-name">
                   {selectedAssistant?.name ||
                     t('quickAsk.noAssistant', 'No Assistant')}
                 </span>
@@ -2328,13 +2339,15 @@ export function QuickAskPanel({
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal
-              container={getNodeBody(assistantTriggerRef.current)}
+              container={
+                assistantTriggerRef.current?.ownerDocument?.body ?? undefined
+              }
             >
               <DropdownMenu.Content
                 side="top"
                 align="start"
                 sideOffset={8}
-                className="smtcmp-quick-ask-assistant-dropdown"
+                className="yolo-quick-ask-assistant-dropdown"
                 onCloseAutoFocus={(e) => e.preventDefault()}
               >
                 <AssistantSelectMenu
@@ -2358,7 +2371,7 @@ export function QuickAskPanel({
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
 
-          <div className="smtcmp-quick-ask-model-select smtcmp-smart-space-model-select">
+          <div className="yolo-quick-ask-model-select yolo-smart-space-model-select">
             <ModelSelect
               ref={modelTriggerRef}
               modelId={
@@ -2387,7 +2400,7 @@ export function QuickAskPanel({
               popover={{
                 variant: 'smart-space',
                 maxHeight: 400,
-                className: 'smtcmp-quick-ask-model-popover',
+                className: 'yolo-quick-ask-model-popover',
               }}
               onKeyDown={(event, isMenuOpen) => {
                 if (isMenuOpen) {
@@ -2421,7 +2434,7 @@ export function QuickAskPanel({
             />
           </div>
 
-          <div className="smtcmp-quick-ask-mode-select">
+          <div className="yolo-quick-ask-mode-select">
             <ModeSelect
               ref={modeTriggerRef}
               mode={mode}
@@ -2462,12 +2475,12 @@ export function QuickAskPanel({
         </div>
 
         {/* Right: Action buttons */}
-        <div className="smtcmp-quick-ask-toolbar-right">
+        <div className="yolo-quick-ask-toolbar-right">
           {/* Clear conversation button - only shown when there are messages */}
           {hasMessages && (
             <button
               type="button"
-              className="smtcmp-quick-ask-toolbar-button"
+              className="yolo-quick-ask-toolbar-button"
               onClick={clearConversation}
               aria-label={t('quickAsk.clear', 'Clear conversation')}
               title={t('quickAsk.clear', 'Clear conversation')}
@@ -2480,7 +2493,7 @@ export function QuickAskPanel({
           {isStreaming ? (
             <button
               type="button"
-              className="smtcmp-quick-ask-send-button stop"
+              className="yolo-quick-ask-send-button stop"
               onClick={abortStream}
               aria-label={t('quickAsk.stop', 'Stop')}
             >
@@ -2489,7 +2502,7 @@ export function QuickAskPanel({
           ) : (
             <button
               type="button"
-              className="smtcmp-quick-ask-send-button"
+              className="yolo-quick-ask-send-button"
               onClick={() => {
                 const lexicalEditor = lexicalEditorRef.current
                 if (lexicalEditor) {
@@ -2516,22 +2529,22 @@ export function QuickAskPanel({
 
       {/* Resize handles */}
       <div
-        className="smtcmp-quick-ask-resize-handle smtcmp-quick-ask-resize-handle-right"
+        className="yolo-quick-ask-resize-handle yolo-quick-ask-resize-handle-right"
         onMouseDown={handleResizeStart('right')}
         ref={(el) => (resizeHandlesRef.current.right = el)}
       />
       <div
-        className="smtcmp-quick-ask-resize-handle smtcmp-quick-ask-resize-handle-bottom"
+        className="yolo-quick-ask-resize-handle yolo-quick-ask-resize-handle-bottom"
         onMouseDown={handleResizeStart('bottom')}
         ref={(el) => (resizeHandlesRef.current.bottom = el)}
       />
       <div
-        className="smtcmp-quick-ask-resize-handle smtcmp-quick-ask-resize-handle-bottom-left"
+        className="yolo-quick-ask-resize-handle yolo-quick-ask-resize-handle-bottom-left"
         onMouseDown={handleResizeStart('bottom-left')}
         ref={(el) => (resizeHandlesRef.current.bottomLeft = el)}
       />
       <div
-        className="smtcmp-quick-ask-resize-handle smtcmp-quick-ask-resize-handle-bottom-right"
+        className="yolo-quick-ask-resize-handle yolo-quick-ask-resize-handle-bottom-right"
         onMouseDown={handleResizeStart('bottom-right')}
         ref={(el) => (resizeHandlesRef.current.bottomRight = el)}
       />

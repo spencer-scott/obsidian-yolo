@@ -34,28 +34,26 @@ export function InstallationIncompleteBanner(): ReactNode {
   const viewDetails = t('update.viewDetails', 'Go check for updates')
 
   return (
-    <div className="smtcmp-installation-incomplete-banner">
-      <div className="smtcmp-installation-incomplete-banner-row">
+    <div className="yolo-installation-incomplete-banner">
+      <div className="yolo-installation-incomplete-banner-row">
         <div
-          className="smtcmp-installation-incomplete-banner-icon"
+          className="yolo-installation-incomplete-banner-icon"
           aria-hidden="true"
         >
           <AlertTriangle size={18} strokeWidth={2} />
         </div>
-        <div className="smtcmp-installation-incomplete-banner-body">
-          <div className="smtcmp-installation-incomplete-banner-title">
+        <div className="yolo-installation-incomplete-banner-body">
+          <div className="yolo-installation-incomplete-banner-title">
             {title}
           </div>
-          <div className="smtcmp-installation-incomplete-banner-meta">
-            {meta}
-          </div>
-          <div className="smtcmp-installation-incomplete-banner-notes">
+          <div className="yolo-installation-incomplete-banner-meta">{meta}</div>
+          <div className="yolo-installation-incomplete-banner-notes">
             {notes}
           </div>
         </div>
         <button
           type="button"
-          className="smtcmp-installation-incomplete-banner-dismiss"
+          className="yolo-installation-incomplete-banner-dismiss"
           onClick={() => {
             dismiss()
           }}
@@ -65,10 +63,10 @@ export function InstallationIncompleteBanner(): ReactNode {
           <X size={16} strokeWidth={2.25} />
         </button>
       </div>
-      <div className="smtcmp-installation-incomplete-banner-actions">
+      <div className="yolo-installation-incomplete-banner-actions">
         <button
           type="button"
-          className="mod-cta smtcmp-installation-incomplete-banner-cta"
+          className="mod-cta yolo-installation-incomplete-banner-cta"
           onClick={() => {
             // @ts-expect-error: setting property exists in Obsidian's App but is not typed
             app.setting.open()

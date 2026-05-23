@@ -250,7 +250,7 @@ export default function AssistantSelectionQuoteButton({
   return (
     <div
       ref={containerRef}
-      className="smtcmp-assistant-message-selectable"
+      className="yolo-assistant-message-selectable"
       data-assistant-message-id={messageId}
     >
       {children}
@@ -258,7 +258,7 @@ export default function AssistantSelectionQuoteButton({
         <button
           ref={buttonRef}
           type="button"
-          className={`smtcmp-assistant-selection-quote-button ${
+          className={`yolo-assistant-selection-quote-button ${
             isVisible ? 'visible' : ''
           }`.trim()}
           style={{

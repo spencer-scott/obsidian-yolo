@@ -16,7 +16,7 @@ import type {
   QuickAskLaunchMode,
   QuickAskSelectionScope,
 } from '../../../features/editor/quick-ask/quickAsk.types'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import type { Mentionable } from '../../../types/mentionable'
 import {
   clearDynamicStyleClass,
@@ -37,7 +37,7 @@ export type QuickAskCapabilities =
   | { edit: false; editor: null; view: null }
 
 type QuickAskOverlayOptions = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   anchor: QuickAskAnchor
   capabilities: QuickAskCapabilities
   contextText: string
@@ -51,6 +51,7 @@ type QuickAskOverlayOptions = {
   editSelectionFrom?: { line: number; ch: number }
   selectionScope?: QuickAskSelectionScope
   autoSend?: boolean
+  initialAssistantId?: string
   onClose: () => void
 }
 
@@ -141,7 +142,7 @@ export class QuickAskOverlay {
       const host = overlayRoot.parentElement
       overlayRoot.remove()
       QuickAskOverlay.overlayRoot = null
-      host?.classList.remove('smtcmp-quick-ask-overlay-host')
+      host?.classList.remove('yolo-quick-ask-overlay-host')
     }
     this.pos = null
   }
@@ -152,7 +153,7 @@ export class QuickAskOverlay {
       QuickAskOverlay.overlayRoot.parentElement !== host
     ) {
       QuickAskOverlay.overlayRoot.parentElement?.classList.remove(
-        'smtcmp-quick-ask-overlay-host',
+        'yolo-quick-ask-overlay-host',
       )
       QuickAskOverlay.overlayRoot.remove()
       QuickAskOverlay.overlayRoot = null
@@ -161,9 +162,9 @@ export class QuickAskOverlay {
     if (QuickAskOverlay.overlayRoot) return QuickAskOverlay.overlayRoot
 
     const root = document.createElement('div')
-    root.className = 'smtcmp-quick-ask-overlay-root'
+    root.className = 'yolo-quick-ask-overlay-root'
     host.appendChild(root)
-    host.classList.add('smtcmp-quick-ask-overlay-host')
+    host.classList.add('yolo-quick-ask-overlay-host')
     QuickAskOverlay.overlayRoot = root
     return root
   }
@@ -200,7 +201,7 @@ export class QuickAskOverlay {
 
     const overlayRoot = QuickAskOverlay.getOverlayRoot(overlayHost)
     const overlayContainer = document.createElement('div')
-    overlayContainer.className = 'smtcmp-quick-ask-overlay'
+    overlayContainer.className = 'yolo-quick-ask-overlay'
     overlayRoot.appendChild(overlayContainer)
     this.overlayContainer = overlayContainer
 
@@ -244,6 +245,7 @@ export class QuickAskOverlay {
                         editSelectionFrom={this.options.editSelectionFrom}
                         selectionScope={this.options.selectionScope}
                         autoSend={this.options.autoSend}
+                        initialAssistantId={this.options.initialAssistantId}
                         onClose={this.closeWithAnimation}
                         containerRef={this.containerRef}
                         onOverlayStateChange={this.handleOverlayStateChange}
@@ -265,6 +267,7 @@ export class QuickAskOverlay {
                         initialMode={this.options.initialMode}
                         initialInput={this.options.initialInput}
                         autoSend={this.options.autoSend}
+                        initialAssistantId={this.options.initialAssistantId}
                         onClose={this.closeWithAnimation}
                         containerRef={this.containerRef}
                         onOverlayStateChange={this.handleOverlayStateChange}
@@ -425,7 +428,7 @@ export class QuickAskOverlay {
     if (panelHeight === null && !this.resizeSize) {
       updateDynamicStyleClass(
         this.overlayContainer,
-        'smtcmp-quick-ask-overlay-pos',
+        'yolo-quick-ask-overlay-pos',
         {
           width: maxPanelWidth,
           left: resolvedLeft,
@@ -461,7 +464,7 @@ export class QuickAskOverlay {
 
     updateDynamicStyleClass(
       this.overlayContainer,
-      'smtcmp-quick-ask-overlay-pos',
+      'yolo-quick-ask-overlay-pos',
       {
         width: maxPanelWidth,
         left: resolvedLeft,
@@ -547,7 +550,7 @@ export class QuickAskOverlay {
 
     updateDynamicStyleClass(
       this.overlayContainer,
-      'smtcmp-quick-ask-overlay-pos',
+      'yolo-quick-ask-overlay-pos',
       {
         width: panelWidth,
         ...(panelHeight ? { height: panelHeight } : {}),
@@ -595,7 +598,7 @@ export class QuickAskOverlay {
 
   private startDockAnimation() {
     if (!this.overlayContainer) return
-    this.overlayContainer.classList.add('smtcmp-quick-ask-overlay--docking')
+    this.overlayContainer.classList.add('yolo-quick-ask-overlay--docking')
 
     if (this.dockAnimationTimeout !== null) {
       window.clearTimeout(this.dockAnimationTimeout)
@@ -603,9 +606,7 @@ export class QuickAskOverlay {
 
     this.dockAnimationTimeout = window.setTimeout(() => {
       this.dockAnimationTimeout = null
-      this.overlayContainer?.classList.remove(
-        'smtcmp-quick-ask-overlay--docking',
-      )
+      this.overlayContainer?.classList.remove('yolo-quick-ask-overlay--docking')
     }, 220)
   }
 

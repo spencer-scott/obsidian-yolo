@@ -11,7 +11,7 @@
 //   node scripts/obsidian-devtools.mjs mem              # heap + DOM summary
 //   node scripts/obsidian-devtools.mjs eval '<js>'      # run JS in renderer
 //
-// The capture buffer lives on `window.__smtcmpDevtools` inside Obsidian's
+// The capture buffer lives on `window.__yoloDevtools` inside Obsidian's
 // renderer and is purely in-memory (no file is written). Run `install`
 // once per Obsidian session; it is idempotent.
 
@@ -88,7 +88,7 @@ async function runInPage(expression, { awaitPromise = false } = {}) {
 const INSTALLER_SRC = `
 (() => {
   const MAX = 2000;
-  const key = '__smtcmpDevtools';
+  const key = '__yoloDevtools';
   if (window[key] && window[key].__installed) {
     return { alreadyInstalled: true, bufferSize: window[key].buffer.length };
   }
@@ -157,7 +157,7 @@ try {
       const limit = Number(process.argv[3] || 200)
       const onlyErr = cmd === 'errors'
       const expr = `(() => {
-        const s = window.__smtcmpDevtools;
+        const s = window.__yoloDevtools;
         if (!s) return { installed: false };
         const all = s.buffer;
         const filtered = ${onlyErr} ? all.filter(e => e.level === 'error' || e.level === 'warn') : all;
@@ -182,7 +182,7 @@ try {
     }
     case 'clear': {
       const r = await runInPage(
-        `(() => { const s = window.__smtcmpDevtools; if (!s) return { installed: false }; const n = s.buffer.length; s.clear(); return { installed: true, cleared: n }; })()`,
+        `(() => { const s = window.__yoloDevtools; if (!s) return { installed: false }; const n = s.buffer.length; s.clear(); return { installed: true, cleared: n }; })()`,
       )
       console.log(JSON.stringify(r))
       break
@@ -196,7 +196,7 @@ try {
           heapLimitMB: m.jsHeapSizeLimit ? Math.round(m.jsHeapSizeLimit / 1048576) : null,
           domNodes: document.getElementsByTagName('*').length,
           detachedQuery: 'open DevTools → Memory → Heap Snapshot, then filter by "Detached"',
-          logBufferSize: window.__smtcmpDevtools?.buffer?.length ?? null,
+          logBufferSize: window.__yoloDevtools?.buffer?.length ?? null,
         };
       })()`)
       console.log(JSON.stringify(r, null, 2))

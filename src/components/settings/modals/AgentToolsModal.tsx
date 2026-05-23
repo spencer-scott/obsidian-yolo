@@ -19,11 +19,12 @@ import {
   getBuiltinToolUiMeta,
 } from '../../../core/agent/builtinToolUiMeta'
 import {
+  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileTools,
 } from '../../../core/mcp/localFileTools'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ObsidianToggle } from '../../common/ObsidianToggle'
 import { ReactModal } from '../../common/ReactModal'
 import { CollapsibleToolDescription } from '../common/CollapsibleToolDescription'
@@ -33,7 +34,7 @@ import { WebSearchSettingsModal } from './WebSearchSettingsModal'
 
 type AgentToolsModalProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 const SPLIT_FS_TOOL_NAME_SET = new Set<string>(LOCAL_FS_SPLIT_ACTION_TOOL_NAMES)
@@ -43,7 +44,7 @@ const SPLIT_MEMORY_TOOL_NAME_SET = new Set<string>(
 const SPLIT_WEB_TOOL_NAME_SET = new Set<string>(WEB_OPS_SPLIT_ACTION_TOOL_NAMES)
 
 export class AgentToolsModal extends ReactModal<AgentToolsModalProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app,
       Component: AgentToolsModalWrapper,
@@ -53,7 +54,7 @@ export class AgentToolsModal extends ReactModal<AgentToolsModalProps> {
       },
       plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 
@@ -80,7 +81,7 @@ function AgentToolsModalContent({
   plugin,
 }: {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }) {
   const { t } = useLanguage()
   const { settings, setSettings } = useSettings()
@@ -90,6 +91,8 @@ function AgentToolsModalContent({
     const tools = getLocalFileTools()
       .filter(
         (tool) =>
+          (settings.mcp.enableToolDisclosure ||
+            tool.name !== LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME) &&
           !SPLIT_FS_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_MEMORY_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_WEB_TOOL_NAME_SET.has(tool.name),
@@ -177,7 +180,7 @@ function AgentToolsModalContent({
       ),
       tools: byCategory.get(category) ?? [],
     })).filter((group) => group.tools.length > 0)
-  }, [settings.mcp.builtinToolOptions, t])
+  }, [settings.mcp.builtinToolOptions, settings.mcp.enableToolDisclosure, t])
 
   const handleToggleBuiltinTool = (toolName: string, enabled: boolean) => {
     const targets =
@@ -209,8 +212,8 @@ function AgentToolsModalContent({
   }
 
   return (
-    <div className="smtcmp-settings-section">
-      <div className="smtcmp-settings-desc smtcmp-settings-callout">
+    <div className="yolo-settings-section">
+      <div className="yolo-settings-desc yolo-settings-callout">
         {t(
           'settings.agent.desc',
           'Manage global capabilities and configure your agents.',
@@ -219,32 +222,32 @@ function AgentToolsModalContent({
 
       {builtinToolGroups.map((group) => (
         <div key={group.category}>
-          <div className="smtcmp-settings-sub-header">
-            <span className="smtcmp-agent-tools-section-title">
+          <div className="yolo-settings-sub-header">
+            <span className="yolo-agent-tools-section-title">
               <span>{group.title}</span>
             </span>
           </div>
-          <div className="smtcmp-mcp-servers-container smtcmp-builtin-tools-table">
-            <div className="smtcmp-mcp-servers-header smtcmp-builtin-tools-table-header">
+          <div className="yolo-mcp-servers-container yolo-builtin-tools-table">
+            <div className="yolo-mcp-servers-header yolo-builtin-tools-table-header">
               <div>{t('settings.mcp.tools', 'Tools')}</div>
               <div>{t('settings.agent.descriptionColumn', 'Description')}</div>
               <div />
               <div>{t('settings.mcp.enabled', 'Enabled')}</div>
             </div>
-            <div className="smtcmp-mcp-server smtcmp-builtin-tools-table-body">
+            <div className="yolo-mcp-server yolo-builtin-tools-table-body">
               {group.tools.map((tool) => (
                 <div
                   key={tool.id}
-                  className="smtcmp-mcp-server-row smtcmp-builtin-tools-table-row"
+                  className="yolo-mcp-server-row yolo-builtin-tools-table-row"
                 >
-                  <div className="smtcmp-mcp-server-name">{tool.label}</div>
-                  <div className="smtcmp-mcp-server-status smtcmp-builtin-tools-table-description">
+                  <div className="yolo-mcp-server-name">{tool.label}</div>
+                  <div className="yolo-mcp-server-status yolo-builtin-tools-table-description">
                     <CollapsibleToolDescription
                       description={tool.description}
                     />
                   </div>
                   <div />
-                  <div className="smtcmp-builtin-tools-table-control">
+                  <div className="yolo-builtin-tools-table-control">
                     {tool.hasSettings ? (
                       <button
                         type="button"

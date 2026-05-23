@@ -3,16 +3,18 @@ import { App, FileSystemAdapter, TFile, TFolder, normalizePath } from 'obsidian'
 import { upsertEditReviewSnapshot } from '../../database/json/chat/editReviewSnapshotStore'
 import { saveExternalAgentProgress } from '../../database/json/chat/externalAgentProgressStore'
 import { buildPdfPageImageCacheKey } from '../../database/json/chat/imageCacheStore'
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 import type { ApplyViewState } from '../../types/apply-view.types'
 import type { AssistantWorkspaceScope } from '../../types/assistant.types'
 import type { ChatMessage } from '../../types/chat'
+import type { ChatModelModality } from '../../types/chat-model.types'
 import type { ContentPart } from '../../types/llm/request'
 import { McpTool } from '../../types/mcp.types'
 import {
   ToolCallResponseStatus,
   type ToolEditSummary,
 } from '../../types/tool-call.types'
+import { uint8ArrayToBase64 } from '../../utils/base64'
 import {
   createToolEditSummary,
   deriveToolEditUndoStatus,
@@ -21,13 +23,18 @@ import { editUndoSnapshotStore } from '../../utils/chat/editUndoSnapshotStore'
 import { isContextPrunableToolName } from '../../utils/chat/tool-context-pruning'
 import { collectWikilinkPaths } from '../../utils/llm/annotate-wikilinks'
 import { extractMarkdownImages } from '../../utils/llm/extract-markdown-images'
-import { chatModelSupportsVision } from '../../utils/llm/model-modalities'
+import {
+  chatModelSupportsPdf,
+  chatModelSupportsVision,
+} from '../../utils/llm/model-modalities'
 import {
   PDF_INDEX_MAX_BYTES,
   PDF_INDEX_MAX_PAGES,
   extractPdfText,
 } from '../../utils/pdf/extractPdfText'
 import { renderPdfPagesToImages } from '../../utils/pdf/renderPdfPagesToImages'
+import { PdfSliceError, slicePdfPages } from '../../utils/pdf/slicePdfPages'
+import type { TodoItem } from '../agent/todos-from-messages'
 import {
   findPathOutsideScope,
   isPathAllowedByScope,
@@ -54,6 +61,8 @@ import {
   runWebScrape,
   runWebSearch,
 } from '../web-search'
+
+import { parseToolName } from './tool-name-utils'
 
 export { recoverLikelyEscapedBackslashSequences }
 
@@ -103,25 +112,30 @@ const getContextPrunableToolCallIds = (
   return acceptedToolCallIds
 }
 
-type LocalFileToolName =
-  | 'fs_list'
-  | 'fs_search'
-  | 'fs_read'
-  | 'context_prune_tool_results'
-  | 'context_compact'
-  | 'fs_edit'
-  | 'fs_create_file'
-  | 'fs_delete_file'
-  | 'fs_create_dir'
-  | 'fs_delete_dir'
-  | 'fs_move'
-  | 'memory_add'
-  | 'memory_update'
-  | 'memory_delete'
-  | 'open_skill'
-  | 'web_search'
-  | 'web_scrape'
-  | 'delegate_external_agent'
+export const LOCAL_FILE_TOOL_SHORT_NAMES = [
+  'fs_list',
+  'fs_search',
+  'fs_read',
+  'context_prune_tool_results',
+  'context_compact',
+  'fs_edit',
+  'fs_create_file',
+  'fs_delete_file',
+  'fs_create_dir',
+  'fs_delete_dir',
+  'fs_move',
+  'memory_add',
+  'memory_update',
+  'memory_delete',
+  'open_skill',
+  'web_search',
+  'web_scrape',
+  'delegate_external_agent',
+  'load_tool_schemas',
+  'todo_write',
+  'ask_user_question',
+] as const
+type LocalFileToolName = (typeof LOCAL_FILE_TOOL_SHORT_NAMES)[number]
 type FsSearchScope = 'files' | 'dirs' | 'content' | 'all'
 type FsSearchMode = 'keyword' | 'rag' | 'hybrid'
 type LegacyFsSearchItem =
@@ -129,18 +143,25 @@ type LegacyFsSearchItem =
   | { kind: 'dir'; path: string }
   | { kind: 'content_match'; path: string; line: number; snippet: string }
 type FsListScope = 'files' | 'dirs' | 'all'
-type FsReadModality = 'text' | 'image'
+// PDF read modality override. Omitted = default behavior (native PDF when the
+// chat model supports it, otherwise text). Concrete values are presented to
+// the model via a per-capability schema (see buildFsReadModalitySchema):
+//   - PDF-capable models: ['text', 'pdf']
+//   - vision-capable (non-PDF): ['text', 'image']
+//   - text-only: field is omitted from the schema entirely
+// The parser still accepts the full superset for resilience (see notes there).
+type FsReadModality = 'text' | 'image' | 'pdf'
 type FsReadOperation =
   | {
       type: 'full'
-      modality: FsReadModality
+      modality?: FsReadModality
     }
   | {
       type: 'lines'
       startLine: number
       endLine?: number
       maxLines: number
-      modality: FsReadModality
+      modality?: FsReadModality
     }
 type ContextPruneMode = 'selected' | 'all'
 
@@ -377,10 +398,71 @@ export function getLocalFileToolServerName(): string {
   return LOCAL_FILE_TOOL_SERVER
 }
 
+export const LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME = 'load_tool_schemas'
+
+/**
+ * Build the modality enum + description fragment exposed to the current chat
+ * model in fs_read's schema.
+ *
+ *   - PDF-capable model      → ['text', 'pdf']
+ *   - vision (non-PDF) model → ['text', 'image']
+ *   - text-only model        → undefined (field is omitted from schema)
+ *   - no model context       → ['text', 'image', 'pdf'] (superset; used by UI
+ *                              listings and permission persistence — the LLM
+ *                              never sees this branch because every runtime
+ *                              call site threads the active model through)
+ *
+ * Image and pdf are mutually exclusive by product definition: image is only a
+ * workaround for models lacking native PDF input, and pdf is meaningless on
+ * models that can't accept it. Tailoring the enum per model collapses the
+ * "model picks a value that has to be silently corrected" failure mode into
+ * "the wrong value isn't representable to begin with."
+ */
+const buildFsReadModalitySchema = (
+  modalities: ChatModelModality[] | undefined,
+): { type: 'string'; enum: string[]; description: string } | undefined => {
+  const isPdfCapable = modalities?.includes('pdf')
+  const isVisionCapable = modalities?.includes('vision')
+
+  if (!modalities) {
+    // Superset (UI / permission listing). Not seen by any live LLM call.
+    return {
+      type: 'string',
+      enum: ['text', 'image', 'pdf'],
+      description:
+        'PDF-only modality override. Omit for the default per active model. text = plain text extraction. image = render pages as images (only available on vision-capable, non-PDF-capable models). pdf = native PDF input (only available on PDF-capable models). Ignored for non-PDF files.',
+    }
+  }
+
+  if (isPdfCapable) {
+    return {
+      type: 'string',
+      enum: ['text', 'pdf'],
+      description:
+        'PDF-only modality override. Omit for default (= "pdf"). "text" = plain text extraction (cheap and fast; pick this only when the user explicitly asks for text-only). "pdf" = native PDF input (highest fidelity). Ignored for non-PDF files.',
+    }
+  }
+
+  if (isVisionCapable) {
+    return {
+      type: 'string',
+      enum: ['text', 'image'],
+      description:
+        'PDF-only modality override. Omit for default (= "text"). "text" = plain text extraction. "image" = render the requested pages as images — opt in ONLY when text is insufficient (formulas, figures, scans, complex layout); avoid for large page ranges. Ignored for non-PDF files.',
+    }
+  }
+
+  // Text-only model: no override is meaningful. Field is omitted from schema
+  // entirely so the model has no decision to make.
+  return undefined
+}
+
 export function getLocalFileTools(options?: {
   vaultBasePath?: string
+  chatModelModalities?: ChatModelModality[]
 }): McpTool[] {
   const vaultBasePath = options?.vaultBasePath
+  const modalitySchema = buildFsReadModalitySchema(options?.chatModelModalities)
   return [
     {
       name: 'fs_list',
@@ -462,7 +544,7 @@ export function getLocalFileTools(options?: {
     {
       name: 'fs_read',
       description:
-        'Read vault files. Lines are 1-based. For PDFs, output is <page N> tags; lines mode uses page numbers. Prefer lines for targeted reads. PDFs default to text; switch modality to "image" only for a small page range that needs visual understanding (formulas, figures, scans, complex layout).',
+        'Read vault files. Lines are 1-based. For PDFs, output is <page N> tags; lines mode uses page numbers. Prefer lines for targeted reads.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -495,12 +577,7 @@ export function getLocalFileTools(options?: {
                 description:
                   'Inclusive end line/page. If set, maxLines is ignored.',
               },
-              modality: {
-                type: 'string',
-                enum: ['text', 'image'],
-                description:
-                  'Read modality (PDF only; ignored for non-PDF files). text (default): extract text per page, returned with <page N> tags — cheap, fast, works for full or multi-page reads. image: render the requested pages to images for the vision model — use only when text is insufficient (formulas, figures, scans, complex layout). Strongly avoid image with full or large page ranges: each page is a high-resolution image, transport may stall and token cost balloons. Recommended: image + lines + a small range (1-3 pages).',
-              },
+              ...(modalitySchema ? { modality: modalitySchema } : {}),
             },
             required: ['type'],
           },
@@ -1044,6 +1121,108 @@ export function getLocalFileTools(options?: {
           },
         },
         required: ['provider', 'sandboxMode', 'prompt'],
+      },
+    },
+    {
+      name: LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
+      description:
+        'Load full schemas for all on-demand tools belonging to the given MCP servers, making them callable in the next turn. Pass MCP server names (the prefix before "__" in any stub tool name) — batch multiple servers when needed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          servers: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+            description:
+              'MCP server names whose on-demand tools should be loaded (e.g. "context7", "deepwiki").',
+          },
+        },
+        required: ['servers'],
+      },
+    },
+    {
+      name: 'ask_user_question',
+      description:
+        'Ask the user one or more structured questions when you are blocked by missing information that cannot be inferred from context or the vault. Group related questions in a single call instead of asking turn by turn. Use sparingly — never to confirm trivial actions. Prefer concrete options (single_select / multi_select) over free text for the main questions. The UI automatically appends an "Other" escape hatch to every single_select / multi_select (with a free-text input that lands in the answer as `otherText`), so you do NOT need to add your own "Other" option. The trailing free_text catch-all is also useful when an open-ended answer is plausible (e.g. "Anything else to add? (optional)") — note that free_text answers are treated as optional and may come back empty. This call MUST be the only tool call in the turn; the agent run pauses until the user submits answers in a dedicated panel.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          questions: {
+            type: 'array',
+            minItems: 1,
+            description:
+              'One or more structured questions to ask the user. Group related questions together rather than splitting them across turns.',
+            items: {
+              type: 'object',
+              required: ['id', 'prompt', 'inputType'],
+              properties: {
+                id: {
+                  type: 'string',
+                  description:
+                    'Stable id used to key the answer back. Must be unique across the questions array.',
+                },
+                prompt: {
+                  type: 'string',
+                  description: 'The question text shown to the user.',
+                },
+                inputType: {
+                  type: 'string',
+                  enum: ['free_text', 'single_select', 'multi_select'],
+                  description:
+                    'free_text: open answer. single_select: pick exactly one option. multi_select: pick one or more options.',
+                },
+                options: {
+                  type: 'array',
+                  minItems: 2,
+                  description:
+                    'Required for single_select / multi_select. Each option has a stable id and a human-readable label. Disallowed for free_text. The id "__other__" is reserved — the UI appends its own "Other" entry, so do not include one yourself.',
+                  items: {
+                    type: 'object',
+                    required: ['id', 'label'],
+                    properties: {
+                      id: { type: 'string' },
+                      label: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        required: ['questions'],
+      },
+    },
+    {
+      name: 'todo_write',
+      description:
+        'Update the todo list for the current agent run. Use proactively for multi-step tasks (≥3 steps) or when the user has multiple requests. Each call replaces the entire list; pass `[]` to clear. Keep at most one item in_progress (and exactly one while work is ongoing). Mark items completed immediately as you finish them.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            description:
+              'Complete replacement list of todo items. Pass [] to clear all todos.',
+            items: {
+              type: 'object',
+              properties: {
+                content: {
+                  type: 'string',
+                  description:
+                    'The work to do, as an action phrase. Examples: "Run tests", "Refactor the parser".',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['pending', 'in_progress', 'completed'],
+                  description: 'Current status of the task.',
+                },
+              },
+              required: ['content', 'status'],
+            },
+          },
+        },
+        required: ['todos'],
       },
     },
   ]
@@ -1682,7 +1861,7 @@ const getSemanticSearchUnavailableReason = ({
   settings,
   getRagEngine,
 }: {
-  settings?: SmartComposerSettings
+  settings?: YoloSettings
   getRagEngine?: () => Promise<RAGEngine>
 }): string | null => {
   if (!getRagEngine || !settings) {
@@ -1841,22 +2020,39 @@ const getFsReadOperation = (args: Record<string, unknown>): FsReadOperation => {
   const parsedOperation = coerceOperationObject(args.operation)
   const type = asOptionalString(parsedOperation.type).trim().toLowerCase()
 
-  // Strict modality parsing: only accept undefined/null (→ default text) or a
-  // string that normalizes to 'text' / 'image'. Numbers, booleans, objects,
-  // arrays all reject — silently coercing them would hide model bugs.
+  // Strict modality parsing: accept undefined / null / empty string (→ unset,
+  // use default per active model) or one of 'text' / 'image' / 'pdf'. Numbers,
+  // booleans, objects, arrays, and any other strings (including legacy 'auto')
+  // all reject.
+  //
+  // The schema presented to the model is tailored per model capability
+  // (see buildFsReadModalitySchema), so e.g. PDF-capable models only see
+  // ['text','pdf']. The parser accepts the full superset because (a) it
+  // doesn't have model context here, and (b) resolveModality below maps any
+  // request to a sensible effective modality given the active model — a
+  // model that somehow sends 'image' to a PDF-capable model gets upgraded to
+  // native PDF rather than rejected, which is the more conservative path.
   const rawModalityValue = parsedOperation.modality
-  let modality: FsReadModality = 'text'
+  let modality: FsReadModality | undefined
   if (rawModalityValue !== undefined && rawModalityValue !== null) {
     if (typeof rawModalityValue !== 'string') {
-      throw new Error('operation.modality must be a string: text or image.')
+      throw new Error(
+        "operation.modality must be 'text', 'image', or 'pdf' (or omitted for default behavior).",
+      )
     }
     const normalized = rawModalityValue.trim().toLowerCase()
     if (normalized === '') {
-      // Empty string is treated as "not provided" → default text.
-    } else if (normalized === 'text' || normalized === 'image') {
+      // Empty string is treated as "not provided" → default behavior.
+    } else if (
+      normalized === 'text' ||
+      normalized === 'image' ||
+      normalized === 'pdf'
+    ) {
       modality = normalized
     } else {
-      throw new Error('operation.modality must be one of: text, image.')
+      throw new Error(
+        "operation.modality must be 'text', 'image', or 'pdf' (or omitted for default behavior).",
+      )
     }
   }
 
@@ -1939,6 +2135,204 @@ export function isLocalFsWriteToolName(toolName: string): boolean {
   return LOCAL_FS_WRITE_TOOL_NAMES.has(normalizeLocalToolName(toolName))
 }
 
+export const ASK_USER_QUESTION_TOOL_NAME = 'ask_user_question'
+
+export type AskUserQuestionInputType =
+  | 'free_text'
+  | 'single_select'
+  | 'multi_select'
+
+export type AskUserQuestionOption = {
+  id: string
+  label: string
+}
+
+/**
+ * Reserved option id used by the UI to inject an "Other" escape hatch into
+ * every single_select / multi_select. The model is forbidden from emitting an
+ * option with this id (the validator rejects it) so the UI can rely on the id
+ * being free.
+ */
+export const ASK_USER_QUESTION_OTHER_ID = '__other__'
+
+export type AskUserQuestionItem = {
+  id: string
+  prompt: string
+  inputType: AskUserQuestionInputType
+  options?: AskUserQuestionOption[]
+}
+
+export type AskUserQuestionArgs = {
+  questions: AskUserQuestionItem[]
+}
+
+export type AskUserQuestionValidationResult =
+  | { ok: true; value: AskUserQuestionArgs }
+  | { ok: false; error: string }
+
+/**
+ * Validate the model-provided arguments for the `ask_user_question` tool.
+ * The tool has no execution path — the gateway calls this and converts a
+ * failed result into a Tool Error response. A successful result is what the
+ * UI panel renders.
+ */
+export function validateAskUserQuestionArgs(
+  rawArgs: unknown,
+): AskUserQuestionValidationResult {
+  if (
+    rawArgs === null ||
+    typeof rawArgs !== 'object' ||
+    Array.isArray(rawArgs)
+  ) {
+    return { ok: false, error: 'arguments must be an object.' }
+  }
+  const args = rawArgs as Record<string, unknown>
+  const rawQuestions = args.questions
+  if (!Array.isArray(rawQuestions)) {
+    return { ok: false, error: 'questions must be an array.' }
+  }
+  if (rawQuestions.length < 1) {
+    return {
+      ok: false,
+      error: 'questions must contain at least 1 item.',
+    }
+  }
+
+  const seenIds = new Set<string>()
+  const validated: AskUserQuestionItem[] = []
+  for (let i = 0; i < rawQuestions.length; i++) {
+    const raw = rawQuestions[i]
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: `questions[${i}] must be an object.` }
+    }
+    const q = raw as Record<string, unknown>
+
+    const id = q.id
+    if (typeof id !== 'string' || id.trim() === '') {
+      return {
+        ok: false,
+        error: `questions[${i}].id must be a non-empty string.`,
+      }
+    }
+    if (seenIds.has(id)) {
+      return {
+        ok: false,
+        error: `questions[${i}].id "${id}" is duplicated; ids must be unique.`,
+      }
+    }
+    seenIds.add(id)
+
+    const prompt = q.prompt
+    if (typeof prompt !== 'string' || prompt.trim() === '') {
+      return {
+        ok: false,
+        error: `questions[${i}].prompt must be a non-empty string.`,
+      }
+    }
+
+    const inputType = q.inputType
+    if (
+      inputType !== 'free_text' &&
+      inputType !== 'single_select' &&
+      inputType !== 'multi_select'
+    ) {
+      return {
+        ok: false,
+        error: `questions[${i}].inputType must be "free_text", "single_select", or "multi_select".`,
+      }
+    }
+
+    let options: AskUserQuestionOption[] | undefined
+
+    if (inputType === 'single_select' || inputType === 'multi_select') {
+      if (!Array.isArray(q.options)) {
+        return {
+          ok: false,
+          error: `questions[${i}].options must be an array for ${inputType}.`,
+        }
+      }
+      if (q.options.length < 2) {
+        return {
+          ok: false,
+          error: `questions[${i}].options must contain at least 2 items.`,
+        }
+      }
+      const seenOptionIds = new Set<string>()
+      const opts: AskUserQuestionOption[] = []
+      for (let j = 0; j < q.options.length; j++) {
+        const rawOpt = q.options[j]
+        if (
+          rawOpt === null ||
+          typeof rawOpt !== 'object' ||
+          Array.isArray(rawOpt)
+        ) {
+          return {
+            ok: false,
+            error: `questions[${i}].options[${j}] must be an object.`,
+          }
+        }
+        const opt = rawOpt as Record<string, unknown>
+        if (typeof opt.id !== 'string' || opt.id.trim() === '') {
+          return {
+            ok: false,
+            error: `questions[${i}].options[${j}].id must be a non-empty string.`,
+          }
+        }
+        if (opt.id === ASK_USER_QUESTION_OTHER_ID) {
+          return {
+            ok: false,
+            error: `questions[${i}].options[${j}].id "${ASK_USER_QUESTION_OTHER_ID}" is reserved by the UI; remove this option and rely on the auto-appended "Other" entry.`,
+          }
+        }
+        if (typeof opt.label !== 'string' || opt.label.trim() === '') {
+          return {
+            ok: false,
+            error: `questions[${i}].options[${j}].label must be a non-empty string.`,
+          }
+        }
+        if (seenOptionIds.has(opt.id)) {
+          return {
+            ok: false,
+            error: `questions[${i}].options[${j}].id "${opt.id}" is duplicated within the question.`,
+          }
+        }
+        seenOptionIds.add(opt.id)
+        opts.push({ id: opt.id, label: opt.label })
+      }
+      options = opts
+    } else {
+      // free_text
+      if (q.options !== undefined) {
+        return {
+          ok: false,
+          error: `questions[${i}].options is not allowed for free_text inputType.`,
+        }
+      }
+    }
+
+    validated.push({
+      id,
+      prompt,
+      inputType,
+      ...(options ? { options } : {}),
+    })
+  }
+
+  return { ok: true, value: { questions: validated } }
+}
+
+export function isAskUserQuestionToolName(toolName: string): boolean {
+  try {
+    const parsed = parseToolName(toolName)
+    return (
+      parsed.serverName === LOCAL_FILE_TOOL_SERVER &&
+      parsed.toolName === ASK_USER_QUESTION_TOOL_NAME
+    )
+  } catch {
+    return false
+  }
+}
+
 export function parseLocalFsActionFromToolArgs({
   toolName,
   args: _args,
@@ -1970,7 +2364,7 @@ const executeFsFileOps = async ({
   toolCallId,
 }: {
   app: App
-  settings?: SmartComposerSettings
+  settings?: YoloSettings
   action: FsFileOpAction
   items: Record<string, unknown>[]
   dryRun: boolean
@@ -2295,7 +2689,7 @@ export async function callLocalFileTool({
   workspaceScope,
 }: {
   app: App
-  settings?: SmartComposerSettings
+  settings?: YoloSettings
   openApplyReview?: (state: ApplyViewState) => Promise<boolean>
   getRagEngine?: () => Promise<RAGEngine>
   conversationId?: string
@@ -2434,6 +2828,8 @@ export async function callLocalFileTool({
               nextStartLine: number | null
               content: string
               wikilinks?: Array<{ link: string; path: string }>
+              effectiveModality?: 'text' | 'image' | 'pdf'
+              warning?: string
             }
           | {
               path: string
@@ -2442,7 +2838,10 @@ export async function callLocalFileTool({
             }
         > = []
 
-        const perFileImageParts: Array<{
+        // Tool result attachments hoisted to a follow-up user message after
+        // the tool block. Mostly image_url for rendered PDFs/images, but also
+        // `document` for native PDF slices.
+        const perFileAttachmentParts: Array<{
           path: string
           parts: ContentPart[]
         }> = []
@@ -2459,6 +2858,10 @@ export async function callLocalFileTool({
         const chatModelAcceptsImages = activeChatModel
           ? chatModelSupportsVision(activeChatModel)
           : true
+        // Conservative: when no active model is known, don't assume PDF support.
+        const chatModelAcceptsPdf = activeChatModel
+          ? chatModelSupportsPdf(activeChatModel)
+          : false
 
         for (const path of paths) {
           if (signal?.aborted) {
@@ -2482,15 +2885,219 @@ export async function callLocalFileTool({
               continue
             }
 
-            // PDF-as-images branch: render pages to PNG only when the model
-            // requested it (operation.modality === 'image'), the model accepts
-            // vision input, and the master image-reading switch is on.
-            const pdfImageMode =
-              operation.modality === 'image' &&
-              chatModelAcceptsImages &&
-              (settings?.chatOptions?.imageReadingEnabled ?? true)
+            // Resolve the effective modality for this PDF read. The schema
+            // exposed to the model is tailored per capability (see
+            // buildFsReadModalitySchema), so normally the requested modality
+            // is already aligned with what the model can use. The branches
+            // below also handle the "out-of-schema" cases (model somehow
+            // sends image to a PDF-capable model, or pdf to a vision-only
+            // model) — those resolve to the strictly-better alternative
+            // rather than failing.
+            //
+            // Decision table:
+            //   ── PDF-capable model ──
+            //     undefined → pdf
+            //     'pdf'     → pdf
+            //     'text'    → text  (cheap path; respected verbatim)
+            //     'image'   → pdf   (image is redundant when native PDF is
+            //                       available — native PDF is strictly more
+            //                       informative; this branch is a safety net,
+            //                       schema doesn't expose image to these
+            //                       models)
+            //   ── vision-capable (non-PDF) ──
+            //     undefined → text
+            //     'pdf'     → text  (pdf not supported; safety-net downgrade)
+            //     'text'    → text
+            //     'image'   → image if image-read setting enabled, else text
+            //   ── text-only ──
+            //     all paths → text (no other modality is supported)
+            const imageReadingEnabled =
+              settings?.chatOptions?.imageReadingEnabled ?? true
+            const canUseImage = chatModelAcceptsImages && imageReadingEnabled
+            const resolvedModality: 'pdf' | 'image' | 'text' = (() => {
+              if (chatModelAcceptsPdf) {
+                switch (operation.modality) {
+                  case undefined:
+                  case 'pdf':
+                  case 'image':
+                    return 'pdf'
+                  case 'text':
+                    return 'text'
+                }
+              }
+              switch (operation.modality) {
+                case undefined:
+                case 'pdf':
+                case 'text':
+                  return 'text'
+                case 'image':
+                  return canUseImage ? 'image' : 'text'
+              }
+            })()
 
-            if (pdfImageMode) {
+            // ── Native PDF slice branch ────────────────────────────────────
+            if (resolvedModality === 'pdf') {
+              const reqStart =
+                operation.type === 'lines' ? operation.startLine : 1
+              // In lines mode without endLine, the semantics match the image/text
+              // branch: read a single page. In full mode, endPage is left
+              // undefined so slicePdfPages automatically reads to the last page.
+              const reqEnd =
+                operation.type === 'lines'
+                  ? (operation.endLine ?? operation.startLine)
+                  : undefined
+
+              // Attempt to slice the PDF. slicePdfPages loads the source once
+              // and reports total page count + clamped range; on failure it
+              // throws a tagged PdfSliceError. Caller-side reaction depends on
+              // the kind:
+              //   • 'invalid-range' (e.g. startPage > totalPages) is a hard
+              //     model-facing error — degrading to text would silently hide
+              //     a bad page request.
+              //   • all other kinds (load-failed / too-large / too-many-pages)
+              //     fall through to text extraction with a warning prefix.
+              let sliceResult:
+                | Awaited<ReturnType<typeof slicePdfPages>>
+                | undefined
+              let sliceFallbackWarning: string | undefined
+
+              try {
+                const rawBuf = await app.vault.readBinary(file)
+                const rawBytes = new Uint8Array(rawBuf)
+                sliceResult = await slicePdfPages(rawBytes, {
+                  startPage: reqStart,
+                  endPage: reqEnd,
+                })
+              } catch (err) {
+                if (
+                  err instanceof PdfSliceError &&
+                  err.kind === 'invalid-range'
+                ) {
+                  results.push({
+                    path,
+                    ok: false,
+                    error: err.message,
+                  })
+                  continue
+                }
+                sliceFallbackWarning =
+                  err instanceof Error ? err.message : String(err)
+              }
+
+              if (sliceResult !== undefined) {
+                // Slice succeeded — emit the document part.
+                const {
+                  bytes: slicedBytes,
+                  totalSourcePages,
+                  actualStart,
+                  actualEnd,
+                } = sliceResult
+                const slicePageCount = actualEnd - actualStart + 1
+
+                const base64Data = uint8ArrayToBase64(slicedBytes)
+                const documentPart: ContentPart = {
+                  type: 'document',
+                  mediaType: 'application/pdf',
+                  name: `${file.name} (pages ${actualStart}–${actualEnd})`,
+                  data: base64Data,
+                  pageCount: slicePageCount,
+                }
+
+                const hasMoreBelow =
+                  operation.type === 'lines' && actualEnd < totalSourcePages
+                const nextStartLine = hasMoreBelow ? actualEnd + 1 : null
+
+                results.push({
+                  path,
+                  ok: true,
+                  totalLines: totalSourcePages,
+                  returnedRange:
+                    operation.type === 'lines'
+                      ? { startLine: actualStart, endLine: actualEnd }
+                      : undefined,
+                  hasMoreBelow,
+                  nextStartLine,
+                  // Explain page-number renumbering so the model cites original
+                  // page numbers (actualStart–actualEnd) rather than the
+                  // slice-internal numbers (1–slicePageCount).
+                  content: `Read pages ${actualStart}–${actualEnd} of "${file.name}" (original document has ${totalSourcePages} pages).\nThe attached PDF slice contains those pages renumbered as 1–${slicePageCount} internally, but you should refer to them by their ORIGINAL page numbers (${actualStart}–${actualEnd}) when citing.`,
+                  effectiveModality: 'pdf' as const,
+                })
+                perFileAttachmentParts.push({ path, parts: [documentPart] })
+                continue
+              }
+
+              // Slice failed — fall through to text extraction with a warning prefix.
+              let pdfSliceFallbackPages: { page: number; text: string }[] = []
+              try {
+                const extracted = await extractPdfText(app, file, {
+                  signal,
+                  maxBinaryBytes: PDF_INDEX_MAX_BYTES,
+                  maxPages: PDF_INDEX_MAX_PAGES,
+                  settings,
+                })
+                pdfSliceFallbackPages = extracted.pages
+              } catch (extractErr) {
+                if (
+                  extractErr instanceof DOMException &&
+                  extractErr.name === 'AbortError'
+                ) {
+                  return { status: ToolCallResponseStatus.Aborted }
+                }
+                results.push({
+                  path,
+                  ok: false,
+                  error:
+                    extractErr instanceof Error
+                      ? extractErr.message
+                      : 'Failed to extract PDF text.',
+                })
+                continue
+              }
+
+              const fbTotalPageCount = pdfSliceFallbackPages.length
+              const fbRangeStart = operation.type === 'lines' ? reqStart : 1
+              const fbRangeEnd =
+                operation.type === 'full'
+                  ? fbTotalPageCount
+                  : Math.min(reqEnd ?? fbRangeStart, fbTotalPageCount)
+              const fbSelectedPages = pdfSliceFallbackPages.filter(
+                (p) => p.page >= fbRangeStart && p.page <= fbRangeEnd,
+              )
+              const fbTaggedBody = fbSelectedPages
+                .map((p) => `<page ${p.page}>\n${p.text}\n</page ${p.page}>`)
+                .join('\n')
+              const fbWarningPrefix = `[PDF native slice failed for pages ${fbRangeStart}–${fbRangeEnd}, falling back to text extraction. Reason: ${sliceFallbackWarning ?? 'unknown error'}]\n\n`
+
+              results.push({
+                path,
+                ok: true,
+                totalLines: fbTotalPageCount,
+                returnedRange:
+                  operation.type === 'lines'
+                    ? {
+                        startLine:
+                          fbSelectedPages.length > 0 ? fbRangeStart : null,
+                        endLine: fbSelectedPages.length > 0 ? fbRangeEnd : null,
+                      }
+                    : undefined,
+                hasMoreBelow:
+                  operation.type === 'lines' && fbRangeEnd < fbTotalPageCount,
+                nextStartLine:
+                  operation.type === 'lines' && fbRangeEnd < fbTotalPageCount
+                    ? fbRangeEnd + 1
+                    : null,
+                content: fbWarningPrefix + fbTaggedBody,
+                effectiveModality: 'text' as const,
+                warning: fbWarningPrefix.trim(),
+              })
+              continue
+            }
+
+            // ── Image render branch ────────────────────────────────────────
+            // resolvedModality has already taken vision capability and the
+            // image-reading setting into account; checking it here is enough.
+            if (resolvedModality === 'image') {
               // Mirror text-mode semantics where it makes sense:
               //   - `full`  → render every page (matches "full = whole file").
               //   - `lines` without `endLine` → render only `startLine`. This
@@ -2555,7 +3162,7 @@ export async function callLocalFileTool({
               })
 
               if (rendered.length > 0) {
-                perFileImageParts.push({
+                perFileAttachmentParts.push({
                   path,
                   parts: rendered.map((r) => ({
                     type: 'image_url' as const,
@@ -2669,10 +3276,24 @@ export async function callLocalFileTool({
               ? rangeEndPageInclusive + 1
               : null
 
-            // When the model requested image modality but vision is not
-            // supported, signal the silent fallback so the model can observe it.
+            // When an explicit modality request was silently re-mapped to
+            // text by the resolver, mark `effectiveModality` so callers /
+            // log readers can observe the divergence between requested and
+            // executed mode. Default (undefined) lands here too — but we
+            // only emit the marker when there's an actual divergence.
+            //
+            // Two visible divergences trigger metadata:
+            //   - 'image' on text-only model → text (caller asked for image
+            //     but the model can't do vision). Carries a model-visible
+            //     warning so the model knows its visual request was lost.
+            //   - 'pdf' on non-PDF model → text (caller asked for native
+            //     PDF, model doesn't support it). No warning text — the
+            //     downgrade is the system's choice, not something the model
+            //     should try to "correct" by asking again.
             const visionDowngraded =
               operation.modality === 'image' && !chatModelAcceptsImages
+            const pdfDowngraded =
+              operation.modality === 'pdf' && !chatModelAcceptsPdf
 
             results.push({
               path,
@@ -2693,7 +3314,9 @@ export async function callLocalFileTool({
                     effectiveModality: 'text' as const,
                     warning: 'The current model does not support image input; automatically downgraded to text reading',
                   }
-                : {}),
+                : pdfDowngraded
+                  ? { effectiveModality: 'text' as const }
+                  : {}),
             })
             continue
           }
@@ -2798,7 +3421,10 @@ export async function callLocalFileTool({
               },
             )
             if (imageResult.contentParts) {
-              perFileImageParts.push({ path, parts: imageResult.contentParts })
+              perFileAttachmentParts.push({
+                path,
+                parts: imageResult.contentParts,
+              })
             }
           }
         }
@@ -2820,8 +3446,8 @@ export async function callLocalFileTool({
         // skip building per-file text headers that would just be discarded.
         // The text JSON (above) is the source of truth for paths/ranges.
         const contentParts: ContentPart[] | undefined =
-          perFileImageParts.length > 0
-            ? perFileImageParts.flatMap((p) => p.parts)
+          perFileAttachmentParts.length > 0
+            ? perFileAttachmentParts.flatMap((p) => p.parts)
             : undefined
 
         return {
@@ -3747,6 +4373,16 @@ export async function callLocalFileTool({
         }
       }
 
+      case LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME: {
+        throw new Error(
+          'load_tool_schemas is only available through the Agent runtime.',
+        )
+      }
+
+      case 'todo_write': {
+        return executeTodoWrite({ args })
+      }
+
       default:
         throw new Error(`Unknown local file tool: ${toolName}`)
     }
@@ -3755,5 +4391,61 @@ export async function callLocalFileTool({
       status: ToolCallResponseStatus.Error,
       error: asErrorMessage(error),
     }
+  }
+}
+
+function executeTodoWrite({
+  args,
+}: {
+  args: Record<string, unknown>
+}): LocalToolCallResult {
+  const rawTodos = args.todos
+  if (!Array.isArray(rawTodos)) {
+    return {
+      status: ToolCallResponseStatus.Error,
+      error: 'todos must be an array.',
+    }
+  }
+
+  const todos: TodoItem[] = []
+  for (let i = 0; i < rawTodos.length; i++) {
+    const item = rawTodos[i]
+    if (typeof item !== 'object' || item === null) {
+      return {
+        status: ToolCallResponseStatus.Error,
+        error: `todos[${i}] must be an object.`,
+      }
+    }
+    const { content, status } = item as Record<string, unknown>
+    if (typeof content !== 'string' || content.trim() === '') {
+      return {
+        status: ToolCallResponseStatus.Error,
+        error: `todos[${i}].content must be a non-empty string.`,
+      }
+    }
+    if (
+      status !== 'pending' &&
+      status !== 'in_progress' &&
+      status !== 'completed'
+    ) {
+      return {
+        status: ToolCallResponseStatus.Error,
+        error: `todos[${i}].status must be "pending", "in_progress", or "completed".`,
+      }
+    }
+    todos.push({ content, status })
+  }
+
+  const inProgressCount = todos.filter((t) => t.status === 'in_progress').length
+  if (inProgressCount > 1) {
+    return {
+      status: ToolCallResponseStatus.Error,
+      error: `At most one todo may be in_progress at a time, but ${inProgressCount} were provided.`,
+    }
+  }
+
+  return {
+    status: ToolCallResponseStatus.Success,
+    text: 'Todos updated. Continue tracking your progress with the todo list.',
   }
 }

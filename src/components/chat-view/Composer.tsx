@@ -10,13 +10,14 @@ import {
   DEFAULT_TAB_COMPLETION_TRIGGERS,
   type TabCompletionTrigger,
 } from '../../settings/schema/setting.types'
-import type { SmartComposerSettings } from '../../settings/schema/setting.types'
+import type { YoloSettings } from '../../settings/schema/setting.types'
 import { getModelDisplayName } from '../../utils/model-id-utils'
 import { ObsidianButton } from '../common/ObsidianButton'
 import { ObsidianDropdown } from '../common/ObsidianDropdown'
 import { ObsidianTextArea } from '../common/ObsidianTextArea'
 import { ObsidianTextInput } from '../common/ObsidianTextInput'
 import { ObsidianToggle } from '../common/ObsidianToggle'
+import { ReasoningPanel } from '../common/ReasoningPanel'
 import { SimpleSelect } from '../common/SimpleSelect'
 import { SelectionChatActionsSettings } from '../settings/SelectionChatActionsSettings'
 import { SmartSpaceQuickActionsSettings } from '../settings/SmartSpaceQuickActionsSettings'
@@ -95,7 +96,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
   }, [orderedEnabledModels, settings.providers])
 
   const updateContinuationOptions = useCallback(
-    (updates: Partial<SmartComposerSettings['continuationOptions']>) => {
+    (updates: Partial<YoloSettings['continuationOptions']>) => {
       void setSettings({
         ...settings,
         continuationOptions: {
@@ -258,16 +259,21 @@ const Composer: React.FC<ComposerProps> = (_props) => {
     settings.continuationOptions.continuationModelId ??
     orderedEnabledModels[0]?.id ??
     ''
+  const tabCompletionChatModel = useMemo(
+    () =>
+      orderedEnabledModels.find((m) => m.id === tabCompletionModelId) ?? null,
+    [orderedEnabledModels, tabCompletionModelId],
+  )
 
   return (
-    <div className="smtcmp-composer-container" ref={composerRef}>
+    <div className="yolo-composer-container" ref={composerRef}>
       <div
-        className="smtcmp-composer-tabs smtcmp-composer-tabs--glider"
+        className="yolo-composer-tabs yolo-composer-tabs--glider"
         role="tablist"
         style={
           {
-            '--smtcmp-tab-count': 3,
-            '--smtcmp-tab-index': [
+            '--yolo-tab-count': 3,
+            '--yolo-tab-index': [
               'smart-space',
               'quick-ask',
               'tab-completion',
@@ -275,57 +281,57 @@ const Composer: React.FC<ComposerProps> = (_props) => {
           } as React.CSSProperties
         }
       >
-        <div className="smtcmp-composer-tabs-glider" aria-hidden="true" />
+        <div className="yolo-composer-tabs-glider" aria-hidden="true" />
         <button
-          className={`smtcmp-composer-tab${
+          className={`yolo-composer-tab${
             activeTab === 'smart-space' ? ' is-active' : ''
           }`}
           onClick={() => setActiveTab('smart-space')}
           role="tab"
           aria-selected={activeTab === 'smart-space'}
         >
-          <span className="smtcmp-composer-tab-label">
+          <span className="yolo-composer-tab-label">
             {t('settings.continuation.customSubsectionTitle', 'Smart Space')}
           </span>
         </button>
         <button
-          className={`smtcmp-composer-tab${
+          className={`yolo-composer-tab${
             activeTab === 'quick-ask' ? ' is-active' : ''
           }`}
           onClick={() => setActiveTab('quick-ask')}
           role="tab"
           aria-selected={activeTab === 'quick-ask'}
         >
-          <span className="smtcmp-composer-tab-label">
+          <span className="yolo-composer-tab-label">
             {t('settings.continuation.quickAskSubsectionTitle', 'Quick Ask')}
           </span>
         </button>
         <button
-          className={`smtcmp-composer-tab${
+          className={`yolo-composer-tab${
             activeTab === 'tab-completion' ? ' is-active' : ''
           }`}
           onClick={() => setActiveTab('tab-completion')}
           role="tab"
           aria-selected={activeTab === 'tab-completion'}
         >
-          <span className="smtcmp-composer-tab-label">
+          <span className="yolo-composer-tab-label">
             {t('settings.continuation.tabSubsectionTitle', 'Tab completion')}
           </span>
         </button>
       </div>
 
-      <div className="smtcmp-composer-scroll">
+      <div className="yolo-composer-scroll">
         {activeTab === 'smart-space' && (
           <>
-            <section className="smtcmp-composer-section">
-              <header className="smtcmp-composer-heading">
-                <div className="smtcmp-composer-heading-title">
+            <section className="yolo-composer-section">
+              <header className="yolo-composer-heading">
+                <div className="yolo-composer-heading-title">
                   {t(
                     'settings.continuation.smartSpaceToggle',
                     'Enable Smart Space',
                   )}
                 </div>
-                <div className="smtcmp-composer-heading-desc">
+                <div className="yolo-composer-heading-desc">
                   {t(
                     'settings.continuation.smartSpaceDescription',
                     'Smart Space triggers on empty lines, providing an entry point for continuation and quick actions.',
@@ -333,22 +339,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </div>
               </header>
 
-              <div className="smtcmp-composer-option">
-                <div className="smtcmp-composer-option-info">
-                  <div className="smtcmp-composer-option-title">
+              <div className="yolo-composer-option">
+                <div className="yolo-composer-option-info">
+                  <div className="yolo-composer-option-title">
                     {t(
                       'settings.continuation.smartSpaceToggle',
                       'Enable Smart Space',
                     )}
                   </div>
-                  <div className="smtcmp-composer-option-desc">
+                  <div className="yolo-composer-option-desc">
                     {t(
                       'settings.continuation.smartSpaceToggleDesc',
                       'When disabled, the Smart Space floating panel will not appear.',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-composer-option-control">
+                <div className="yolo-composer-option-control">
                   <ObsidianToggle
                     value={enableSmartSpace}
                     onChange={(value) =>
@@ -360,23 +366,23 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
               {enableSmartSpace && (
                 <>
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.smartSpaceTriggerMode',
                           'Trigger mode',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.smartSpaceTriggerModeDesc',
                           'Define how Smart Space is triggered when pressing space on an empty line.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control smtcmp-composer-option-control--fluid">
-                      <div className="smtcmp-simple-select-wrapper">
+                    <div className="yolo-composer-option-control yolo-composer-option-control--fluid">
+                      <div className="yolo-simple-select-wrapper">
                         <SimpleSelect
                           value={smartSpaceTriggerMode}
                           options={[
@@ -423,12 +429,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
             </section>
 
             {enableSmartSpace && (
-              <section className="smtcmp-composer-section">
-                <header className="smtcmp-composer-heading">
-                  <div className="smtcmp-composer-heading-title">
+              <section className="yolo-composer-section">
+                <header className="yolo-composer-heading">
+                  <div className="yolo-composer-heading-title">
                     {t('settings.smartSpace.quickActionsTitle', 'Quick actions')}
                   </div>
-                  <div className="smtcmp-composer-heading-desc">
+                  <div className="yolo-composer-heading-desc">
                     {t(
                       'settings.smartSpace.quickActionsDesc',
                       'Customize the quick options and prompts shown in Smart Space.',
@@ -439,12 +445,12 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               </section>
             )}
 
-            <section className="smtcmp-composer-section">
-              <header className="smtcmp-composer-heading">
-                <div className="smtcmp-composer-heading-title">
+            <section className="yolo-composer-section">
+              <header className="yolo-composer-heading">
+                <div className="yolo-composer-heading-title">
                   {t('settings.rag.title', 'Knowledge base')}
                 </div>
-                <div className="smtcmp-composer-heading-desc">
+                <div className="yolo-composer-heading-desc">
                   {t(
                     'settings.rag.composerEntryDesc',
                     'Knowledge base indexing has been moved to the settings page. This provides a quick entry point.',
@@ -452,19 +458,19 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </div>
               </header>
 
-              <div className="smtcmp-composer-option">
-                <div className="smtcmp-composer-option-info">
-                  <div className="smtcmp-composer-option-title">
+              <div className="yolo-composer-option">
+                <div className="yolo-composer-option-info">
+                  <div className="yolo-composer-option-title">
                     {t('settings.rag.openKnowledgeSettings', 'Open knowledge base settings')}
                   </div>
-                  <div className="smtcmp-composer-option-desc">
+                  <div className="yolo-composer-option-desc">
                     {t(
                       'settings.rag.openKnowledgeSettingsDesc',
                       'Go to settings to configure knowledge base indexing, scope, status, and advanced parameters.',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-composer-option-control">
+                <div className="yolo-composer-option-control">
                   <ObsidianButton
                     text={t(
                       'settings.rag.openKnowledgeSettings',
@@ -485,15 +491,15 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
         {activeTab === 'quick-ask' && (
           <>
-            <section className="smtcmp-composer-section">
-              <header className="smtcmp-composer-heading">
-                <div className="smtcmp-composer-heading-title">
+            <section className="yolo-composer-section">
+              <header className="yolo-composer-heading">
+                <div className="yolo-composer-heading-title">
                   {t(
                     'settings.continuation.quickAskSubsectionTitle',
                     'Quick Ask',
                   )}
                 </div>
-                <div className="smtcmp-composer-heading-desc">
+                <div className="yolo-composer-heading-desc">
                   {t(
                     'settings.continuation.quickAskDescription',
                     'Type the trigger character on an empty line to quickly open the floating chat panel.',
@@ -501,22 +507,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </div>
               </header>
 
-              <div className="smtcmp-composer-option">
-                <div className="smtcmp-composer-option-info">
-                  <div className="smtcmp-composer-option-title">
+              <div className="yolo-composer-option">
+                <div className="yolo-composer-option-info">
+                  <div className="yolo-composer-option-title">
                     {t(
                       'settings.continuation.quickAskToggle',
                       'Enable Quick Ask',
                     )}
                   </div>
-                  <div className="smtcmp-composer-option-desc">
+                  <div className="yolo-composer-option-desc">
                     {t(
                       'settings.continuation.quickAskToggleDesc',
                       'When disabled, the Quick Ask floating panel will not appear.',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-composer-option-control">
+                <div className="yolo-composer-option-control">
                   <ObsidianToggle
                     value={enableQuickAsk}
                     onChange={(value) =>
@@ -528,19 +534,19 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
               {enableQuickAsk && (
                 <>
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t('settings.continuation.quickAskTrigger', 'Trigger character')}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskTriggerDesc',
                           'Supports 1-3 characters.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control">
+                    <div className="yolo-composer-option-control">
                       <ObsidianTextInput
                         value={quickAskTrigger}
                         onChange={(value) => {
@@ -554,22 +560,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       />
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.quickAskContextBeforeChars',
                           'Characters before cursor',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskContextBeforeCharsDesc',
                           'Maximum number of characters above the cursor to pass to the model.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control">
+                    <div className="yolo-composer-option-control">
                       <ObsidianTextInput
                         type="number"
                         value={quickAskNumberInputs.contextBeforeChars}
@@ -598,22 +604,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       />
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.quickAskContextAfterChars',
                           'Characters after cursor',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.quickAskContextAfterCharsDesc',
                           'Maximum number of characters below the cursor to pass to the model.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control">
+                    <div className="yolo-composer-option-control">
                       <ObsidianTextInput
                         type="number"
                         value={quickAskNumberInputs.contextAfterChars}
@@ -646,37 +652,37 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               )}
             </section>
 
-            <section className="smtcmp-composer-section">
-              <header className="smtcmp-composer-heading">
-                <div className="smtcmp-composer-heading-title">
+            <section className="yolo-composer-section">
+              <header className="yolo-composer-heading">
+                <div className="yolo-composer-heading-title">
                   {t(
                     'settings.continuation.selectionChatSubsectionTitle',
                     'Cursor Chat',
                   )}
                 </div>
-                <div className="smtcmp-composer-heading-desc">
+                <div className="yolo-composer-heading-desc">
                   {t(
                     'settings.continuation.selectionChatDescription',
                     'Show a quick actions panel after selecting text, synced with the sidebar chat.',
                   )}
                 </div>
               </header>
-              <div className="smtcmp-composer-option">
-                <div className="smtcmp-composer-option-info">
-                  <div className="smtcmp-composer-option-title">
+              <div className="yolo-composer-option">
+                <div className="yolo-composer-option-info">
+                  <div className="yolo-composer-option-title">
                     {t(
                       'settings.continuation.selectionChatToggle',
                       'Selection Chat',
                     )}
                   </div>
-                  <div className="smtcmp-composer-option-desc">
+                  <div className="yolo-composer-option-desc">
                     {t(
                       'settings.continuation.selectionChatToggleDesc',
                       'Show a quick actions panel after selecting text.',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-composer-option-control">
+                <div className="yolo-composer-option-control">
                   <ObsidianToggle
                     value={enableSelectionChat}
                     onChange={(value) =>
@@ -688,22 +694,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </div>
               </div>
               {enableSelectionChat && (
-                <div className="smtcmp-composer-option">
-                  <div className="smtcmp-composer-option-info">
-                    <div className="smtcmp-composer-option-title">
+                <div className="yolo-composer-option">
+                  <div className="yolo-composer-option-info">
+                    <div className="yolo-composer-option-title">
                       {t(
                         'settings.continuation.selectionChatAutoDock',
                         'Auto-dock to top right',
                       )}
                     </div>
-                    <div className="smtcmp-composer-option-desc">
+                    <div className="yolo-composer-option-desc">
                       {t(
                         'settings.continuation.selectionChatAutoDockDesc',
                         'Automatically move to the top-right corner of the editor after sending a question (stops following after manual drag).',
                       )}
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option-control">
+                  <div className="yolo-composer-option-control">
                     <ObsidianToggle
                       value={
                         settings.continuationOptions
@@ -727,15 +733,15 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
         {activeTab === 'tab-completion' && (
           <>
-            <section className="smtcmp-composer-section">
-              <header className="smtcmp-composer-heading">
-                <div className="smtcmp-composer-heading-title">
+            <section className="yolo-composer-section">
+              <header className="yolo-composer-heading">
+                <div className="yolo-composer-heading-title">
                   {t(
                     'settings.continuation.tabCompletionBasicTitle',
                     'Basic settings',
                   )}
                 </div>
-                <div className="smtcmp-composer-heading-desc">
+                <div className="yolo-composer-heading-desc">
                   {t(
                     'settings.continuation.tabCompletionBasicDesc',
                     'Enable Tab completion and configure basic parameters.',
@@ -743,19 +749,19 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </div>
               </header>
 
-              <div className="smtcmp-composer-option">
-                <div className="smtcmp-composer-option-info">
-                  <div className="smtcmp-composer-option-title">
+              <div className="yolo-composer-option">
+                <div className="yolo-composer-option-info">
+                  <div className="yolo-composer-option-title">
                     {t('settings.continuation.tabCompletion', 'Enable Tab completion')}
                   </div>
-                  <div className="smtcmp-composer-option-desc">
+                  <div className="yolo-composer-option-desc">
                     {t(
                       'settings.continuation.tabCompletionDesc',
                       'When enabled, completion suggestions will be triggered automatically in the editor.',
                     )}
                   </div>
                 </div>
-                <div className="smtcmp-composer-option-control">
+                <div className="yolo-composer-option-control">
                   <ObsidianToggle
                     value={enableTabCompletion}
                     onChange={(value) => {
@@ -776,23 +782,23 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
               {enableTabCompletion && (
                 <>
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionModel',
                           'Completion model',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionModelDesc',
                           'Select the model used for Tab completion.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control smtcmp-composer-option-control--fluid">
-                      <div className="smtcmp-simple-select-wrapper">
+                    <div className="yolo-composer-option-control yolo-composer-option-control--fluid">
+                      <div className="yolo-simple-select-wrapper">
                         <SimpleSelect
                           value={tabCompletionModelId}
                           groupedOptions={tabCompletionOptionGroups}
@@ -810,22 +816,30 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     </div>
                   </div>
 
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <ReasoningPanel
+                    model={tabCompletionChatModel}
+                    value={tabCompletionOptions.reasoningLevel}
+                    onChange={(level) => {
+                      updateTabCompletionOptions({ reasoningLevel: level })
+                    }}
+                  />
+
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionMaxSuggestionLength',
                           'Max completion length',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionMaxSuggestionLengthDesc',
                           'Control the maximum length of a single suggestion.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control">
+                    <div className="yolo-composer-option-control">
                       <ObsidianTextInput
                         type="number"
                         value={tabNumberInputs.maxSuggestionLength}
@@ -856,34 +870,34 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     </div>
                   </div>
 
-                  <div className="smtcmp-composer-option">
-                    <div className="smtcmp-composer-option-info">
-                      <div className="smtcmp-composer-option-title">
+                  <div className="yolo-composer-option">
+                    <div className="yolo-composer-option-info">
+                      <div className="yolo-composer-option-title">
                         {t(
                           'settings.continuation.tabCompletionLengthPreset',
                           'Completion length',
                         )}
                       </div>
-                      <div className="smtcmp-composer-option-desc">
+                      <div className="yolo-composer-option-desc">
                         {t(
                           'settings.continuation.tabCompletionLengthPresetDesc',
                           'Prompt the model to generate short, medium, or long completions.',
                         )}
                       </div>
                     </div>
-                    <div className="smtcmp-composer-option-control">
+                    <div className="yolo-composer-option-control">
                       <div
-                        className="smtcmp-segmented smtcmp-segmented--glider"
+                        className="yolo-segmented yolo-segmented--glider"
                         style={
                           {
-                            '--smtcmp-segment-count': 3,
-                            '--smtcmp-segment-index':
+                            '--yolo-segment-count': 3,
+                            '--yolo-segment-index':
                               tabCompletionLengthPresetIndex,
                           } as React.CSSProperties
                         }
                       >
                         <div
-                          className="smtcmp-segmented-glider"
+                          className="yolo-segmented-glider"
                           aria-hidden="true"
                         />
                         <button
@@ -940,15 +954,15 @@ const Composer: React.FC<ComposerProps> = (_props) => {
             </section>
 
             {enableTabCompletion && (
-              <section className="smtcmp-composer-section">
-                <header className="smtcmp-composer-heading">
-                  <div className="smtcmp-composer-heading-title">
+              <section className="yolo-composer-section">
+                <header className="yolo-composer-heading">
+                  <div className="yolo-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionTriggersSectionTitle',
                       'Trigger settings',
                     )}
                   </div>
-                  <div className="smtcmp-composer-heading-desc">
+                  <div className="yolo-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionTriggersSectionDesc',
                       'Configure completion trigger conditions and rules.',
@@ -956,22 +970,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   </div>
                 </header>
 
-                <div className="smtcmp-composer-option">
-                  <div className="smtcmp-composer-option-info">
-                    <div className="smtcmp-composer-option-title">
+                <div className="yolo-composer-option">
+                  <div className="yolo-composer-option-info">
+                    <div className="yolo-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionTriggerDelay',
                         'Trigger delay',
                       )}
                     </div>
-                    <div className="smtcmp-composer-option-desc">
+                    <div className="yolo-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionTriggerDelayDesc',
                         'Milliseconds to wait after typing before triggering.',
                       )}
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option-control">
+                  <div className="yolo-composer-option-control">
                     <ObsidianTextInput
                       type="number"
                       value={tabNumberInputs.triggerDelayMs}
@@ -1000,24 +1014,24 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   </div>
                 </div>
 
-                <div className="smtcmp-composer-option smtcmp-composer-option--table">
-                  <div className="smtcmp-composer-option-info">
-                    <div className="smtcmp-composer-option-title">
+                <div className="yolo-composer-option yolo-composer-option--table">
+                  <div className="yolo-composer-option-info">
+                    <div className="yolo-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionTriggersTitle',
                         'Triggers',
                       )}
                     </div>
-                    <div className="smtcmp-composer-option-desc">
+                    <div className="yolo-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionTriggersDesc',
                         'Configure completion trigger rules.',
                       )}
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option-control smtcmp-composer-option-control--full">
-                    <div className="smtcmp-settings-table-container">
-                      <table className="smtcmp-settings-table">
+                  <div className="yolo-composer-option-control yolo-composer-option-control--full">
+                    <div className="yolo-settings-table-container">
+                      <table className="yolo-settings-table">
                         <thead>
                           <tr>
                             <th>
@@ -1131,15 +1145,15 @@ const Composer: React.FC<ComposerProps> = (_props) => {
             )}
 
             {enableTabCompletion && (
-              <section className="smtcmp-composer-section">
-                <header className="smtcmp-composer-heading">
-                  <div className="smtcmp-composer-heading-title">
+              <section className="yolo-composer-section">
+                <header className="yolo-composer-heading">
+                  <div className="yolo-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionAutoSectionTitle',
                       'Auto-completion settings',
                     )}
                   </div>
-                  <div className="smtcmp-composer-heading-desc">
+                  <div className="yolo-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionAutoSectionDesc',
                       'Configure auto-completion behavior after pausing.',
@@ -1147,22 +1161,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   </div>
                 </header>
 
-                <div className="smtcmp-composer-option">
-                  <div className="smtcmp-composer-option-info">
-                    <div className="smtcmp-composer-option-title">
+                <div className="yolo-composer-option">
+                  <div className="yolo-composer-option-info">
+                    <div className="yolo-composer-option-title">
                       {t(
                         'settings.continuation.tabCompletionAutoTrigger',
                         'Auto-complete (after pause)',
                       )}
                     </div>
-                    <div className="smtcmp-composer-option-desc">
+                    <div className="yolo-composer-option-desc">
                       {t(
                         'settings.continuation.tabCompletionAutoTriggerDesc',
                         'When enabled, completion will also trigger after a pause in typing.',
                       )}
                     </div>
                   </div>
-                  <div className="smtcmp-composer-option-control">
+                  <div className="yolo-composer-option-control">
                     <ObsidianToggle
                       value={tabCompletionOptions.idleTriggerEnabled}
                       onChange={(value) => {
@@ -1176,22 +1190,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
 
                 {tabCompletionOptions.idleTriggerEnabled && (
                   <>
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerDelay',
                             'Auto-complete pause time (ms)',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerDelayDesc',
                             'How long to wait after typing stops before triggering auto-completion.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.autoTriggerDelayMs}
@@ -1222,22 +1236,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       </div>
                     </div>
 
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerCooldown',
                             'Auto-complete cooldown (ms)',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionAutoTriggerCooldownDesc',
                             'Cooldown period after auto-completion triggers to avoid frequent requests.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.autoTriggerCooldownMs}
@@ -1273,15 +1287,15 @@ const Composer: React.FC<ComposerProps> = (_props) => {
             )}
 
             {enableTabCompletion && (
-              <section className="smtcmp-composer-section smtcmp-composer-section--advanced">
-                <header className="smtcmp-composer-heading">
-                  <div className="smtcmp-composer-heading-title">
+              <section className="yolo-composer-section yolo-composer-section--advanced">
+                <header className="yolo-composer-heading">
+                  <div className="yolo-composer-heading-title">
                     {t(
                       'settings.continuation.tabCompletionAdvanced',
                       'Advanced settings',
                     )}
                   </div>
-                  <div className="smtcmp-composer-heading-desc">
+                  <div className="yolo-composer-heading-desc">
                     {t(
                       'settings.continuation.tabCompletionAdvancedSectionDesc',
                       'Configure advanced parameters for Tab completion.',
@@ -1290,7 +1304,7 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                 </header>
 
                 <div
-                  className={`smtcmp-settings-advanced-toggle smtcmp-clickable${
+                  className={`yolo-settings-advanced-toggle yolo-clickable${
                     showTabAdvanced ? ' is-expanded' : ''
                   }`}
                   onClick={() => setShowTabAdvanced((prev) => !prev)}
@@ -1303,30 +1317,28 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                     }
                   }}
                 >
-                  <span className="smtcmp-settings-advanced-toggle-icon">
-                    ▶
-                  </span>
+                  <span className="yolo-settings-advanced-toggle-icon">▶</span>
                   {t('settings.continuation.tabCompletionAdvanced', 'Advanced settings')}
                 </div>
 
                 {showTabAdvanced && (
                   <>
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionContextRange',
                             'Context range',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionContextRangeDesc',
                             'Control the context range size.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.contextRange}
@@ -1355,22 +1367,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       </div>
                     </div>
 
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionMinContextLength',
                             'Minimum context length',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionMinContextLengthDesc',
                             'Completion will not trigger below this length.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.minContextLength}
@@ -1401,22 +1413,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       </div>
                     </div>
 
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionTemperature',
                             'Temperature',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionTemperatureDesc',
                             'Control the randomness of generation.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.temperature}
@@ -1446,22 +1458,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       </div>
                     </div>
 
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionRequestTimeout',
                             'Request timeout',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionRequestTimeoutDesc',
                             'Requests exceeding this time will be cancelled.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control">
+                      <div className="yolo-composer-option-control">
                         <ObsidianTextInput
                           type="number"
                           value={tabNumberInputs.requestTimeoutMs}
@@ -1492,22 +1504,22 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                       </div>
                     </div>
 
-                    <div className="smtcmp-composer-option">
-                      <div className="smtcmp-composer-option-info">
-                        <div className="smtcmp-composer-option-title">
+                    <div className="yolo-composer-option">
+                      <div className="yolo-composer-option-info">
+                        <div className="yolo-composer-option-title">
                           {t(
                             'settings.continuation.tabCompletionConstraints',
                             'Completion constraints',
                           )}
                         </div>
-                        <div className="smtcmp-composer-option-desc">
+                        <div className="yolo-composer-option-desc">
                           {t(
                             'settings.continuation.tabCompletionConstraintsDesc',
                             'Additional rules inserted into the completion prompt.',
                           )}
                         </div>
                       </div>
-                      <div className="smtcmp-composer-option-control smtcmp-composer-option-control--full">
+                      <div className="yolo-composer-option-control yolo-composer-option-control--full">
                         <ObsidianTextArea
                           value={
                             settings.continuationOptions

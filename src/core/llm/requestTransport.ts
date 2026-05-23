@@ -2,9 +2,11 @@ import { Platform } from 'obsidian'
 
 import { RequestTransportMode } from '../../types/provider.types'
 
+import { inheritLLMDebugTraceSignal } from './debugCapture'
+
 export type AutoPromotedTransportMode = Extract<
   RequestTransportMode,
-  'node' | 'obsidian'
+  'browser' | 'node' | 'obsidian'
 >
 
 type RequestTransportSettings = {
@@ -175,6 +177,7 @@ const createLinkedAbortController = (
   cleanup: () => void
 } => {
   const controller = new AbortController()
+  inheritLLMDebugTraceSignal({ source: signal, target: controller.signal })
 
   if (!signal) {
     return {
@@ -261,24 +264,52 @@ export const runWithRequestTransport = async <T>({
     return runNode()
   }
 
+  // Desktop auto order: node → browser → obsidian. Mobile (no node): browser → obsidian.
+  // Node is the primary attempt on desktop because it has no CORS surface, honors
+  // custom headers, and routes proxy decisions through proxy-agent for parity with
+  // Chromium. Browser is the next fallback (covers rare proxy-agent edge cases),
+  // and obsidian's requestUrl is the last resort.
   const effectiveRunNode = Platform.isDesktop ? runNode : undefined
 
+  const fallbackAttempts: Array<{
+    mode: AutoPromotedTransportMode
+    run: () => Promise<T>
+  }> = effectiveRunNode
+    ? [
+        { mode: 'browser', run: runBrowser },
+        { mode: 'obsidian', run: runObsidian },
+      ]
+    : [{ mode: 'obsidian', run: runObsidian }]
+
+  const runPrimary = effectiveRunNode ?? runBrowser
+
   try {
-    return await runBrowser()
+    return await runPrimary()
   } catch (error) {
     if (!shouldRetryWithObsidianTransport(error)) {
       throw error
     }
-    if (effectiveRunNode) {
-      const nodeResponse = await effectiveRunNode()
-      rememberTransportMode('node', memoryKey)
-      onAutoPromoteTransportMode?.('node')
-      return nodeResponse
+    let lastError: unknown = error
+    for (const attempt of fallbackAttempts) {
+      try {
+        const response = await attempt.run()
+        rememberTransportMode(attempt.mode, memoryKey)
+        onAutoPromoteTransportMode?.(attempt.mode)
+        return response
+      } catch (fallbackError) {
+        lastError = fallbackError
+        if (!shouldRetryWithObsidianTransport(fallbackError)) {
+          throw fallbackError
+        }
+      }
     }
-    const obsidianResponse = await runObsidian()
-    rememberTransportMode('obsidian', memoryKey)
-    onAutoPromoteTransportMode?.('obsidian')
-    return obsidianResponse
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(
+          typeof lastError === 'string'
+            ? lastError
+            : 'Unknown request transport error',
+        )
   }
 }
 
@@ -359,15 +390,60 @@ const createAutoFallbackStream = <T>({
     }
   }
 
+  // Desktop auto order: node → browser → obsidian. Mobile (no node): browser → obsidian.
+  // The primary attempt is timed; fallbacks are timed for browser/node (fast
+  // failure on CORS/proxy) and untimed for obsidian's buffered requestUrl.
+  const primaryAttempt: {
+    mode: 'browser' | 'node'
+    createStream: (signal?: AbortSignal) => Promise<AsyncIterable<T>>
+  } = createNodeStream
+    ? { mode: 'node', createStream: createNodeStream }
+    : { mode: 'browser', createStream: createBrowserStream }
+
+  type FallbackAttempt =
+    | {
+        mode: 'browser' | 'node'
+        createStream: (signal?: AbortSignal) => Promise<AsyncIterable<T>>
+        timed: true
+      }
+    | {
+        mode: 'obsidian'
+        createStream: (signal?: AbortSignal) => Promise<AsyncIterable<T>>
+        timed: false
+      }
+
+  const fallbackAttempts: FallbackAttempt[] = createNodeStream
+    ? [
+        {
+          mode: 'browser',
+          createStream: createBrowserStream,
+          timed: true,
+        },
+        {
+          mode: 'obsidian',
+          createStream: (attemptSignal?: AbortSignal) =>
+            createObsidianStream(attemptSignal ?? signal),
+          timed: false,
+        },
+      ]
+    : [
+        {
+          mode: 'obsidian',
+          createStream: (attemptSignal?: AbortSignal) =>
+            createObsidianStream(attemptSignal ?? signal),
+          timed: false,
+        },
+      ]
+
   return {
     async *[Symbol.asyncIterator]() {
       let yieldedAnyChunk = false
       try {
-        const browserStream = await startTimedStreamAttempt({
-          transportMode: 'browser',
-          createStream: createBrowserStream,
+        const primaryStream = await startTimedStreamAttempt({
+          transportMode: primaryAttempt.mode,
+          createStream: primaryAttempt.createStream,
         })
-        for await (const chunk of browserStream) {
+        for await (const chunk of primaryStream) {
           yieldedAnyChunk = true
           yield chunk
         }
@@ -378,58 +454,40 @@ const createAutoFallbackStream = <T>({
         }
       }
 
-      const streamFactories = createNodeStream
-        ? [
-            {
-              mode: 'node' as const,
-              createStream: (attemptSignal?: AbortSignal) =>
-                createNodeStream(attemptSignal),
-              timed: true as const,
-            },
-          ]
-        : [
-            {
-              mode: 'obsidian' as const,
-              createStream: (attemptSignal?: AbortSignal) =>
-                createObsidianStream(attemptSignal ?? signal),
-              timed: false as const,
-            },
-          ]
-
       let lastError: unknown
-      for (const {
-        mode: fallbackMode,
-        createStream,
-        timed,
-      } of streamFactories) {
+      for (const attempt of fallbackAttempts) {
+        let attemptYieldedChunk = false
         try {
-          const fallbackStream =
-            timed && fallbackMode === 'node'
-              ? await startTimedStreamAttempt({
-                  transportMode: 'node',
-                  createStream,
-                })
-              : await createStream(signal)
+          const fallbackStream = attempt.timed
+            ? await startTimedStreamAttempt({
+                transportMode: attempt.mode,
+                createStream: attempt.createStream,
+              })
+            : await attempt.createStream(signal)
           let remembered = false
           for await (const chunk of fallbackStream) {
             if (!remembered) {
-              rememberTransportMode(fallbackMode, memoryKey)
-              onAutoPromoteTransportMode?.(fallbackMode)
+              rememberTransportMode(attempt.mode, memoryKey)
+              onAutoPromoteTransportMode?.(attempt.mode)
               remembered = true
             }
+            attemptYieldedChunk = true
             yield chunk
           }
           if (!remembered) {
-            rememberTransportMode(fallbackMode, memoryKey)
-            onAutoPromoteTransportMode?.(fallbackMode)
+            rememberTransportMode(attempt.mode, memoryKey)
+            onAutoPromoteTransportMode?.(attempt.mode)
           }
           return
         } catch (fallbackError) {
           lastError = fallbackError
-          if (
-            fallbackMode === 'node' &&
-            shouldRetryWithNextTransport(fallbackError)
-          ) {
+          // Once this attempt has yielded chunks, downstream consumers have
+          // already seen a partial response — switching transports now would
+          // splice two responses together. Bail out with the live error.
+          if (attemptYieldedChunk) {
+            throw fallbackError
+          }
+          if (attempt.timed && shouldRetryWithNextTransport(fallbackError)) {
             continue
           }
           throw fallbackError

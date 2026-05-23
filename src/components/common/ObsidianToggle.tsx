@@ -14,13 +14,14 @@ export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
   const [toggleComponent, setToggleComponent] =
     useState<ToggleComponent | null>(null)
   const onChangeRef = useRef(onChange)
+  const isSyncingRef = useRef(false)
 
   useEffect(() => {
     if (setting) {
       let newToggleComponent: ToggleComponent | null = null
       setting.addToggle((component) => {
         newToggleComponent = component
-        newToggleComponent?.toggleEl.addClass('smtcmp-checkbox-container')
+        newToggleComponent?.toggleEl.addClass('yolo-checkbox-container')
       })
       setToggleComponent(newToggleComponent)
 
@@ -29,7 +30,7 @@ export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
       }
     } else if (containerRef.current) {
       const newToggleComponent = new ToggleComponent(containerRef.current)
-      newToggleComponent.toggleEl.addClass('smtcmp-checkbox-container')
+      newToggleComponent.toggleEl.addClass('yolo-checkbox-container')
       setToggleComponent(newToggleComponent)
 
       return () => {
@@ -44,13 +45,22 @@ export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
 
   useEffect(() => {
     if (!toggleComponent) return
-    toggleComponent.onChange((v) => onChangeRef.current(v))
+    toggleComponent.onChange((v) => {
+      if (isSyncingRef.current) {
+        return
+      }
+      onChangeRef.current(v)
+    })
   }, [toggleComponent])
 
   useEffect(() => {
     if (!toggleComponent) return
+    isSyncingRef.current = true
     toggleComponent.setValue(value)
+    queueMicrotask(() => {
+      isSyncingRef.current = false
+    })
   }, [toggleComponent, value])
 
-  return <div ref={containerRef} className="smtcmp-display-contents" />
+  return <div ref={containerRef} className="yolo-display-contents" />
 }

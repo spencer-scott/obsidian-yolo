@@ -1,20 +1,20 @@
 import { App } from 'obsidian'
 
 import { DatabaseManager } from '../../database/DatabaseManager'
-import { SmartComposerSettings } from '../../settings/schema/setting.types'
+import { YoloSettings } from '../../settings/schema/setting.types'
 
 import { RAGEngine } from './ragEngine'
 
 type RagCoordinatorDeps = {
   app: App
-  getSettings: () => SmartComposerSettings
+  getSettings: () => YoloSettings
   ensureRuntimeReady: () => Promise<{ version: string; dir: string }>
   getDbManager: () => Promise<DatabaseManager>
 }
 
 export class RagCoordinator {
   private readonly app: App
-  private readonly getSettings: () => SmartComposerSettings
+  private readonly getSettings: () => YoloSettings
   private readonly ensureRuntimeReady: () => Promise<{
     version: string
     dir: string
@@ -57,7 +57,7 @@ export class RagCoordinator {
     return this.ragEngineInitPromise
   }
 
-  updateSettings(settings: SmartComposerSettings) {
+  updateSettings(settings: YoloSettings) {
     this.ragEngine?.setSettings(settings)
   }
 

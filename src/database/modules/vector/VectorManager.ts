@@ -50,6 +50,11 @@ export type ReconcileConfig = {
   excludePatterns: string[]
   /** When false, PDFs are excluded from the desired set (and existing PDF rows are removed). */
   indexPdf: boolean
+  /**
+   * Max parallel embedding requests. Clamped to [1, 24]. Default 10. Lower
+   * this when the embedding provider returns 429 (e.g. Azure S0 tier).
+   */
+  embeddingConcurrency?: number
   /** Optional YOLO-root-aware settings handle; enables the PDF text cache. */
   settings?: YoloSettingsLike | null
 }
@@ -382,6 +387,7 @@ export class VectorManager {
     // 8. Embed in batches with rate-limit aware retry.
     await this.embedAndInsertBatches(plan.toEmbed, embeddingModel, {
       signal,
+      maxConcurrency: config.embeddingConcurrency,
       onProgress: (snapshot) =>
         onProgress?.({
           ...snapshot,
@@ -545,6 +551,11 @@ export class VectorManager {
     embeddingModel: EmbeddingModelClient,
     options: {
       signal?: AbortSignal
+      /**
+       * Max parallel embedding requests. Clamped to [1, 24]. Default 10.
+       * The adaptive batch-size shrink/grow stays within [1, maxConcurrency].
+       */
+      maxConcurrency?: number
       onProgress?: (snapshot: {
         completedChunks: number
         totalChunks: number
@@ -590,9 +601,21 @@ export class VectorManager {
       return f
     }
 
-    let currentBatchSize = 24
-    const MIN_BATCH_SIZE = 10
-    const MAX_BATCH_SIZE = 24
+    const MAX_BATCH_SIZE = Math.max(
+      1,
+      Math.min(24, Math.floor(options.maxConcurrency ?? 10)),
+    )
+    // Keep the adaptive floor at 10 when the ceiling allows, otherwise collapse
+    // to the ceiling so user-configured low values aren't auto-scaled up.
+    const MIN_BATCH_SIZE = Math.min(10, MAX_BATCH_SIZE)
+    let currentBatchSize = MAX_BATCH_SIZE
+    // Full DB snapshot checkpoint interval (chunks). requestSave() triggers
+    // a full pgClient.dumpDataDir + writeBinary, whose cost scales with total
+    // DB size — not with the 1500-chunk delta — so lowering this knob has
+    // O(DB size) write amplification and is not a sound way to bound the
+    // "embeddings already paid for but not yet persisted" loss. If that loss
+    // ever needs a real bound, do it with an incremental segment log, not by
+    // shortening this interval.
     const INCREMENTAL_SAVE_THRESHOLD = 1500
     let chunksSinceLastSave = 0
 

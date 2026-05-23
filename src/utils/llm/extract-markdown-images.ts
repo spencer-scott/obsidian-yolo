@@ -6,6 +6,7 @@ import {
   buildImageCacheKey,
 } from '../../database/json/chat/imageCacheStore'
 import { ContentPart } from '../../types/llm/request'
+import { arrayBufferToBase64 } from '../base64'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
@@ -122,16 +123,6 @@ function resolveImageFile(
   const sourceDir = sourcePath.substring(0, sourcePath.lastIndexOf('/'))
   const relativePath = sourceDir ? `${sourceDir}/${linkPath}` : linkPath
   return app.vault.getFileByPath(relativePath) ?? null
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer)
-  const CHUNK = 0x8000
-  const chunks: string[] = []
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)))
-  }
-  return btoa(chunks.join(''))
 }
 
 /**

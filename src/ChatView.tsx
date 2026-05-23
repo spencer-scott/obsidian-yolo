@@ -20,7 +20,7 @@ import { PluginProvider } from './contexts/plugin-context'
 import { RAGProvider } from './contexts/rag-context'
 import { SettingsProvider } from './contexts/settings-context'
 import type { PendingChatOpenPayload } from './features/chat/chatLeafSessionManager'
-import SmartComposerPlugin from './main'
+import YoloPlugin from './main'
 import { ConversationOverrideSettings } from './types/conversation-settings.types'
 import { MentionableBlockData, MentionableImage } from './types/mentionable'
 
@@ -29,11 +29,10 @@ export class ChatView extends ItemView {
   private root: Root | null = null
   private initialChatProps?: ChatProps
   private chatRef: React.RefObject<ChatRef> = React.createRef()
-  private removeSettingsChangeListener?: () => void
 
   constructor(
     leaf: WorkspaceLeaf,
-    private plugin: SmartComposerPlugin,
+    private plugin: YoloPlugin,
   ) {
     super(leaf)
   }
@@ -59,14 +58,6 @@ export class ChatView extends ItemView {
     this.updateDisplayTitle(
       manager.getLeafSummary(this.leaf)?.currentConversationTitle,
     )
-    this.removeSettingsChangeListener = this.plugin.addSettingsChangeListener(
-      () => {
-        this.updateDisplayTitle(
-          this.plugin.getChatLeafSessionManager().getLeafSummary(this.leaf)
-            ?.currentConversationTitle,
-        )
-      },
-    )
     this.initialChatProps = this.getInitialChatProps(pendingPayload)
 
     await this.render()
@@ -79,8 +70,6 @@ export class ChatView extends ItemView {
   }
 
   onClose(): Promise<void> {
-    this.removeSettingsChangeListener?.()
-    this.removeSettingsChangeListener = undefined
     this.plugin.getChatLeafSessionManager().unregisterLeaf(this.leaf)
     this.root?.unmount()
     return Promise.resolve()
@@ -191,6 +180,7 @@ export class ChatView extends ItemView {
     text: string,
     options?: {
       submit?: boolean
+      assistantId?: string
     },
   ) {
     this.plugin.getChatLeafSessionManager().touchLeafInteracted(this.leaf)
@@ -315,6 +305,7 @@ export class ChatView extends ItemView {
         payload.prefillText,
         {
           submit: payload.autoSend,
+          assistantId: payload.assistantId,
         },
       )
       return
@@ -348,10 +339,8 @@ export class ChatView extends ItemView {
   }
 
   private updateDisplayTitle(conversationTitle?: string): void {
-    const nextTitle = this.plugin.settings.chatOptions
-      .tabTitleFollowsConversation
-      ? conversationTitle?.trim() || DEFAULT_UNTITLED_CONVERSATION_TITLE
-      : 'Yolo chat'
+    const nextTitle =
+      conversationTitle?.trim() || DEFAULT_UNTITLED_CONVERSATION_TITLE
 
     if (this.displayTitle === nextTitle) {
       return

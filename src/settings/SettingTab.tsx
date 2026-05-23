@@ -4,13 +4,13 @@ import { Root, createRoot } from 'react-dom/client'
 import { SettingsTabRoot } from '../components/settings/SettingsTabRoot'
 import { PluginProvider } from '../contexts/plugin-context'
 import { SettingsProvider } from '../contexts/settings-context'
-import SmartComposerPlugin from '../main'
+import YoloPlugin from '../main'
 
-export class SmartComposerSettingTab extends PluginSettingTab {
-  plugin: SmartComposerPlugin
+export class YoloSettingTab extends PluginSettingTab {
+  plugin: YoloPlugin
   private root: Root | null = null
 
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super(app, plugin)
     this.plugin = plugin
   }

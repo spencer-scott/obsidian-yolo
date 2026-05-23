@@ -52,21 +52,21 @@ function AgentModeWarningModalComponent({
 
     return (
       <>
-        <strong className="smtcmp-agent-mode-warning-risk-title">{`${matched[1]}${matched[2]}`}</strong>
+        <strong className="yolo-agent-mode-warning-risk-title">{`${matched[1]}${matched[2]}`}</strong>
         <span>{matched[3]}</span>
       </>
     )
   }
 
   return (
-    <div className="smtcmp-agent-mode-warning-modal">
-      <p className="smtcmp-agent-mode-warning-description">{description}</p>
-      <ol className="smtcmp-agent-mode-warning-list">
+    <div className="yolo-agent-mode-warning-modal">
+      <p className="yolo-agent-mode-warning-description">{description}</p>
+      <ol className="yolo-agent-mode-warning-list">
         {risks.map((risk, index) => (
           <li key={`${index}-${risk}`}>{renderRisk(risk)}</li>
         ))}
       </ol>
-      <label className="smtcmp-agent-mode-warning-checkbox">
+      <label className="yolo-agent-mode-warning-checkbox">
         <input
           type="checkbox"
           checked={confirmed}
@@ -76,10 +76,10 @@ function AgentModeWarningModalComponent({
         />
         <span>{checkboxLabel}</span>
       </label>
-      <div className="modal-button-container smtcmp-agent-mode-warning-actions">
+      <div className="modal-button-container yolo-agent-mode-warning-actions">
         <button
           type="button"
-          className="mod-warning smtcmp-agent-mode-warning-confirm"
+          className="mod-warning yolo-agent-mode-warning-confirm"
           disabled={!confirmed}
           onClick={() => {
             if (!confirmed) return

@@ -8,7 +8,7 @@ import {
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 
 import { useLanguage } from '../../../contexts/language-context'
-import { getNodeBody, getNodeWindow } from '../../../utils/dom/window-context'
+import { getNodeWindow } from '../../../utils/dom/window-context'
 import { YoloDropdownContent } from '../../common/popover'
 
 export type ChatMode = 'chat' | 'agent'
@@ -78,7 +78,6 @@ export const ChatModeSelect = forwardRef<
     const { t } = useLanguage()
     const [isOpen, setIsOpen] = useState(false)
     const triggerRef = useRef<HTMLButtonElement | null>(null)
-    const resolvedContainer = container ?? getNodeBody(triggerRef.current)
     const itemRefs = useRef<Record<ChatMode, HTMLDivElement | null>>({
       chat: null,
       agent: null,
@@ -173,25 +172,26 @@ export const ChatModeSelect = forwardRef<
       <DropdownMenu.Root open={isOpen} onOpenChange={handleOpenChange}>
         <DropdownMenu.Trigger
           ref={setTriggerRef}
-          className="smtcmp-chat-input-model-select smtcmp-chat-mode-select"
+          className="yolo-chat-input-model-select yolo-chat-mode-select"
           onKeyDown={handleTriggerKeyDown}
         >
-          <div className="smtcmp-chat-mode-select__icon">
+          <div className="yolo-chat-mode-select__icon">
             {currentOption?.icon}
           </div>
-          <div className="smtcmp-chat-input-model-select__model-name">
+          <div className="yolo-chat-input-model-select__model-name">
             {t(
               currentOption?.labelKey ?? 'chatMode.chat',
               currentOption?.labelFallback ?? 'Chat',
             )}
           </div>
-          <div className="smtcmp-chat-input-model-select__icon">
+          <div className="yolo-chat-input-model-select__icon">
             {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </div>
         </DropdownMenu.Trigger>
 
         <YoloDropdownContent
-          container={resolvedContainer}
+          container={container}
+          anchorRef={triggerRef}
           variant="default"
           minWidth={220}
           maxHeight={400}
@@ -210,7 +210,7 @@ export const ChatModeSelect = forwardRef<
           }}
         >
           <DropdownMenu.RadioGroup
-            className="smtcmp-model-select-list smtcmp-chat-mode-select-list"
+            className="yolo-model-select-list yolo-chat-mode-select-list"
             value={mode}
             onKeyDown={(event) => {
               if (event.key === 'ArrowDown') {
@@ -230,21 +230,21 @@ export const ChatModeSelect = forwardRef<
             {MODE_OPTIONS.map((option) => (
               <DropdownMenu.RadioItem
                 key={option.value}
-                className="smtcmp-popover-item smtcmp-chat-mode-select-item"
+                className="yolo-popover-item yolo-chat-mode-select-item"
                 value={option.value}
                 ref={(element) => {
                   itemRefs.current[option.value] = element
                 }}
                 data-mode={option.value}
               >
-                <div className="smtcmp-chat-mode-select-item__icon">
+                <div className="yolo-chat-mode-select-item__icon">
                   {option.icon}
                 </div>
-                <div className="smtcmp-chat-mode-select-item__content">
-                  <div className="smtcmp-chat-mode-select-item__label">
+                <div className="yolo-chat-mode-select-item__content">
+                  <div className="yolo-chat-mode-select-item__label">
                     {t(option.labelKey, option.labelFallback)}
                   </div>
-                  <div className="smtcmp-chat-mode-select-item__desc">
+                  <div className="yolo-chat-mode-select-item__desc">
                     {t(option.descKey, option.descFallback)}
                   </div>
                 </div>

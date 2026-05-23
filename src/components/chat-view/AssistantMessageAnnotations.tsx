@@ -18,29 +18,29 @@ const AssistantMessageAnnotations = memo(function AssistantMessageAnnotations({
 
   return (
     <div
-      className={`smtcmp-assistant-message-metadata${
+      className={`yolo-assistant-message-metadata${
         isExpanded ? ' is-expanded' : ''
       }`}
     >
       <button
         type="button"
-        className="smtcmp-assistant-message-metadata-toggle"
+        className="yolo-assistant-message-metadata-toggle"
         onClick={handleToggle}
       >
         <span>View Sources ({annotations.length})</span>
         {isExpanded ? (
-          <ChevronUp className="smtcmp-assistant-message-metadata-toggle-icon" />
+          <ChevronUp className="yolo-assistant-message-metadata-toggle-icon" />
         ) : (
-          <ChevronDown className="smtcmp-assistant-message-metadata-toggle-icon" />
+          <ChevronDown className="yolo-assistant-message-metadata-toggle-icon" />
         )}
       </button>
       {isExpanded && (
-        <div className="smtcmp-assistant-message-metadata-content">
-          <div className="smtcmp-assistant-message-metadata-annotations">
+        <div className="yolo-assistant-message-metadata-content">
+          <div className="yolo-assistant-message-metadata-annotations">
             {annotations.map((annotation, index) => {
               return (
                 <div key={annotation.url_citation.url}>
-                  <span className="smtcmp-url-citation-text">
+                  <span className="yolo-url-citation-text">
                     [{index + 1}]{' '}
                     <a
                       href={annotation.url_citation.url}

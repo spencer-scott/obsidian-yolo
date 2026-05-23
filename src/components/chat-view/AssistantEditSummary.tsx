@@ -16,7 +16,7 @@ const renderDeltaPair = (addedLines: number, removedLines: number) => {
 
   if (addedLines > 0) {
     items.push(
-      <span key="added" className="smtcmp-agent-edit-summary-added">
+      <span key="added" className="yolo-agent-edit-summary-added">
         {formatDelta(addedLines, '+')}
       </span>,
     )
@@ -24,7 +24,7 @@ const renderDeltaPair = (addedLines: number, removedLines: number) => {
 
   if (removedLines > 0) {
     items.push(
-      <span key="removed" className="smtcmp-agent-edit-summary-removed">
+      <span key="removed" className="yolo-agent-edit-summary-removed">
         {formatDelta(removedLines, '-')}
       </span>,
     )
@@ -35,7 +35,7 @@ const renderDeltaPair = (addedLines: number, removedLines: number) => {
   }
 
   return [
-    <span key="zero" className="smtcmp-agent-edit-summary-neutral">
+    <span key="zero" className="yolo-agent-edit-summary-neutral">
       0
     </span>,
   ]
@@ -75,9 +75,9 @@ const AssistantEditSummary = memo(function AssistantEditSummary({
   const isUndoingAll = undoingTargetKey === 'all'
 
   return (
-    <div className="smtcmp-agent-edit-summary">
-      <div className="smtcmp-agent-edit-summary-header">
-        <div className="smtcmp-agent-edit-summary-totals">
+    <div className="yolo-agent-edit-summary">
+      <div className="yolo-agent-edit-summary-header">
+        <div className="yolo-agent-edit-summary-totals">
           <span>
             {t(
               'chat.editSummary.filesChanged',
@@ -88,12 +88,12 @@ const AssistantEditSummary = memo(function AssistantEditSummary({
         </div>
         <button
           type="button"
-          className="smtcmp-agent-edit-summary-undo"
+          className="yolo-agent-edit-summary-undo"
           onClick={undoDisabled ? undefined : onUndo}
           disabled={undoDisabled}
         >
           {isUndoingAll ? (
-            <Loader2 size={14} className="smtcmp-spinner" />
+            <Loader2 size={14} className="yolo-spinner" />
           ) : (
             <Undo2 size={14} />
           )}
@@ -104,18 +104,18 @@ const AssistantEditSummary = memo(function AssistantEditSummary({
           </span>
         </button>
       </div>
-      <div className="smtcmp-agent-edit-summary-list">
+      <div className="yolo-agent-edit-summary-list">
         {summary.files.map((file) => (
-          <div key={file.path} className="smtcmp-agent-edit-summary-item">
+          <div key={file.path} className="yolo-agent-edit-summary-item">
             <button
               type="button"
-              className="smtcmp-agent-edit-summary-path"
+              className="yolo-agent-edit-summary-path"
               onClick={() => onOpenFile(file)}
               title={file.path}
             >
               {getOperationLabelKey(file.operation) ? (
                 <span
-                  className={`smtcmp-agent-edit-summary-badge smtcmp-agent-edit-summary-badge--${file.operation}`}
+                  className={`yolo-agent-edit-summary-badge yolo-agent-edit-summary-badge--${file.operation}`}
                 >
                   {t(
                     getOperationLabelKey(file.operation) ?? '',
@@ -123,14 +123,14 @@ const AssistantEditSummary = memo(function AssistantEditSummary({
                   )}
                 </span>
               ) : null}
-              <span className="smtcmp-agent-edit-summary-path-text">
+              <span className="yolo-agent-edit-summary-path-text">
                 {file.path}
               </span>
             </button>
-            <div className="smtcmp-agent-edit-summary-item-trailing">
+            <div className="yolo-agent-edit-summary-item-trailing">
               <button
                 type="button"
-                className={`smtcmp-agent-edit-summary-undo smtcmp-agent-edit-summary-undo-icon${
+                className={`yolo-agent-edit-summary-undo yolo-agent-edit-summary-undo-icon${
                   undoingTargetKey === file.path ? ' is-visible' : ''
                 }`}
                 onClick={
@@ -144,12 +144,12 @@ const AssistantEditSummary = memo(function AssistantEditSummary({
                 aria-label={t('chat.editSummary.undoFile', 'Undo file change')}
               >
                 {undoingTargetKey === file.path ? (
-                  <Loader2 size={14} className="smtcmp-spinner" />
+                  <Loader2 size={14} className="yolo-spinner" />
                 ) : (
                   <Undo2 size={14} />
                 )}
               </button>
-              <div className="smtcmp-agent-edit-summary-deltas">
+              <div className="yolo-agent-edit-summary-deltas">
                 {renderDeltaPair(file.addedLines, file.removedLines)}
               </div>
             </div>

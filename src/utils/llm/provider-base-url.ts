@@ -34,6 +34,17 @@ const DEFAULT_BASE_URL_BY_PRESET: Partial<
   perplexity: 'https://api.perplexity.ai',
   mistral: 'https://api.mistral.ai/v1',
   morph: 'https://api.morphllm.com',
+  zhipu: 'https://open.bigmodel.cn/api/paas/v4',
+  doubao: 'https://ark.cn-beijing.volces.com/api/v3',
+  siliconflow: 'https://api.siliconflow.cn/v1',
+  stepfun: 'https://api.stepfun.com/v1',
+  minimax: 'https://api.minimax.chat/v1',
+  hunyuan: 'https://api.hunyuan.cloud.tencent.com/v1',
+  xai: 'https://api.x.ai/v1',
+  'together-ai': 'https://api.together.xyz/v1',
+  cerebras: 'https://api.cerebras.ai/v1',
+  sambanova: 'https://api.sambanova.ai/v1',
+  xiaomimimo: 'https://api.xiaomimimo.com/v1',
 }
 
 export function getDefaultBaseUrlForPreset(

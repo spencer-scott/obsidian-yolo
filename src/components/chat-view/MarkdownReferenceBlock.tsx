@@ -109,11 +109,11 @@ export default function MarkdownReferenceBlock({
 
   return (
     blockContent && (
-      <div className={cx('smtcmp-code-block', filename && 'has-filename')}>
-        <div className="smtcmp-code-block-header">
+      <div className={cx('yolo-code-block', filename && 'has-filename')}>
+        <div className="yolo-code-block-header">
           {filename && (
             <div
-              className="smtcmp-code-block-header-filename"
+              className="yolo-code-block-header-filename"
               onClick={handleOpenFile}
             >
               {isPdf
@@ -123,10 +123,10 @@ export default function MarkdownReferenceBlock({
                 : filename}
             </div>
           )}
-          <div className="smtcmp-code-block-header-button-container smtcmp-code-block-header-button-container--spaced">
+          <div className="yolo-code-block-header-button-container yolo-code-block-header-button-container--spaced">
             {canCollapse && (
               <button
-                className="clickable-icon smtcmp-code-block-header-button"
+                className="clickable-icon yolo-code-block-header-button"
                 onClick={() => setCollapsed((v) => !v)}
               >
                 {collapsed ? (
@@ -143,7 +143,7 @@ export default function MarkdownReferenceBlock({
               </button>
             )}
             <button
-              className="clickable-icon smtcmp-code-block-header-button"
+              className="clickable-icon yolo-code-block-header-button"
               onClick={() => {
                 setIsPreviewMode(!isPreviewMode)
               }}
@@ -154,7 +154,7 @@ export default function MarkdownReferenceBlock({
           </div>
         </div>
         {isPreviewMode ? (
-          <div className="smtcmp-code-block-obsidian-markdown">
+          <div className="yolo-code-block-obsidian-markdown">
             <ObsidianMarkdown content={displayContent} scale="sm" />
           </div>
         ) : (
@@ -162,12 +162,12 @@ export default function MarkdownReferenceBlock({
             fallback={
               <pre
                 className={cx(
-                  'smtcmp-syntax-highlighter',
+                  'yolo-syntax-highlighter',
                   filename
-                    ? 'smtcmp-syntax-highlighter--with-filename'
-                    : 'smtcmp-syntax-highlighter--standalone',
+                    ? 'yolo-syntax-highlighter--with-filename'
+                    : 'yolo-syntax-highlighter--standalone',
                   language === 'markdown'
-                    ? 'smtcmp-syntax-highlighter--markdown'
+                    ? 'yolo-syntax-highlighter--markdown'
                     : null,
                 )}
               >

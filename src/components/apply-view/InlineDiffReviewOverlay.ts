@@ -17,14 +17,14 @@ import {
   countOriginalLines,
 } from '../../features/editor/diff-review/review-model'
 import { ReviewSession } from '../../features/editor/diff-review/review-session'
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 import type { ApplyViewState } from '../../types/apply-view.types'
 import { type DiffBlock, type InlineDiffToken } from '../../utils/chat/diff'
 
 import type { ApplyViewActions } from './types'
 
 type InlineDiffReviewOverlayOptions = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   view: EditorView
   state: ApplyViewState
   onClose: () => void
@@ -63,7 +63,7 @@ class InlineReviewWidget extends WidgetType {
 
   override toDOM(): HTMLElement {
     const root = document.createElement('div')
-    root.className = `smtcmp-inline-review-widget${this.isActive ? ' is-active' : ''}`
+    root.className = `yolo-inline-review-widget${this.isActive ? ' is-active' : ''}`
     root.setAttribute('data-review-index', String(this.reviewIndex))
 
     if (this.decision !== 'pending') {
@@ -73,11 +73,11 @@ class InlineReviewWidget extends WidgetType {
           ? (this.block.modifiedValue ?? this.block.originalValue ?? '')
           : (this.block.originalValue ?? '')
       const resolvedContainer = document.createElement('div')
-      resolvedContainer.className = 'smtcmp-inline-review-resolved'
+      resolvedContainer.className = 'yolo-inline-review-resolved'
       const resolvedLines = resolved.split('\n')
       resolvedLines.forEach((line) => {
         const lineEl = document.createElement('div')
-        lineEl.className = 'smtcmp-inline-review-line'
+        lineEl.className = 'yolo-inline-review-line'
         lineEl.textContent = line
         resolvedContainer.appendChild(lineEl)
       })
@@ -86,7 +86,7 @@ class InlineReviewWidget extends WidgetType {
     }
 
     const content = document.createElement('div')
-    content.className = 'smtcmp-inline-review-content'
+    content.className = 'yolo-inline-review-content'
     if (this.block.presentation === 'block') {
       if (this.block.originalValue !== undefined) {
         content.appendChild(
@@ -101,7 +101,7 @@ class InlineReviewWidget extends WidgetType {
     } else {
       this.block.inlineLines.forEach((line) => {
         const lineEl = document.createElement('div')
-        lineEl.className = `smtcmp-inline-review-line is-${line.type}`
+        lineEl.className = `yolo-inline-review-line is-${line.type}`
         line.tokens.forEach((token) => {
           lineEl.appendChild(createTokenElement(token))
         })
@@ -130,11 +130,11 @@ function createTokenElement(token: InlineDiffToken): HTMLElement {
   const span = document.createElement('span')
   span.textContent = token.text
   if (token.type === 'add') {
-    span.className = 'smtcmp-inline-diff smtcmp-inline-diff-add'
+    span.className = 'yolo-inline-diff yolo-inline-diff-add'
   } else if (token.type === 'del') {
-    span.className = 'smtcmp-inline-diff smtcmp-inline-diff-del'
+    span.className = 'yolo-inline-diff yolo-inline-diff-del'
   } else {
-    span.className = 'smtcmp-inline-diff'
+    span.className = 'yolo-inline-diff'
   }
   return span
 }
@@ -145,11 +145,11 @@ function createBlockSection(
   stateClass: 'added' | 'removed',
 ): HTMLElement {
   const section = document.createElement('div')
-  section.className = `smtcmp-inline-review-section is-${stateClass}`
+  section.className = `yolo-inline-review-section is-${stateClass}`
 
   text.split('\n').forEach((line) => {
     const lineEl = document.createElement('div')
-    lineEl.className = 'smtcmp-inline-review-line'
+    lineEl.className = 'yolo-inline-review-line'
     lineEl.appendChild(createTokenElement({ type: tokenType, text: line }))
     section.appendChild(lineEl)
   })
@@ -164,17 +164,17 @@ function createActionButton(
 ): HTMLButtonElement {
   const button = document.createElement('button')
   button.type = 'button'
-  button.className = 'smtcmp-apply-action'
+  button.className = 'yolo-apply-action'
   if (icon === '✓') {
-    button.classList.add('smtcmp-apply-action-accept')
+    button.classList.add('yolo-apply-action-accept')
   }
   if (icon === '×') {
-    button.classList.add('smtcmp-apply-action-reject')
+    button.classList.add('yolo-apply-action-reject')
   }
   button.title = label
   button.setAttribute('aria-label', label)
   const iconEl = document.createElement('span')
-  iconEl.className = 'smtcmp-apply-action-icon'
+  iconEl.className = 'yolo-apply-action-icon'
   iconEl.textContent = icon
   button.appendChild(iconEl)
   button.addEventListener('mousedown', (event) => {
@@ -361,20 +361,20 @@ export class InlineDiffReviewOverlay {
     if (this.floatingRoot) return
 
     const host = this.options.view.dom
-    host.classList.add('smtcmp-inline-review-host')
+    host.classList.add('yolo-inline-review-host')
 
     const root = document.createElement('div')
-    root.className = 'smtcmp-inline-review-floating-root'
+    root.className = 'yolo-inline-review-floating-root'
     root.tabIndex = -1
     root.setAttribute('aria-label', 'Inline review controls')
 
     const rail = document.createElement('div')
-    rail.className = 'smtcmp-inline-review-floating-rail'
+    rail.className = 'yolo-inline-review-floating-rail'
     rail.style.transition = FLOATING_RAIL_POSITION_TRANSITION
     root.appendChild(rail)
 
     const actions = document.createElement('div')
-    actions.className = 'smtcmp-inline-review-floating-actions'
+    actions.className = 'yolo-inline-review-floating-actions'
     actions.style.transition = FLOATING_ACTIONS_POSITION_TRANSITION
     actions.appendChild(
       createActionButton('×', 'Accept current', () =>
@@ -403,7 +403,7 @@ export class InlineDiffReviewOverlay {
 
     const onEditorMouseDownCapture = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null
-      if (target?.closest('.smtcmp-inline-review-floating-actions')) {
+      if (target?.closest('.yolo-inline-review-floating-actions')) {
         return
       }
       event.preventDefault()
@@ -487,7 +487,7 @@ export class InlineDiffReviewOverlay {
     this.floatingRoot = null
     this.floatingRail = null
     this.floatingActions = null
-    this.options.view.dom.classList.remove('smtcmp-inline-review-host')
+    this.options.view.dom.classList.remove('yolo-inline-review-host')
 
     if (this.previousActiveElement?.isConnected) {
       this.previousActiveElement.focus({ preventScroll: true })
@@ -525,7 +525,7 @@ export class InlineDiffReviewOverlay {
     const toRect = this.options.view.coordsAtPos(toProbe)
     const widgetRect = this.options.view.dom
       .querySelector(
-        `.smtcmp-inline-review-widget[data-review-index="${this.currentIndex}"]`,
+        `.yolo-inline-review-widget[data-review-index="${this.currentIndex}"]`,
       )
       ?.getBoundingClientRect()
 

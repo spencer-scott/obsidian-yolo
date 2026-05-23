@@ -3,13 +3,13 @@ import { App } from 'obsidian'
 import { LanguageProvider } from '../../contexts/language-context'
 import { PluginProvider } from '../../contexts/plugin-context'
 import { SettingsProvider } from '../../contexts/settings-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 
 import { SettingsTabs } from './SettingsTabs'
 
 type SettingsTabRootProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export function SettingsTabRoot({ app, plugin }: SettingsTabRootProps) {

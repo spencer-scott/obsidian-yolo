@@ -73,7 +73,7 @@ type RagIndexServiceDeps = {
 
 type RagIndexSubscriber = (snapshot: RagIndexRunSnapshot) => void
 
-const STORAGE_KEY = 'smtcmp_rag_index_run'
+const STORAGE_KEY = 'yolo_rag_index_run'
 const RETRY_ACTIVITY_ID = 'rag:index'
 const TRANSIENT_RETRY_DELAY_MS = 5 * 60 * 1000
 const INTERRUPTED_RETRY_DELAY_MS = 15 * 1000
@@ -172,6 +172,10 @@ export class RagIndexService {
             this.snapshot = {
               ...this.snapshot,
               status: shouldRecover ? 'retry_scheduled' : 'failed',
+              // Interrupted runs always resume as 'sync' so the reconcile loop
+              // skips chunks already in the DB instead of truncating. Users who
+              // truly want a fresh rebuild trigger it explicitly from the UI.
+              mode: shouldRecover ? 'sync' : this.snapshot.mode,
               retryAt: shouldRecover
                 ? Date.now() + INTERRUPTED_RETRY_DELAY_MS
                 : undefined,

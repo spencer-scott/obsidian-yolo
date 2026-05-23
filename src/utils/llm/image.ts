@@ -7,6 +7,7 @@ import {
   buildImageCacheKey,
 } from '../../database/json/chat/imageCacheStore'
 import { MentionableImage } from '../../types/mentionable'
+import { arrayBufferToBase64 } from '../base64'
 
 /**
  * Vault-file extensions we treat as images for vision payloads.
@@ -107,17 +108,6 @@ export async function tFileToImageDataUrl(
   const buffer = await app.vault.readBinary(file)
   const base64 = arrayBufferToBase64(buffer)
   return `data:${mimeType};base64,${base64}`
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer)
-  const chunkSize = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize)
-    binary += String.fromCharCode.apply(null, Array.from(chunk))
-  }
-  return btoa(binary)
 }
 
 function fileToBase64(file: File): Promise<string> {

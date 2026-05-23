@@ -28,7 +28,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
 import { getEmbeddingModelClient } from '../../../core/rag/embedding'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ChatModel } from '../../../types/chat-model.types'
 import { EmbeddingModel } from '../../../types/embedding-model.types'
 import { LLMProvider } from '../../../types/provider.types'
@@ -40,20 +40,18 @@ import { AddChatModelModal } from '../modals/AddChatModelModal'
 import { AddEmbeddingModelModal } from '../modals/AddEmbeddingModelModal'
 import { EditChatModelModal } from '../modals/EditChatModelModal'
 import { EditEmbeddingModelModal } from '../modals/EditEmbeddingModelModal'
-import {
-  AddProviderModal,
-  EditProviderModal,
-} from '../modals/ProviderFormModal'
+import { EditProviderModal } from '../modals/ProviderFormModal'
+import { ProviderPickerModal } from '../modals/ProviderPickerModal'
 
 type ProvidersAndModelsSectionProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 type ProviderSectionItemProps = {
   provider: LLMProvider
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   t: Translator
   isExpanded: boolean
   toggleProvider: (id: string) => void
@@ -87,7 +85,7 @@ function ChatGPTOAuthPanel({
   plugin,
   provider,
 }: {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   provider: LLMProvider
 }) {
   const { t } = useLanguage()
@@ -174,8 +172,8 @@ function ChatGPTOAuthPanel({
   }
 
   return (
-    <div className="smtcmp-models-subsection">
-      <div className="smtcmp-models-subsection-header">
+    <div className="yolo-models-subsection">
+      <div className="yolo-models-subsection-header">
         <span>
           {t('settings.providers.chatgptOAuthTitle', 'ChatGPT OAuth')}
         </span>
@@ -183,7 +181,7 @@ function ChatGPTOAuthPanel({
           <button
             type="button"
             onClick={handleConnect}
-            className="smtcmp-add-model-btn"
+            className="yolo-add-model-btn"
             disabled={isConnecting || !Platform.isDesktop}
           >
             {isConnecting
@@ -194,14 +192,14 @@ function ChatGPTOAuthPanel({
           <button
             type="button"
             onClick={handleDisconnect}
-            className="smtcmp-add-model-btn smtcmp-chatgpt-oauth-disconnect-btn"
+            className="yolo-add-model-btn yolo-chatgpt-oauth-disconnect-btn"
             disabled={isConnecting}
           >
             {t('settings.providers.chatgptOAuthDisconnect', 'Disconnect')}
           </button>
         )}
       </div>
-      <div className="smtcmp-no-models">
+      <div className="yolo-no-models">
         {!Platform.isDesktop && !connected
           ? t(
               'settings.providers.oauthDesktopOnly',
@@ -222,7 +220,7 @@ function ChatGPTOAuthPanel({
           ? ` ${t('settings.providers.chatgptOAuthPendingCode', 'Current device code:')} ${pendingCode}`
           : ''}
       </div>
-      <div className="smtcmp-chatgpt-oauth-note">
+      <div className="yolo-chatgpt-oauth-note">
         {t(
           'settings.providers.chatgptOAuthStreamingNotice',
           'Due to Obsidian environment limitations, ChatGPT OAuth currently does not support streaming responses.',
@@ -236,7 +234,7 @@ function GeminiOAuthPanel({
   plugin,
   provider,
 }: {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   provider: LLMProvider
 }) {
   const { t } = useLanguage()
@@ -317,14 +315,14 @@ function GeminiOAuthPanel({
   }
 
   return (
-    <div className="smtcmp-models-subsection">
-      <div className="smtcmp-models-subsection-header">
+    <div className="yolo-models-subsection">
+      <div className="yolo-models-subsection-header">
         <span>{t('settings.providers.geminiOAuthTitle', 'Gemini OAuth')}</span>
         {!connected ? (
           <button
             type="button"
             onClick={handleConnect}
-            className="smtcmp-add-model-btn"
+            className="yolo-add-model-btn"
             disabled={isConnecting || !Platform.isDesktop}
           >
             {isConnecting
@@ -335,14 +333,14 @@ function GeminiOAuthPanel({
           <button
             type="button"
             onClick={handleDisconnect}
-            className="smtcmp-add-model-btn smtcmp-chatgpt-oauth-disconnect-btn"
+            className="yolo-add-model-btn yolo-chatgpt-oauth-disconnect-btn"
             disabled={isConnecting}
           >
             {t('settings.providers.geminiOAuthDisconnect', 'Disconnect')}
           </button>
         )}
       </div>
-      <div className="smtcmp-no-models">
+      <div className="yolo-no-models">
         {!Platform.isDesktop && !connected
           ? t(
               'settings.providers.oauthDesktopOnly',
@@ -360,7 +358,7 @@ function GeminiOAuthPanel({
                   'Not connected. Connect to use Gemini quota from your Google account.',
                 )}
       </div>
-      <div className="smtcmp-chatgpt-oauth-note">
+      <div className="yolo-chatgpt-oauth-note">
         {t(
           'settings.providers.geminiOAuthStreamingNotice',
           'Gemini OAuth will try streaming by default and automatically fall back to buffered responses when needed.',
@@ -374,7 +372,7 @@ function QwenOAuthPanel({
   plugin,
   provider,
 }: {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   provider: LLMProvider
 }) {
   const { t } = useLanguage()
@@ -457,14 +455,14 @@ function QwenOAuthPanel({
   }
 
   return (
-    <div className="smtcmp-models-subsection">
-      <div className="smtcmp-models-subsection-header">
+    <div className="yolo-models-subsection">
+      <div className="yolo-models-subsection-header">
         <span>{t('settings.providers.qwenOAuthTitle', 'Qwen OAuth')}</span>
         {!connected ? (
           <button
             type="button"
             onClick={handleConnect}
-            className="smtcmp-add-model-btn"
+            className="yolo-add-model-btn"
             disabled={isConnecting || !Platform.isDesktop}
           >
             {isConnecting
@@ -475,14 +473,14 @@ function QwenOAuthPanel({
           <button
             type="button"
             onClick={handleDisconnect}
-            className="smtcmp-add-model-btn smtcmp-chatgpt-oauth-disconnect-btn"
+            className="yolo-add-model-btn yolo-chatgpt-oauth-disconnect-btn"
             disabled={isConnecting}
           >
             {t('settings.providers.qwenOAuthDisconnect', 'Disconnect')}
           </button>
         )}
       </div>
-      <div className="smtcmp-no-models">
+      <div className="yolo-no-models">
         {!Platform.isDesktop && !connected
           ? t(
               'settings.providers.oauthDesktopOnly',
@@ -500,7 +498,7 @@ function QwenOAuthPanel({
                   'Not connected. Connect to use models from your Qwen account.',
                 )}
       </div>
-      <div className="smtcmp-chatgpt-oauth-note">
+      <div className="yolo-chatgpt-oauth-note">
         {t(
           'settings.providers.qwenOAuthStreamingNotice',
           'Qwen OAuth supports streaming; using Obsidian requestUrl may buffer output, while desktop Node fetch can provide real-time streaming.',
@@ -556,14 +554,14 @@ function ProviderSectionItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`smtcmp-provider-section ${isDragging ? 'smtcmp-provider-dragging' : ''}`}
+      className={`yolo-provider-section ${isDragging ? 'yolo-provider-dragging' : ''}`}
       data-provider-id={provider.id}
       {...attributes}
     >
-      <div className="smtcmp-provider-header">
+      <div className="yolo-provider-header">
         <button
           type="button"
-          className="smtcmp-provider-drag-handle"
+          className="yolo-provider-drag-handle"
           aria-label={t('settings.providers.dragHandle', 'Drag to reorder')}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
@@ -582,10 +580,10 @@ function ProviderSectionItem({
 
         <button
           type="button"
-          className="smtcmp-provider-main-trigger smtcmp-clickable"
+          className="yolo-provider-main-trigger yolo-clickable"
           onClick={() => toggleProvider(provider.id)}
         >
-          <div className="smtcmp-provider-expand-btn">
+          <div className="yolo-provider-expand-btn">
             {isExpanded ? (
               <ChevronDown size={16} />
             ) : (
@@ -593,35 +591,33 @@ function ProviderSectionItem({
             )}
           </div>
 
-          <div className="smtcmp-provider-info">
-            <span className="smtcmp-provider-id">{provider.id}</span>
+          <div className="yolo-provider-info">
+            <span className="yolo-provider-id">{provider.id}</span>
           </div>
         </button>
 
         <button
           type="button"
-          className="smtcmp-provider-type smtcmp-provider-base-url-btn"
+          className="yolo-provider-type yolo-provider-base-url-btn"
           onClick={(e) => {
             e.stopPropagation()
             new EditProviderModal(app, plugin, provider).open()
           }}
         >
-          <span className="smtcmp-provider-base-url-text">
-            {displayBaseUrl}
-          </span>
+          <span className="yolo-provider-base-url-text">{displayBaseUrl}</span>
         </button>
 
         <button
           type="button"
-          className="smtcmp-provider-secondary-trigger smtcmp-clickable"
+          className="yolo-provider-secondary-trigger yolo-clickable"
           onClick={() => toggleProvider(provider.id)}
         >
-          <span className="smtcmp-provider-model-counts">
+          <span className="yolo-provider-model-counts">
             {chatModelsLabel} · {embeddingModelsLabel}
           </span>
         </button>
 
-        <div className="smtcmp-provider-actions">
+        <div className="yolo-provider-actions">
           <button
             type="button"
             onClick={(e) => {
@@ -648,18 +644,18 @@ function ProviderSectionItem({
 
       {isDeleteConfirming && (
         <div
-          className="smtcmp-provider-delete-confirm"
+          className="yolo-provider-delete-confirm"
           data-provider-delete-confirm-id={provider.id}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <div className="smtcmp-provider-delete-confirm-copy">
-            <span className="smtcmp-provider-delete-confirm-title">
+          <div className="yolo-provider-delete-confirm-copy">
+            <span className="yolo-provider-delete-confirm-title">
               {t(
                 'settings.providers.deleteConfirmTitle',
                 'Delete provider "{provider}"?',
               ).replace('{provider}', provider.id)}
             </span>
-            <span className="smtcmp-provider-delete-confirm-meta">
+            <span className="yolo-provider-delete-confirm-meta">
               {t(
                 'settings.providers.deleteConfirmImpact',
                 'This will also delete {chatCount} chat models, {embeddingCount} embedding models, and clean up related vector data.',
@@ -668,17 +664,17 @@ function ProviderSectionItem({
                 .replace('{embeddingCount}', String(embeddingModels.length))}
             </span>
           </div>
-          <div className="smtcmp-provider-delete-confirm-actions">
+          <div className="yolo-provider-delete-confirm-actions">
             <button
               type="button"
-              className="smtcmp-provider-delete-cancel"
+              className="yolo-provider-delete-cancel"
               onClick={() => onCancelDeleteProvider()}
             >
               {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="button"
-              className="smtcmp-provider-delete-confirm-btn"
+              className="yolo-provider-delete-confirm-btn"
               onClick={() => onConfirmDeleteProvider(provider)}
             >
               {t('settings.providers.confirmDeleteAction', 'Confirm delete')}
@@ -688,7 +684,7 @@ function ProviderSectionItem({
       )}
 
       {isExpanded && (
-        <div className="smtcmp-provider-models">
+        <div className="yolo-provider-models">
           {isChatGPTOAuth && (
             <ChatGPTOAuthPanel
               plugin={plugin}
@@ -735,7 +731,7 @@ function ProviderSectionItem({
 type ChatModelsTableProps = {
   provider: LLMProvider
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   t: Translator
   models: ChatModel[]
   sensors: ReturnType<typeof useSensors>
@@ -758,12 +754,12 @@ function ChatModelsTable({
   const items = models.map((model) => model.id)
 
   return (
-    <div className="smtcmp-models-subsection">
-      <div className="smtcmp-models-subsection-header">
+    <div className="yolo-models-subsection">
+      <div className="yolo-models-subsection-header">
         <span>{t('settings.models.chatModels')}</span>
         <button
           type="button"
-          className="smtcmp-add-model-btn"
+          className="yolo-add-model-btn"
           onClick={() => {
             const modal = new AddChatModelModal(app, plugin, provider)
             modal.open()
@@ -780,7 +776,7 @@ function ChatModelsTable({
           onDragEnd={onDragEnd}
         >
           <SortableContext items={items} strategy={verticalListSortingStrategy}>
-            <table className="smtcmp-models-table">
+            <table className="yolo-models-table">
               <colgroup>
                 <col width={16} />
                 <col />
@@ -815,7 +811,7 @@ function ChatModelsTable({
           </SortableContext>
         </DndContext>
       ) : (
-        <div className="smtcmp-no-models">
+        <div className="yolo-no-models">
           {t('settings.models.noChatModelsConfigured')}
         </div>
       )}
@@ -826,7 +822,7 @@ function ChatModelsTable({
 type EmbeddingModelsTableProps = {
   provider: LLMProvider
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   t: Translator
   models: EmbeddingModel[]
   sensors: ReturnType<typeof useSensors>
@@ -850,13 +846,13 @@ function EmbeddingModelsTable({
   const embeddingSupported = providerSupportsEmbedding(provider)
 
   return (
-    <div className="smtcmp-models-subsection">
-      <div className="smtcmp-models-subsection-header">
+    <div className="yolo-models-subsection">
+      <div className="yolo-models-subsection-header">
         <span>{t('settings.models.embeddingModels')}</span>
         {embeddingSupported && (
           <button
             type="button"
-            className="smtcmp-add-model-btn"
+            className="yolo-add-model-btn"
             onClick={() => {
               const modal = new AddEmbeddingModelModal(app, plugin, provider)
               modal.open()
@@ -874,7 +870,7 @@ function EmbeddingModelsTable({
           onDragEnd={onDragEnd}
         >
           <SortableContext items={items} strategy={verticalListSortingStrategy}>
-            <table className="smtcmp-models-table smtcmp-embedding-models-table">
+            <table className="yolo-models-table yolo-embedding-models-table">
               <colgroup>
                 <col width={16} />
                 <col />
@@ -909,7 +905,7 @@ function EmbeddingModelsTable({
           </SortableContext>
         </DndContext>
       ) : (
-        <div className="smtcmp-no-models">
+        <div className="yolo-no-models">
           {!embeddingSupported
             ? `${provider.id} provider does not support embeddings.`
             : t('settings.models.noEmbeddingModelsConfigured')}
@@ -923,7 +919,7 @@ type ChatModelRowProps = {
   provider: LLMProvider
   model: ChatModel
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   t: Translator
   onToggle: (modelId: string, value: boolean) => void
   onDelete: (modelId: string) => void
@@ -956,7 +952,7 @@ function ChatModelRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={isDragging ? 'smtcmp-row-dragging' : ''}
+      className={isDragging ? 'yolo-row-dragging' : ''}
       data-model-id={model.id}
       data-model-key={`${provider.id}:${model.id}`}
       {...attributes}
@@ -965,7 +961,7 @@ function ChatModelRow({
       <td>
         <button
           type="button"
-          className="smtcmp-drag-handle"
+          className="yolo-drag-handle"
           aria-label={t('settings.models.dragHandle', 'Drag to reorder')}
         >
           <GripVertical />
@@ -980,7 +976,7 @@ function ChatModelRow({
         />
       </td>
       <td>
-        <div className="smtcmp-settings-actions">
+        <div className="yolo-settings-actions">
           <button
             type="button"
             onClick={() => new EditChatModelModal(app, plugin, model).open()}
@@ -1008,7 +1004,7 @@ type EmbeddingModelRowProps = {
   provider: LLMProvider
   model: EmbeddingModel
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   t: Translator
   onDelete: (modelId: string) => void
   isDeleting: boolean
@@ -1041,7 +1037,7 @@ function EmbeddingModelRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={isDragging ? 'smtcmp-row-dragging' : ''}
+      className={isDragging ? 'yolo-row-dragging' : ''}
       data-model-id={model.id}
       data-model-key={`${provider.id}:${model.id}`}
       {...attributes}
@@ -1050,7 +1046,7 @@ function EmbeddingModelRow({
       <td>
         <button
           type="button"
-          className="smtcmp-drag-handle"
+          className="yolo-drag-handle"
           aria-label={t('settings.models.dragHandle', 'Drag to reorder')}
         >
           <GripVertical />
@@ -1060,7 +1056,7 @@ function EmbeddingModelRow({
       <td title={model.model}>{model.model}</td>
       <td>{model.dimension}</td>
       <td>
-        <div className="smtcmp-settings-actions">
+        <div className="yolo-settings-actions">
           <button
             type="button"
             onClick={() =>
@@ -1080,7 +1076,7 @@ function EmbeddingModelRow({
             disabled={isDeleting}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            {isDeleting ? <Loader2 className="smtcmp-spinner" /> : <Trash2 />}
+            {isDeleting ? <Loader2 className="yolo-spinner" /> : <Trash2 />}
           </button>
         </div>
       </td>
@@ -1204,9 +1200,9 @@ export function ProvidersAndModelsSection({
         movedRow = document.querySelector(`tr[data-model-id="${movedId}"]`)
       }
       if (movedRow) {
-        movedRow.classList.add('smtcmp-row-drop-success')
+        movedRow.classList.add('yolo-row-drop-success')
         window.setTimeout(() => {
-          movedRow.classList.remove('smtcmp-row-drop-success')
+          movedRow.classList.remove('yolo-row-drop-success')
         }, 700)
       } else if (attempt < 8) {
         window.setTimeout(() => tryFind(attempt + 1), 50)
@@ -1549,12 +1545,12 @@ export function ProvidersAndModelsSection({
   const triggerProviderDropSuccessFeedback = (movedId: string) => {
     const tryFind = (attempt = 0) => {
       const movedSection = document.querySelector(
-        `.smtcmp-provider-section[data-provider-id="${movedId}"]`,
+        `.yolo-provider-section[data-provider-id="${movedId}"]`,
       )
       if (movedSection) {
-        movedSection.classList.add('smtcmp-provider-drop-success')
+        movedSection.classList.add('yolo-provider-drop-success')
         window.setTimeout(() => {
-          movedSection.classList.remove('smtcmp-provider-drop-success')
+          movedSection.classList.remove('yolo-provider-drop-success')
         }, 700)
       } else if (attempt < 8) {
         window.setTimeout(() => tryFind(attempt + 1), 50)
@@ -1564,27 +1560,27 @@ export function ProvidersAndModelsSection({
   }
 
   return (
-    <div className="smtcmp-settings-section">
-      <section className="smtcmp-models-block smtcmp-providers-models-block">
-        <div className="smtcmp-models-block-head smtcmp-providers-models-block-head">
-          <div className="smtcmp-models-block-head-title-row">
-            <div className="smtcmp-settings-sub-header smtcmp-models-block-title">
+    <div className="yolo-settings-section">
+      <section className="yolo-models-block yolo-providers-models-block">
+        <div className="yolo-models-block-head yolo-providers-models-block-head">
+          <div className="yolo-models-block-head-title-row">
+            <div className="yolo-settings-sub-header yolo-models-block-title">
               {t('settings.providers.title')}
             </div>
-            <div className="smtcmp-settings-desc smtcmp-models-block-desc">
+            <div className="yolo-settings-desc yolo-models-block-desc">
               {providersCountLabel}
             </div>
           </div>
-          <div className="smtcmp-models-block-action smtcmp-providers-models-block-action">
+          <div className="yolo-models-block-action yolo-providers-models-block-action">
             <ObsidianButton
               text={t('settings.providers.addProvider')}
-              onClick={() => new AddProviderModal(app, plugin).open()}
+              onClick={() => new ProviderPickerModal(app, plugin).open()}
               cta
             />
           </div>
         </div>
 
-        <div className="smtcmp-providers-models-container">
+        <div className="yolo-providers-models-container">
           <DndContext
             sensors={providerSensors}
             collisionDetection={closestCenter}

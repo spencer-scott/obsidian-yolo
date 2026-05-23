@@ -79,16 +79,16 @@ export function AssistantSelectMenu({
 
   return (
     <div
-      className={`smtcmp-quick-ask-assistant-menu ${compact ? 'compact' : ''}`}
+      className={`yolo-quick-ask-assistant-menu ${compact ? 'compact' : ''}`}
     >
       {!compact && (
-        <div className="smtcmp-quick-ask-assistant-menu-title">
+        <div className="yolo-quick-ask-assistant-menu-title">
           {t('quickAsk.selectAssistant', 'Select an assistant')}
         </div>
       )}
       <ul
         ref={listRef}
-        className="smtcmp-quick-ask-assistant-list"
+        className="yolo-quick-ask-assistant-list"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         role="listbox"
@@ -98,7 +98,7 @@ export function AssistantSelectMenu({
         <li
           ref={(el) => (itemRefs.current[0] = el)}
           id="assistant-item-0"
-          className={`smtcmp-quick-ask-assistant-item ${
+          className={`yolo-quick-ask-assistant-item ${
             selectedIndex === 0 ? 'selected' : ''
           } ${!currentAssistantId ? 'current' : ''}`}
           onClick={() => onSelect(null)}
@@ -106,15 +106,15 @@ export function AssistantSelectMenu({
           role="option"
           aria-selected={selectedIndex === 0}
         >
-          <div className="smtcmp-quick-ask-assistant-item-icon">
+          <div className="yolo-quick-ask-assistant-item-icon">
             <User size={14} />
           </div>
-          <div className="smtcmp-quick-ask-assistant-item-content">
-            <div className="smtcmp-quick-ask-assistant-item-name">
+          <div className="yolo-quick-ask-assistant-item-content">
+            <div className="yolo-quick-ask-assistant-item-name">
               {t('quickAsk.noAssistant', 'No Assistant')}
             </div>
             {!compact && (
-              <div className="smtcmp-quick-ask-assistant-item-description">
+              <div className="yolo-quick-ask-assistant-item-description">
                 {t(
                   'quickAsk.noAssistantDescription',
                   'Use default system prompt',
@@ -123,7 +123,7 @@ export function AssistantSelectMenu({
             )}
           </div>
           {!currentAssistantId && (
-            <div className="smtcmp-quick-ask-assistant-item-check">
+            <div className="yolo-quick-ask-assistant-item-check">
               <Check size={12} />
             </div>
           )}
@@ -140,7 +140,7 @@ export function AssistantSelectMenu({
               key={assistant.id}
               ref={(el) => (itemRefs.current[itemIndex] = el)}
               id={`assistant-item-${itemIndex}`}
-              className={`smtcmp-quick-ask-assistant-item ${
+              className={`yolo-quick-ask-assistant-item ${
                 isSelected ? 'selected' : ''
               } ${isCurrent ? 'current' : ''}`}
               onClick={() => onSelect(assistant)}
@@ -148,21 +148,21 @@ export function AssistantSelectMenu({
               role="option"
               aria-selected={isSelected}
             >
-              <div className="smtcmp-quick-ask-assistant-item-icon">
+              <div className="yolo-quick-ask-assistant-item-icon">
                 {renderAssistantIcon(assistant.icon, 14)}
               </div>
-              <div className="smtcmp-quick-ask-assistant-item-content">
-                <div className="smtcmp-quick-ask-assistant-item-name">
+              <div className="yolo-quick-ask-assistant-item-content">
+                <div className="yolo-quick-ask-assistant-item-name">
                   {assistant.name}
                 </div>
                 {!compact && assistant.description && (
-                  <div className="smtcmp-quick-ask-assistant-item-description">
+                  <div className="yolo-quick-ask-assistant-item-description">
                     {assistant.description}
                   </div>
                 )}
               </div>
               {isCurrent && (
-                <div className="smtcmp-quick-ask-assistant-item-check">
+                <div className="yolo-quick-ask-assistant-item-check">
                   <Check size={12} />
                 </div>
               )}
@@ -171,7 +171,7 @@ export function AssistantSelectMenu({
         })}
       </ul>
       {!compact && (
-        <div className="smtcmp-quick-ask-assistant-menu-hint">
+        <div className="yolo-quick-ask-assistant-menu-hint">
           {t(
             'quickAsk.navigationHint',
             '↑↓ to navigate, Enter to select, Esc to cancel',

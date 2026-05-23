@@ -20,7 +20,7 @@
  * The feature entry (index.ts) guards against mobile before calling enable().
  */
 
-import type SmartComposerPlugin from '../../main'
+import type YoloPlugin from '../../main'
 
 const TOOLBAR_BUTTON_ATTR = 'data-yolo-pdf-screenshot-btn'
 
@@ -28,7 +28,7 @@ export class PdfToolbarButtonManager {
   private observer: MutationObserver | null = null
 
   constructor(
-    private readonly plugin: SmartComposerPlugin,
+    private readonly plugin: YoloPlugin,
     /**
      * Callback invoked when the toolbar button is clicked.
      * Should trigger the same logic as the `capture-pdf-region` command.

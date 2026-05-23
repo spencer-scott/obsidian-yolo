@@ -1,12 +1,28 @@
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $createTextNode, COMMAND_PRIORITY_NORMAL, TextNode } from 'lexical'
-import { Check, Minimize2, Sparkles } from 'lucide-react'
-import { RefObject, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  FilePlus2,
+  Minimize2,
+  Sparkles,
+  Zap,
+} from 'lucide-react'
+import {
+  type ReactNode,
+  RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import type { JSX as ReactJSX } from 'react/jsx-runtime'
 import { createPortal } from 'react-dom'
 
 import { useLanguage } from '../../../../../contexts/language-context'
 import { LiteSkillEntry } from '../../../../../core/skills/liteSkills'
+import { SnippetEntry } from '../../../../../core/snippets/snippetsManager'
 import { MenuOption } from '../shared/LexicalMenu'
 import {
   LexicalTypeaheadMenuPlugin,
@@ -17,6 +33,7 @@ import { $createSkillNode } from './SkillNode'
 
 const SUGGESTION_LIST_LENGTH_LIMIT = 20
 const COMPACT_COMMAND_ID = 'compact-context'
+const CREATE_SNIPPETS_FILE_COMMAND_ID = 'create-snippets-file'
 
 export type SlashCommand = {
   id: typeof COMPACT_COMMAND_ID
@@ -24,31 +41,82 @@ export type SlashCommand = {
   description: string
 }
 
+type SlashMenuScope = 'root' | 'skill' | 'snippet'
+
+type SlashEntryType = 'skill' | 'snippet'
+
+type SlashTypeaheadOptionPayload =
+  | {
+      kind: 'back'
+      label: string
+    }
+  | {
+      kind: 'entry'
+      entryType: SlashEntryType
+      label: string
+    }
+  | {
+      kind: 'skill'
+      skill: LiteSkillEntry
+      isSelected: boolean
+    }
+  | {
+      kind: 'snippet'
+      snippet: SnippetEntry
+    }
+  | {
+      kind: 'command'
+      command: SlashCommand
+    }
+  | {
+      kind: 'create-snippets-file'
+      label: string
+    }
+
 class SkillTypeaheadOption extends MenuOption {
-  type: 'skill' | 'command'
   name: string
   subtitle: string
-  skill?: LiteSkillEntry
-  command?: SlashCommand
-  isSelectedSkill: boolean
+  payload: SlashTypeaheadOptionPayload
 
-  constructor({
-    skill,
-    command,
-    isSelectedSkill,
-  }: {
-    skill?: LiteSkillEntry
-    command?: SlashCommand
-    isSelectedSkill: boolean
-  }) {
-    const entity = skill ?? command
-    super(`${skill ? 'skill' : 'command'}:${entity?.id ?? 'unknown'}`)
-    this.type = skill ? 'skill' : 'command'
-    this.name = entity?.name ?? ''
-    this.subtitle = entity?.description ?? ''
-    this.skill = skill
-    this.command = command
-    this.isSelectedSkill = isSelectedSkill
+  constructor(payload: SlashTypeaheadOptionPayload) {
+    let key = 'unknown'
+    let name = ''
+    let subtitle = ''
+
+    switch (payload.kind) {
+      case 'back':
+        key = 'slash:back'
+        name = payload.label
+        break
+      case 'entry':
+        key = `slash:entry:${payload.entryType}`
+        name = payload.label
+        break
+      case 'skill':
+        key = `slash:skill:${payload.skill.id}`
+        name = payload.skill.name
+        subtitle = payload.skill.description
+        break
+      case 'snippet':
+        key = `slash:snippet:${payload.snippet.id}`
+        name = payload.snippet.trigger
+        subtitle = payload.snippet.description ?? ''
+        break
+      case 'command':
+        key = `slash:command:${payload.command.id}`
+        name = payload.command.name
+        subtitle = payload.command.description
+        break
+      case 'create-snippets-file':
+        key = `slash:command:${CREATE_SNIPPETS_FILE_COMMAND_ID}`
+        name = payload.label
+        break
+    }
+
+    super(key)
+    this.name = name
+    this.subtitle = subtitle
+    this.payload = payload
   }
 }
 
@@ -65,12 +133,54 @@ function SkillTypeaheadMenuItem({
   onMouseEnter: () => void
   option: SkillTypeaheadOption
 }) {
-  const ItemIcon = option.type === 'command' ? Minimize2 : Sparkles
+  let iconNode: ReactNode = null
+  switch (option.payload.kind) {
+    case 'back':
+      iconNode = (
+        <ArrowLeft size={14} className="yolo-smart-space-mention-option-icon" />
+      )
+      break
+    case 'entry':
+      iconNode =
+        option.payload.entryType === 'skill' ? (
+          <Sparkles
+            size={14}
+            className="yolo-smart-space-mention-option-icon"
+          />
+        ) : (
+          <Zap size={14} className="yolo-smart-space-mention-option-icon" />
+        )
+      break
+    case 'skill':
+      iconNode = (
+        <Sparkles size={14} className="yolo-smart-space-mention-option-icon" />
+      )
+      break
+    case 'snippet':
+      iconNode = (
+        <Zap size={14} className="yolo-smart-space-mention-option-icon" />
+      )
+      break
+    case 'command':
+      iconNode = (
+        <Minimize2 size={14} className="yolo-smart-space-mention-option-icon" />
+      )
+      break
+    case 'create-snippets-file':
+      iconNode = (
+        <FilePlus2 size={14} className="yolo-smart-space-mention-option-icon" />
+      )
+      break
+  }
+
+  const isSelectedSkill =
+    option.payload.kind === 'skill' && option.payload.isSelected
+  const showChevron = option.payload.kind === 'entry'
 
   return (
     <button
       type="button"
-      className={`smtcmp-popover-item smtcmp-smart-space-mention-option ${
+      className={`yolo-popover-item yolo-smart-space-mention-option ${
         isSelected ? 'active' : ''
       }`}
       ref={(el) => option.setRefElement(el)}
@@ -82,19 +192,25 @@ function SkillTypeaheadMenuItem({
       onClick={onClick}
       data-highlighted={isSelected ? 'true' : undefined}
     >
-      <ItemIcon size={14} className="smtcmp-smart-space-mention-option-icon" />
-      <div className="smtcmp-smart-space-mention-option-text smtcmp-smart-space-mention-option-text--inline-meta">
-        <div className="smtcmp-smart-space-mention-option-name">
+      {iconNode}
+      <div className="yolo-smart-space-mention-option-text yolo-smart-space-mention-option-text--inline-meta">
+        <div className="yolo-smart-space-mention-option-name">
           {option.name}
         </div>
         {option.subtitle && (
-          <div className="smtcmp-smart-space-mention-option-path smtcmp-smart-space-mention-option-inline-meta">
+          <div className="yolo-smart-space-mention-option-path yolo-smart-space-mention-option-inline-meta">
             {option.subtitle}
           </div>
         )}
       </div>
-      {option.isSelectedSkill && (
-        <Check size={12} className="smtcmp-smart-space-mention-option-check" />
+      {isSelectedSkill && (
+        <Check size={12} className="yolo-smart-space-mention-option-check" />
+      )}
+      {showChevron && (
+        <ChevronRight
+          size={14}
+          className="yolo-smart-space-mention-option-expand"
+        />
       )}
     </button>
   )
@@ -102,6 +218,7 @@ function SkillTypeaheadMenuItem({
 
 export default function SkillSlashPlugin({
   skills,
+  snippets = [],
   selectedSkillIds = [],
   mentionDisplayMode = 'inline',
   onMenuOpenChange,
@@ -109,8 +226,10 @@ export default function SkillSlashPlugin({
   placement = 'top',
   onSelectSkill,
   onRunCommand,
+  onCreateSnippetsFile,
 }: {
   skills: LiteSkillEntry[]
+  snippets?: SnippetEntry[]
   selectedSkillIds?: string[]
   mentionDisplayMode?: 'inline' | 'badge'
   onMenuOpenChange?: (isOpen: boolean) => void
@@ -118,9 +237,11 @@ export default function SkillSlashPlugin({
   placement?: 'top' | 'bottom'
   onSelectSkill?: (skill: LiteSkillEntry) => void
   onRunCommand?: (command: SlashCommand) => void
+  onCreateSnippetsFile?: () => void
 }): ReactJSX.Element | null {
   const [editor] = useLexicalComposerContext()
   const [queryString, setQueryString] = useState<string | null>(null)
+  const [menuScope, setMenuScope] = useState<SlashMenuScope>('root')
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -128,6 +249,12 @@ export default function SkillSlashPlugin({
       onMenuOpenChange?.(false)
     }
   }, [onMenuOpenChange])
+
+  useEffect(() => {
+    if (queryString === null) {
+      setMenuScope('root')
+    }
+  }, [queryString])
 
   const checkForSlashTriggerMatch = useBasicTypeaheadTriggerMatch('/', {
     minLength: 0,
@@ -155,48 +282,212 @@ export default function SkillSlashPlugin({
     [t],
   )
 
+  const skillEntryLabel = t('chat.slashMenu.entrySkill', 'Skills')
+  const snippetEntryLabel = t('chat.slashMenu.entrySnippet', 'Snippets')
+  const backLabel = t('chat.mentionMenu.back', 'Back')
+  const createSnippetsLabel = t(
+    'chat.slashMenu.createSnippetsFile',
+    'Click to create snippets.md',
+  )
+
+  const filterSkills = useCallback(
+    (query: string) => {
+      const q = query
+      return skills.filter((skill) => {
+        if (!q) return true
+        return (
+          skill.name.toLowerCase().includes(q) ||
+          skill.id.toLowerCase().includes(q) ||
+          skill.description.toLowerCase().includes(q) ||
+          skill.path.toLowerCase().includes(q)
+        )
+      })
+    },
+    [skills],
+  )
+
+  const filterSnippets = useCallback(
+    (query: string) => {
+      const q = query
+      return snippets.filter((snippet) => {
+        if (!q) return true
+        const triggerLower = snippet.trigger.toLowerCase()
+        const descriptionLower = (snippet.description ?? '').toLowerCase()
+        return (
+          triggerLower.startsWith(q) ||
+          triggerLower.includes(q) ||
+          descriptionLower.includes(q)
+        )
+      })
+    },
+    [snippets],
+  )
+
   const options = useMemo(() => {
     if (queryString == null) {
       return [] as SkillTypeaheadOption[]
     }
 
-    const skillOptions = skills
-      .filter((skill) => {
-        if (!normalizedQuery) return true
-        return (
-          skill.name.toLowerCase().includes(normalizedQuery) ||
-          skill.id.toLowerCase().includes(normalizedQuery) ||
-          skill.description.toLowerCase().includes(normalizedQuery) ||
-          skill.path.toLowerCase().includes(normalizedQuery)
-        )
-      })
-      .map(
+    if (menuScope === 'skill') {
+      const skillOptions = filterSkills(normalizedQuery).map(
         (skill) =>
           new SkillTypeaheadOption({
+            kind: 'skill',
             skill,
-            isSelectedSkill: selectedSkillIdSet.has(skill.id),
+            isSelected: selectedSkillIdSet.has(skill.id),
           }),
       )
-    const commandMatches =
-      !normalizedQuery ||
-      compactCommand.name.toLowerCase().includes(normalizedQuery) ||
-      compactCommand.id.toLowerCase().includes(normalizedQuery) ||
-      compactCommand.description.toLowerCase().includes(normalizedQuery)
+      return [
+        new SkillTypeaheadOption({ kind: 'back', label: backLabel }),
+        ...skillOptions,
+      ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT + 1)
+    }
 
-    const commandOptions = commandMatches
-      ? [
+    if (menuScope === 'snippet') {
+      // "Create snippets.md" appears only when the user has no snippets at all
+      // (file missing or no parseable entries). Filtered-but-non-empty lists
+      // should NOT show it — clicking only opens an existing file, which is
+      // misleading when the user is searching within a populated library.
+      if (snippets.length === 0) {
+        return [
+          new SkillTypeaheadOption({ kind: 'back', label: backLabel }),
           new SkillTypeaheadOption({
-            command: compactCommand,
-            isSelectedSkill: false,
+            kind: 'create-snippets-file',
+            label: createSnippetsLabel,
           }),
         ]
-      : []
+      }
+      const snippetOptions = filterSnippets(normalizedQuery).map(
+        (snippet) =>
+          new SkillTypeaheadOption({
+            kind: 'snippet',
+            snippet,
+          }),
+      )
+      return [
+        new SkillTypeaheadOption({ kind: 'back', label: backLabel }),
+        ...snippetOptions,
+      ].slice(0, SUGGESTION_LIST_LENGTH_LIMIT + 1)
+    }
 
+    // root scope
+    if (normalizedQuery) {
+      // Cross-category search: rank candidates by match strength rather than
+      // by category order. A snippet whose trigger starts with the query must
+      // outrank a skill whose only match is in its description.
+      const q = normalizedQuery
+      const scoreText = (text: string): number => {
+        const t = text.toLowerCase()
+        if (t === q) return 100
+        if (t.startsWith(q)) return 80
+        if (t.includes(q)) return 60
+        return 0
+      }
+
+      type RankedOption = {
+        option: SkillTypeaheadOption
+        score: number
+        categoryRank: number // tiebreaker: skill < snippet < command
+        order: number // tiebreaker: preserve within-category insertion order
+      }
+      const ranked: RankedOption[] = []
+      let orderCounter = 0
+
+      skills.forEach((skill) => {
+        const score = Math.max(
+          scoreText(skill.name),
+          skill.id.toLowerCase().includes(q) ? 30 : 0,
+          skill.description.toLowerCase().includes(q) ? 10 : 0,
+          skill.path.toLowerCase().includes(q) ? 5 : 0,
+        )
+        if (score === 0) return
+        ranked.push({
+          option: new SkillTypeaheadOption({
+            kind: 'skill',
+            skill,
+            isSelected: selectedSkillIdSet.has(skill.id),
+          }),
+          score,
+          categoryRank: 0,
+          order: orderCounter++,
+        })
+      })
+
+      snippets.forEach((snippet) => {
+        const score = Math.max(
+          scoreText(snippet.trigger),
+          (snippet.description ?? '').toLowerCase().includes(q) ? 10 : 0,
+        )
+        if (score === 0) return
+        ranked.push({
+          option: new SkillTypeaheadOption({ kind: 'snippet', snippet }),
+          score,
+          categoryRank: 1,
+          order: orderCounter++,
+        })
+      })
+
+      const commandScore = Math.max(
+        scoreText(compactCommand.name),
+        compactCommand.id.toLowerCase().includes(q) ? 30 : 0,
+        compactCommand.description.toLowerCase().includes(q) ? 10 : 0,
+      )
+      if (commandScore > 0) {
+        ranked.push({
+          option: new SkillTypeaheadOption({
+            kind: 'command',
+            command: compactCommand,
+          }),
+          score: commandScore,
+          categoryRank: 2,
+          order: orderCounter++,
+        })
+      }
+
+      ranked.sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score
+        if (a.categoryRank !== b.categoryRank)
+          return a.categoryRank - b.categoryRank
+        return a.order - b.order
+      })
+
+      return ranked
+        .slice(0, SUGGESTION_LIST_LENGTH_LIMIT)
+        .map((entry) => entry.option)
+    }
+
+    // root scope, empty query: show three entries
     return [
-      ...skillOptions.slice(0, SUGGESTION_LIST_LENGTH_LIMIT),
-      ...commandOptions,
+      new SkillTypeaheadOption({
+        kind: 'entry',
+        entryType: 'skill',
+        label: skillEntryLabel,
+      }),
+      new SkillTypeaheadOption({
+        kind: 'entry',
+        entryType: 'snippet',
+        label: snippetEntryLabel,
+      }),
+      new SkillTypeaheadOption({
+        kind: 'command',
+        command: compactCommand,
+      }),
     ]
-  }, [compactCommand, normalizedQuery, queryString, selectedSkillIdSet, skills])
+  }, [
+    backLabel,
+    compactCommand,
+    createSnippetsLabel,
+    filterSkills,
+    filterSnippets,
+    menuScope,
+    normalizedQuery,
+    queryString,
+    selectedSkillIdSet,
+    skillEntryLabel,
+    snippetEntryLabel,
+    skills,
+    snippets,
+  ])
 
   const onSelectOption = useCallback(
     (
@@ -204,24 +495,66 @@ export default function SkillSlashPlugin({
       nodeToReplace: TextNode | null,
       closeMenu: () => void,
     ) => {
-      if (selectedOption.isSelectedSkill) {
+      const payload = selectedOption.payload
+
+      if (payload.kind === 'back') {
+        if (nodeToReplace) {
+          const triggerNode = $createTextNode('/')
+          nodeToReplace.replace(triggerNode)
+          triggerNode.selectEnd()
+        }
+        setMenuScope('root')
+        return
+      }
+
+      if (payload.kind === 'entry') {
+        if (nodeToReplace) {
+          const triggerNode = $createTextNode('/')
+          nodeToReplace.replace(triggerNode)
+          triggerNode.selectEnd()
+        }
+        setMenuScope(payload.entryType === 'skill' ? 'skill' : 'snippet')
+        return
+      }
+
+      if (payload.kind === 'command') {
         if (nodeToReplace) {
           const emptyNode = $createTextNode('')
           nodeToReplace.replace(emptyNode)
           emptyNode.select()
+        }
+        onRunCommand?.(payload.command)
+        closeMenu()
+        return
+      }
+
+      if (payload.kind === 'create-snippets-file') {
+        if (nodeToReplace) {
+          const emptyNode = $createTextNode('')
+          nodeToReplace.replace(emptyNode)
+          emptyNode.select()
+        }
+        onCreateSnippetsFile?.()
+        closeMenu()
+        return
+      }
+
+      if (payload.kind === 'snippet') {
+        if (nodeToReplace) {
+          const textNode = $createTextNode(payload.snippet.content)
+          nodeToReplace.replace(textNode)
+          textNode.selectEnd()
         }
         closeMenu()
         return
       }
 
-      if (selectedOption.type === 'command') {
+      // payload.kind === 'skill'
+      if (payload.isSelected) {
         if (nodeToReplace) {
           const emptyNode = $createTextNode('')
           nodeToReplace.replace(emptyNode)
           emptyNode.select()
-        }
-        if (selectedOption.command) {
-          onRunCommand?.(selectedOption.command)
         }
         closeMenu()
         return
@@ -233,41 +566,63 @@ export default function SkillSlashPlugin({
           nodeToReplace.replace(emptyNode)
           emptyNode.select()
         }
-        if (selectedOption.skill) {
-          onSelectSkill?.(selectedOption.skill)
-        }
+        onSelectSkill?.(payload.skill)
         closeMenu()
         return
       }
 
-      if (nodeToReplace && selectedOption.skill) {
-        const skillNode = $createSkillNode(selectedOption.skill.name, {
-          id: selectedOption.skill.id,
-          name: selectedOption.skill.name,
-          description: selectedOption.skill.description,
-          path: selectedOption.skill.path,
+      if (nodeToReplace) {
+        const skillNode = $createSkillNode(payload.skill.name, {
+          id: payload.skill.id,
+          name: payload.skill.name,
+          description: payload.skill.description,
+          path: payload.skill.path,
         })
         nodeToReplace.replace(skillNode)
         const spaceNode = $createTextNode(' ')
         skillNode.insertAfter(spaceNode)
         spaceNode.select()
       }
-      if (selectedOption.skill) {
-        onSelectSkill?.(selectedOption.skill)
-      }
+      onSelectSkill?.(payload.skill)
       closeMenu()
     },
-    [mentionDisplayMode, onRunCommand, onSelectSkill],
+    [mentionDisplayMode, onCreateSnippetsFile, onRunCommand, onSelectSkill],
   )
 
   const checkForTriggerMatch = useCallback(
     (text: string) => {
-      if (skills.length === 0 && !onRunCommand) {
+      if (
+        skills.length === 0 &&
+        snippets.length === 0 &&
+        !onRunCommand &&
+        !onCreateSnippetsFile
+      ) {
         return null
       }
       return checkForSlashTriggerMatch(text, editor)
     },
-    [checkForSlashTriggerMatch, editor, onRunCommand, skills.length],
+    [
+      checkForSlashTriggerMatch,
+      editor,
+      onCreateSnippetsFile,
+      onRunCommand,
+      skills.length,
+      snippets.length,
+    ],
+  )
+
+  const getDefaultHighlightedIndex = useCallback(
+    (menuOptions: SkillTypeaheadOption[]) => {
+      if (menuScope === 'root') {
+        return 0
+      }
+      const firstOption = menuOptions[0]
+      if (firstOption?.payload.kind === 'back' && menuOptions.length > 1) {
+        return 1
+      }
+      return 0
+    },
+    [menuScope],
   )
 
   return (
@@ -277,7 +632,7 @@ export default function SkillSlashPlugin({
       triggerFn={checkForTriggerMatch}
       options={options}
       commandPriority={COMMAND_PRIORITY_NORMAL}
-      getDefaultHighlightedIndex={() => 0}
+      getDefaultHighlightedIndex={getDefaultHighlightedIndex}
       onOpen={() => onMenuOpenChange?.(true)}
       onClose={() => onMenuOpenChange?.(false)}
       menuRenderFn={(
@@ -287,14 +642,14 @@ export default function SkillSlashPlugin({
         anchorElementRef.current && options.length
           ? createPortal(
               <div
-                className="smtcmp-smart-space-mention-popover"
+                className="yolo-smart-space-mention-popover"
                 data-placement={placement}
               >
-                <div className="yolo-popover-surface yolo-popover-surface--smart-space smtcmp-smart-space-mention-dropdown">
+                <div className="yolo-popover-surface yolo-popover-surface--smart-space yolo-smart-space-mention-dropdown">
                   <div
-                    className="smtcmp-smart-space-mention-list"
+                    className="yolo-smart-space-mention-list"
                     role="listbox"
-                    aria-label={t('chat.mentionMenu.entrySkill', 'Skills')}
+                    aria-label={skillEntryLabel}
                   >
                     {options.map((option, index) => (
                       <SkillTypeaheadMenuItem

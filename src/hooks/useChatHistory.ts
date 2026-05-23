@@ -11,6 +11,13 @@ import {
 import { useApp } from '../contexts/app-context'
 import { useLanguage } from '../contexts/language-context'
 import { useSettings } from '../contexts/settings-context'
+import { executeSingleTurn } from '../core/ai/single-turn'
+import {
+  createLLMDebugTrace,
+  isLLMDebugCaptureEnabled,
+  registerLLMDebugTraceForTurn,
+  updateLLMDebugTrace,
+} from '../core/llm/debugCapture'
 import { getChatModelClient } from '../core/llm/manager'
 import { promoteProviderTransportModeToObsidian } from '../core/llm/transportModePromotion'
 import { batchLookupImageCache } from '../database/json/chat/imageCacheStore'
@@ -44,7 +51,7 @@ const AUTO_TITLE_MAX_RETRIES = 2
 const AUTO_TITLE_FAILURE_COOLDOWN_MS = 5 * 60 * 1000
 const AUTO_TITLE_WAIT_CONVERSATION_RETRIES = 15
 const AUTO_TITLE_WAIT_CONVERSATION_INTERVAL_MS = 200
-const CHAT_HISTORY_UPDATED_EVENT = 'smtcmp:chat-history-updated'
+const CHAT_HISTORY_UPDATED_EVENT = 'yolo:chat-history-updated'
 
 const isUntitledConversationTitle = (title: string): boolean =>
   LEGACY_UNTITLED_CONVERSATION_TITLES.has(title)
@@ -167,10 +174,10 @@ export function useChatHistory(): UseChatHistory {
     const handler = () => {
       void fetchChatList()
     }
-    window.addEventListener('smtcmp:chat-history-cleared', handler)
+    window.addEventListener('yolo:chat-history-cleared', handler)
     window.addEventListener(CHAT_HISTORY_UPDATED_EVENT, handler)
     return () => {
-      window.removeEventListener('smtcmp:chat-history-cleared', handler)
+      window.removeEventListener('yolo:chat-history-cleared', handler)
       window.removeEventListener(CHAT_HISTORY_UPDATED_EVENT, handler)
     }
   }, [fetchChatList])
@@ -601,22 +608,62 @@ export function useChatHistory(): UseChatHistory {
               customizedPrompt.length > 0
                 ? customizedPrompt
                 : defaultTitlePrompt
+            const debugTrace = isLLMDebugCaptureEnabled()
+              ? createLLMDebugTrace({
+                  model,
+                  requestKind: 'title-generation',
+                })
+              : null
+            if (debugTrace) {
+              registerLLMDebugTraceForTurn({
+                conversationId: id,
+                sourceUserMessageId: firstUserMessage.id,
+                traceId: debugTrace.id,
+              })
+            }
 
-            const response = await providerClient.generateResponse(
-              model,
-              {
-                model: model.model,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: titleInput },
-                ],
+            const startedAt = Date.now()
+            let response: Awaited<ReturnType<typeof executeSingleTurn>>
+            try {
+              response = await executeSingleTurn({
+                providerClient,
+                model,
+                request: {
+                  model: model.model,
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: titleInput },
+                  ],
+                },
                 stream: false,
-              },
-              { signal: controller.signal },
-            )
+                purpose: 'auxiliary',
+                signal: controller.signal,
+                debugTraceId: debugTrace?.id,
+              })
+            } catch (error) {
+              updateLLMDebugTrace(debugTrace?.id, {
+                completedAt: Date.now(),
+                durationMs: Date.now() - startedAt,
+                generationState: controller.signal.aborted
+                  ? 'aborted'
+                  : 'error',
+                errorMessage:
+                  error instanceof Error ? error.message : String(error),
+              })
+              throw error
+            }
+            updateLLMDebugTrace(debugTrace?.id, {
+              completedAt: Date.now(),
+              durationMs: Date.now() - startedAt,
+              generationState: 'completed',
+              usage: response.usage,
+              hasToolCalls: response.toolCalls.length > 0,
+              toolCallNames: response.toolCalls.map(
+                (toolCall) => toolCall.name,
+              ),
+            })
 
-            const generated = response.choices?.[0]?.message?.content ?? ''
-            const nextTitle = (generated || '')
+            const nextTitle = (response.content || '')
               .trim()
               .replace(/^["']+|["']+$/g, '')
             return nextTitle || null

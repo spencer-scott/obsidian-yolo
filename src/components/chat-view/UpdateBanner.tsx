@@ -29,25 +29,25 @@ export function UpdateBanner(): ReactNode {
   const dismissLabel = t('update.dismiss', 'Dismiss')
 
   return (
-    <div className="smtcmp-update-banner">
-      <div className="smtcmp-update-banner-row">
-        <div className="smtcmp-update-banner-icon" aria-hidden="true">
+    <div className="yolo-update-banner">
+      <div className="yolo-update-banner-row">
+        <div className="yolo-update-banner-icon" aria-hidden="true">
           <Download size={18} strokeWidth={2} />
         </div>
-        <div className="smtcmp-update-banner-body">
-          <div className="smtcmp-update-banner-title">{title}</div>
-          <div className="smtcmp-update-banner-meta">
+        <div className="yolo-update-banner-body">
+          <div className="yolo-update-banner-title">{title}</div>
+          <div className="yolo-update-banner-meta">
             {currentLabel}: v{plugin.manifest.version}
           </div>
           {result.releaseNotes ? (
-            <div className="smtcmp-update-banner-notes">
+            <div className="yolo-update-banner-notes">
               {result.releaseNotes}
             </div>
           ) : null}
         </div>
         <button
           type="button"
-          className="smtcmp-update-banner-dismiss"
+          className="yolo-update-banner-dismiss"
           onClick={() => {
             dismiss()
           }}
@@ -57,7 +57,7 @@ export function UpdateBanner(): ReactNode {
           <X size={16} strokeWidth={2.25} />
         </button>
       </div>
-      <div className="smtcmp-update-banner-actions">
+      <div className="yolo-update-banner-actions">
         <button
           type="button"
           className="mod-cta"

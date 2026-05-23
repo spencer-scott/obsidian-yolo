@@ -73,7 +73,7 @@ const baseDom = baseline.result.value.dom
 
 await send('Runtime.evaluate', {
   expression: `(() => {
-    const K = '__smtcmpDiagnose';
+    const K = '__yoloDiagnose';
     if (window[K]) { clearInterval(window[K].id); }
     const samples = [];
     const id = setInterval(() => {
@@ -111,7 +111,7 @@ const { profile } = await send('Profiler.stop')
 
 const samplesRes = await send('Runtime.evaluate', {
   expression: `(() => {
-    const s = window.__smtcmpDiagnose;
+    const s = window.__yoloDiagnose;
     if (!s) return null;
     clearInterval(s.id);
     return s.samples;

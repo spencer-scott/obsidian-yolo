@@ -1,12 +1,12 @@
 /* MCP Section Styles */
-.smtcmp-mcp-servers-container {
+.yolo-mcp-servers-container {
   display: flex;
   flex-direction: column;
 }
 
-.smtcmp-mcp-servers-header {
+.yolo-mcp-servers-header {
   display: grid;
-  grid-template-columns: 1fr 128px 64px 112px; /* Match columns with .smtcmp-mcp-server-row to ensure proper alignment */
+  grid-template-columns: 1fr 128px 64px 112px; /* Match columns with .yolo-mcp-server-row to ensure proper alignment */
   gap: var(--size-4-4);
   align-items: center;
   min-height: var(--size-4-10);
@@ -31,7 +31,7 @@
   }
 }
 
-.smtcmp-mcp-servers-empty {
+.yolo-mcp-servers-empty {
   padding: var(--size-4-4) 0;
   display: flex;
   justify-content: center;
@@ -39,13 +39,13 @@
   color: var(--text-muted);
 }
 
-.smtcmp-mcp-server {
+.yolo-mcp-server {
   border-bottom: var(--border-width) solid var(--background-modifier-border);
 }
 
-.smtcmp-mcp-server-row {
+.yolo-mcp-server-row {
   display: grid;
-  grid-template-columns: 1fr 128px 64px 112px; /* Match columns with .smtcmp-mcp-servers-header to ensure proper alignment */
+  grid-template-columns: 1fr 128px 64px 112px; /* Match columns with .yolo-mcp-servers-header to ensure proper alignment */
   gap: var(--size-4-4);
   align-items: center;
   min-height: var(--size-4-10);
@@ -55,22 +55,22 @@
   }
 }
 
-.smtcmp-mcp-server-name {
+.yolo-mcp-server-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.smtcmp-mcp-server-status {
+.yolo-mcp-server-status {
   display: flex;
   justify-content: flex-start;
 }
 
-.smtcmp-mcp-server-toggle {
+.yolo-mcp-server-toggle {
   display: flex;
   justify-content: center;
 }
 
-.smtcmp-mcp-server-actions {
+.yolo-mcp-server-actions {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,24 +83,24 @@
   }
 }
 
-.smtcmp-server-expanded-info {
+.yolo-server-expanded-info {
   margin-bottom: var(--size-4-4);
   padding-left: var(--size-4-4);
   border-left: var(--border-width) solid var(--background-modifier-border);
 }
 
-.smtcmp-server-expanded-info-header {
+.yolo-server-expanded-info-header {
   font-weight: var(--font-medium);
   margin-bottom: var(--size-4-3);
 }
 
-.smtcmp-server-tools-container {
+.yolo-server-tools-container {
   display: flex;
   flex-direction: column;
   gap: var(--size-4-4);
 }
 
-.smtcmp-server-error-message {
+.yolo-server-error-message {
   color: var(--text-error);
   font-weight: var(--font-medium);
   font-family: var(--font-monospace);
@@ -108,7 +108,7 @@
   user-select: text;
 }
 
-.smtcmp-mcp-server-status-badge {
+.yolo-mcp-server-status-badge {
   border-radius: 9999px;
   padding: var(--size-2-1) var(--size-4-2);
   display: flex;
@@ -117,60 +117,60 @@
   line-height: 1;
 }
 
-.smtcmp-mcp-server-status-badge-label {
+.yolo-mcp-server-status-badge-label {
   font-size: var(--font-ui-smaller);
 }
 
-.smtcmp-mcp-server-status-badge--connected {
+.yolo-mcp-server-status-badge--connected {
   background-color: color-mix(in srgb, var(--text-success) 10%, transparent);
   color: var(--text-success);
 }
 
-.smtcmp-mcp-server-status-badge--connecting {
+.yolo-mcp-server-status-badge--connecting {
   background-color: color-mix(in srgb, var(--text-muted) 10%, transparent);
   color: var(--text-muted);
 }
 
-.smtcmp-mcp-server-status-badge--error {
+.yolo-mcp-server-status-badge--error {
   background-color: color-mix(in srgb, var(--text-error) 10%, transparent);
   color: var(--text-error);
 }
 
-.smtcmp-mcp-server-status-badge--disconnected {
+.yolo-mcp-server-status-badge--disconnected {
   background-color: color-mix(in srgb, var(--text-muted) 10%, transparent);
   color: var(--text-muted);
 }
 
-.smtcmp-mcp-tool {
+.yolo-mcp-tool {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: var(--size-4-4);
   align-items: center;
 }
 
-.smtcmp-mcp-tool-info {
+.yolo-mcp-tool-info {
   display: flex;
   flex-direction: column;
 }
 
-.smtcmp-mcp-tool-name {
+.yolo-mcp-tool-name {
   font-family: var(--font-monospace);
   font-size: var(--font-ui-smaller);
 }
 
-.smtcmp-mcp-tool-description {
+.yolo-mcp-tool-description {
   position: relative;
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
-.smtcmp-mcp-tool-description-header {
+.yolo-mcp-tool-description-header {
   display: flex;
   align-items: center;
   gap: var(--size-2-1);
 }
 
-.smtcmp-mcp-tool-description-text.is-clamped {
+.yolo-mcp-tool-description-text.is-clamped {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -178,23 +178,23 @@
   overflow: hidden;
 }
 
-.smtcmp-mcp-tool-description-text.is-expanded {
+.yolo-mcp-tool-description-text.is-expanded {
   white-space: pre-wrap;
 }
 
-.smtcmp-mcp-tool-description > button.smtcmp-mcp-tool-description-toggle {
+.yolo-mcp-tool-description > button.yolo-mcp-tool-description-toggle {
   position: absolute;
   top: 0;
   right: 0;
 }
 
-.smtcmp-mcp-tool-description
-  > button.smtcmp-mcp-tool-description-toggle
-  ~ .smtcmp-mcp-tool-description-text {
+.yolo-mcp-tool-description
+  > button.yolo-mcp-tool-description-toggle
+  ~ .yolo-mcp-tool-description-text {
   padding-right: var(--size-4-6);
 }
 
-button.smtcmp-mcp-tool-description-toggle {
+button.yolo-mcp-tool-description-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -210,42 +210,42 @@ button.smtcmp-mcp-tool-description-toggle {
   flex-shrink: 0;
 }
 
-button.smtcmp-mcp-tool-description-toggle:hover {
+button.yolo-mcp-tool-description-toggle:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
 }
 
-button.smtcmp-mcp-tool-description-toggle.is-expanded {
+button.yolo-mcp-tool-description-toggle.is-expanded {
   transform: rotate(180deg);
 }
 
-.smtcmp-mcp-tool-toggle {
+.yolo-mcp-tool-toggle {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
 }
 
-.smtcmp-mcp-tool-toggle-label {
+.yolo-mcp-tool-toggle-label {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
 }
 
 /* MCP Server Modal Styles */
-.smtcmp-mcp-parameters-header {
+.yolo-mcp-parameters-header {
   display: block;
 }
 
-.smtcmp-mcp-parameters-title-row {
+.yolo-mcp-parameters-title-row {
   display: inline-flex;
   align-items: center;
   gap: var(--size-2-1);
 }
 
-.smtcmp-mcp-parameters-header .setting-item-description {
+.yolo-mcp-parameters-header .setting-item-description {
   margin-top: var(--size-2-1);
 }
 
-.smtcmp-mcp-parameters-info-icon {
+.yolo-mcp-parameters-info-icon {
   all: unset;
   appearance: none;
   display: inline-flex;
@@ -273,7 +273,7 @@ button.smtcmp-mcp-tool-description-toggle.is-expanded {
   }
 }
 
-.smtcmp-mcp-sr-only {
+.yolo-mcp-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -285,7 +285,7 @@ button.smtcmp-mcp-tool-description-toggle.is-expanded {
   border: 0;
 }
 
-.smtcmp-tooltip-content--wide {
+.yolo-tooltip-content--wide {
   width: min(360px, calc(100vw - 24px));
   max-width: min(360px, calc(100vw - 24px));
   padding: var(--size-4-2) var(--size-4-3);
@@ -295,33 +295,33 @@ button.smtcmp-mcp-tool-description-toggle.is-expanded {
   z-index: 10000 !important;
 }
 
-.smtcmp-mcp-parameters-tooltip {
+.yolo-mcp-parameters-tooltip {
   display: flex;
   flex-direction: column;
   gap: var(--size-2-2);
 }
 
-.smtcmp-mcp-parameters-tooltip-title {
+.yolo-mcp-parameters-tooltip-title {
   font-size: var(--font-ui-small);
   font-weight: var(--font-medium);
   color: var(--text-normal);
   margin-bottom: var(--size-2-1);
 }
 
-.smtcmp-mcp-parameters-tooltip-line {
+.yolo-mcp-parameters-tooltip-line {
   font-size: var(--font-ui-smaller);
   line-height: 1.5;
   color: var(--text-normal);
   word-wrap: break-word;
 }
 
-.smtcmp-mcp-parameters-tooltip-keyword {
+.yolo-mcp-parameters-tooltip-keyword {
   color: var(--text-muted);
   margin-right: var(--size-2-1);
   font-weight: var(--font-medium);
 }
 
-.smtcmp-mcp-parameters-tooltip-tip {
+.yolo-mcp-parameters-tooltip-tip {
   font-size: var(--font-ui-smaller);
   line-height: 1.5;
   color: var(--text-muted);
@@ -330,24 +330,24 @@ button.smtcmp-mcp-tool-description-toggle.is-expanded {
   border-top: 1px dashed var(--background-modifier-border);
 }
 
-.smtcmp-mcp-server-modal-textarea {
+.yolo-mcp-server-modal-textarea {
   width: 100%;
   font-family: var(--font-monospace);
   resize: none;
   word-break: break-all;
 }
 
-.smtcmp-mcp-server-modal-validation {
+.yolo-mcp-server-modal-validation {
   font-family: var(--font-monospace);
   font-size: var(--font-ui-small);
   padding: var(--size-4-1) 0;
   white-space: pre-wrap;
 
-  &.smtcmp-mcp-server-modal-validation--error {
+  &.yolo-mcp-server-modal-validation--error {
     color: var(--text-error);
   }
 
-  &.smtcmp-mcp-server-modal-validation--success {
+  &.yolo-mcp-server-modal-validation--success {
     color: var(--text-success);
   }
 }

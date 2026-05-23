@@ -1,32 +1,28 @@
-import { App, Notice } from 'obsidian'
-import { useMemo, useState } from 'react'
+import { App, Notice, TFile, TFolder } from 'obsidian'
+import { useCallback, useMemo, useState } from 'react'
 
 import { useLanguage } from '../../../contexts/language-context'
 import {
   SettingsProvider,
   useSettings,
 } from '../../../contexts/settings-context'
-import {
-  getYoloSkillsDir,
-  getYoloSkillsIndexPath,
-} from '../../../core/paths/yoloPaths'
+import { getYoloSkillsDir } from '../../../core/paths/yoloPaths'
 import { listLiteSkillEntries } from '../../../core/skills/liteSkills'
-import {
-  YOLO_SKILLS_INDEX_TEMPLATE,
-  getSkillsPathAwareTemplate,
-} from '../../../core/skills/templates'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianToggle } from '../../common/ObsidianToggle'
 import { ReactModal } from '../../common/ReactModal'
+import { ConfirmModal } from '../../modals/ConfirmModal'
+
+import { ImportSkillModal } from './ImportSkillModal'
 
 type AgentSkillsModalProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export class AgentSkillsModal extends ReactModal<AgentSkillsModalProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app,
       Component: AgentSkillsModalWrapper,
@@ -36,7 +32,7 @@ export class AgentSkillsModal extends ReactModal<AgentSkillsModalProps> {
       },
       plugin,
     })
-    this.modalEl.classList.add('smtcmp-modal--wide')
+    this.modalEl.classList.add('yolo-modal--wide')
   }
 }
 
@@ -63,11 +59,13 @@ function AgentSkillsModalContent({
   plugin: _plugin,
 }: {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }) {
   const { t } = useLanguage()
   const { settings, setSettings } = useSettings()
   const [refreshTick, setRefreshTick] = useState(0)
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const skillsDir = getYoloSkillsDir(settings)
 
   const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
@@ -80,6 +78,11 @@ function AgentSkillsModalContent({
     void refreshTick
     return listLiteSkillEntries(app, { settings })
   }, [app, refreshTick, settings])
+
+  const deletableSkills = useMemo(
+    () => skills.filter((s) => !s.path.startsWith('builtin://')),
+    [skills],
+  )
 
   const handleToggleSkill = (skillId: string, enabled: boolean) => {
     const current = new Set(settings.skills?.disabledSkillIds ?? [])
@@ -98,75 +101,170 @@ function AgentSkillsModalContent({
     })
   }
 
-  const handleInitializeSkillsSystem = async () => {
-    const indexPath = getYoloSkillsIndexPath(settings)
+  const handleOpenImportModal = () => {
+    const modal = new ImportSkillModal(app, _plugin, () => {
+      // Delay refresh to wait for vault file index update
+      setTimeout(() => {
+        setRefreshTick((value) => value + 1)
+      }, 300)
+    })
+    modal.open()
+  }
 
-    try {
-      const maybeFolder = app.vault.getAbstractFileByPath(skillsDir)
-      if (!maybeFolder) {
-        await app.vault.createFolder(skillsDir)
+  // Selection mode
+  const handleEnterSelectMode = () => {
+    setIsSelectMode(true)
+    setSelectedIds(new Set())
+  }
+
+  const handleExitSelectMode = () => {
+    setIsSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  const handleToggleSelect = useCallback((skillId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(skillId)) {
+        next.delete(skillId)
+      } else {
+        next.add(skillId)
       }
+      return next
+    })
+  }, [])
 
-      if (!app.vault.getAbstractFileByPath(indexPath)) {
-        await app.vault.create(
-          indexPath,
-          getSkillsPathAwareTemplate(YOLO_SKILLS_INDEX_TEMPLATE, skillsDir),
-        )
-      }
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(deletableSkills.map((s) => s.id)))
+  }, [deletableSkills])
 
-      setRefreshTick((value) => value + 1)
-      new Notice(
-        t(
-          'settings.agent.skillsTemplateCreated',
-          'Skills system initialized in {path}.',
-        ).replace('{path}', skillsDir),
-      )
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to create skill files.'
-      new Notice(message)
-    }
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return
+
+    const selectedSkills = skills.filter((s) => selectedIds.has(s.id))
+    const names = selectedSkills.map((s) => s.name)
+
+    const modal = new ConfirmModal(app, {
+      title: t('settings.agent.deleteSkillTitle', 'Delete skill'),
+      message: t(
+        'settings.agent.deleteSkillBatchMessage',
+        'Are you sure you want to delete {count} skill(s)? This cannot be undone.',
+      ).replace('{count}', String(names.length)),
+      ctaText: t('settings.agent.deleteSkillConfirm', 'Delete'),
+      onConfirm: async () => {
+        let successCount = 0
+        for (const skill of selectedSkills) {
+          try {
+            const file = app.vault.getAbstractFileByPath(skill.path)
+            if (file) {
+              if (file instanceof TFile) {
+                const parent = file.parent
+                if (
+                  parent &&
+                  parent.path !== skillsDir &&
+                  parent instanceof TFolder &&
+                  file.name === 'SKILL.md'
+                ) {
+                  await app.fileManager.trashFile(parent)
+                } else {
+                  await app.fileManager.trashFile(file)
+                }
+              } else if (file instanceof TFolder) {
+                await app.fileManager.trashFile(file)
+              }
+            }
+            successCount++
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error'
+            new Notice(
+              t(
+                'settings.agent.deleteSkillError',
+                'Failed to delete "{name}": {error}',
+              )
+                .replace('{name}', skill.name)
+                .replace('{error}', message),
+            )
+          }
+        }
+
+        if (successCount > 0) {
+          new Notice(
+            t(
+              'settings.agent.deleteSkillBatchSuccess',
+              'Deleted {count} skill(s).',
+            ).replace('{count}', String(successCount)),
+          )
+        }
+
+        setIsSelectMode(false)
+        setSelectedIds(new Set())
+        setRefreshTick((value) => value + 1)
+      },
+    })
+    modal.open()
   }
 
   return (
-    <div className="smtcmp-settings-section">
-      <div className="smtcmp-settings-desc smtcmp-settings-callout">
+    <div className="yolo-settings-section">
+      <div className="yolo-settings-desc yolo-settings-callout">
         {t(
           'settings.agent.skillsGlobalDesc',
           'Skills are discovered from built-in skills and {path}/**/*.md (excluding Skills.md where applicable). Disable a skill here to block it for all agents.',
         ).replace('{path}', skillsDir)}
       </div>
 
-      <div className="smtcmp-agent-skills-toolbar">
-        <div className="smtcmp-settings-desc">
-          {t(
-            'settings.agent.skillsSourcePath',
-            'Source: built-in skills + {path}/*.md + {path}/**/SKILL.md',
-          )
-            .split('{path}')
-            .join(skillsDir)}
-        </div>
-        <div className="smtcmp-agent-skills-toolbar-actions">
-          <ObsidianButton
-            text={t(
-              'settings.agent.createSkillTemplates',
-              'Initialize Skills system',
-            )}
-            onClick={() => void handleInitializeSkillsSystem()}
-          />
-          <ObsidianButton
-            text={t('settings.agent.refreshSkills', 'Refresh')}
-            onClick={() => setRefreshTick((value) => value + 1)}
-          />
+      <div className="yolo-agent-skills-toolbar">
+        <div className="yolo-agent-skills-toolbar-actions">
+          {isSelectMode ? (
+            <div
+              key="select-mode"
+              className="yolo-agent-skills-toolbar-actions"
+            >
+              <ObsidianButton
+                text={t('settings.agent.deleteSkillSelectAll', 'Select all')}
+                onClick={handleSelectAll}
+              />
+              <ObsidianButton
+                text={`${t('settings.agent.deleteSkillBatchBtn', 'Delete')} (${selectedIds.size})`}
+                warning
+                disabled={selectedIds.size === 0}
+                onClick={handleDeleteSelected}
+              />
+              <ObsidianButton
+                text={t('settings.agent.deleteSkillCancel', 'Cancel')}
+                onClick={handleExitSelectMode}
+              />
+            </div>
+          ) : (
+            <div
+              key="normal-mode"
+              className="yolo-agent-skills-toolbar-actions"
+            >
+              <ObsidianButton
+                text={t('settings.agent.importSkill', 'Import Skill')}
+                onClick={handleOpenImportModal}
+              />
+              {deletableSkills.length > 0 && (
+                <ObsidianButton
+                  text={t('settings.agent.selectSkills', 'Select')}
+                  onClick={handleEnterSelectMode}
+                />
+              )}
+              <ObsidianButton
+                text={t('settings.agent.refreshSkills', 'Refresh')}
+                onClick={() => setRefreshTick((value) => value + 1)}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="smtcmp-agent-tools-panel smtcmp-agent-skills-modal-panel">
-        <div className="smtcmp-agent-tools-panel-head">
-          <div className="smtcmp-agent-tools-panel-title">
+      <div className="yolo-agent-tools-panel yolo-agent-skills-modal-panel">
+        <div className="yolo-agent-tools-panel-head">
+          <div className="yolo-agent-tools-panel-title">
             {t('settings.agent.skills', 'Skills')}
           </div>
-          <div className="smtcmp-agent-tools-panel-count">
+          <div className="yolo-agent-tools-panel-count">
             {t(
               'settings.agent.skillsCountWithEnabled',
               '{count} skills (enabled {enabled})',
@@ -183,33 +281,54 @@ function AgentSkillsModalContent({
         </div>
 
         {skills.length > 0 ? (
-          <div className="smtcmp-agent-tool-list">
-            {skills.map((skill) => {
-              const enabled = !disabledSkillIdSet.has(skill.id)
-              return (
-                <div key={skill.id} className="smtcmp-agent-tool-row">
-                  <div className="smtcmp-agent-tool-main">
-                    <div className="smtcmp-agent-tool-name">{skill.name}</div>
-                    <div className="smtcmp-agent-tool-source smtcmp-agent-tool-source--preview">
-                      {skill.description}
-                    </div>
-                    <div className="smtcmp-agent-skill-meta">
-                      <span className="smtcmp-agent-chip">id: {skill.id}</span>
-                      <span className="smtcmp-agent-chip">{skill.path}</span>
-                    </div>
-                  </div>
-                  <div className="smtcmp-agent-tool-toggle">
-                    <ObsidianToggle
-                      value={enabled}
-                      onChange={(value) => handleToggleSkill(skill.id, value)}
-                    />
-                  </div>
-                </div>
+          <div className="yolo-agent-tool-list">
+            {skills
+              .filter((skill) =>
+                isSelectMode ? !skill.path.startsWith('builtin://') : true,
               )
-            })}
+              .map((skill) => {
+                const enabled = !disabledSkillIdSet.has(skill.id)
+                const isSelected = selectedIds.has(skill.id)
+
+                return (
+                  <div
+                    key={skill.id}
+                    className={`yolo-agent-tool-row ${isSelectMode && isSelected ? 'is-selected' : ''}`}
+                  >
+                    {isSelectMode && (
+                      <input
+                        type="checkbox"
+                        className="yolo-agent-skill-checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(skill.id)}
+                      />
+                    )}
+                    <div className="yolo-agent-tool-main">
+                      <div className="yolo-agent-tool-name">{skill.name}</div>
+                      <div className="yolo-agent-tool-source yolo-agent-tool-source--preview">
+                        {skill.description}
+                      </div>
+                      <div className="yolo-agent-skill-meta">
+                        <span className="yolo-agent-chip">id: {skill.id}</span>
+                        <span className="yolo-agent-chip">{skill.path}</span>
+                      </div>
+                    </div>
+                    {!isSelectMode && (
+                      <div className="yolo-agent-tool-toggle">
+                        <ObsidianToggle
+                          value={enabled}
+                          onChange={(value) =>
+                            handleToggleSkill(skill.id, value)
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
           </div>
         ) : (
-          <div className="smtcmp-agent-tools-empty">
+          <div className="yolo-agent-tools-empty">
             {t(
               'settings.agent.skillsEmptyHint',
               'No skills found. Create skill markdown files under {path}.',

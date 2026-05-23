@@ -44,10 +44,6 @@ export abstract class BaseLLMProvider<P extends LLMProvider> {
       ? model.customParameters
       : []
 
-    if (entries.length === 0) {
-      return request
-    }
-
     const next: Record<string, unknown> = { ...request }
     for (const entry of entries) {
       const key = typeof entry?.key === 'string' ? entry.key.trim() : ''
@@ -56,8 +52,25 @@ export abstract class BaseLLMProvider<P extends LLMProvider> {
       if (rawValue.trim().length === 0) {
         continue
       }
-      next[key] = parseCustomParameterValue(rawValue, entry.type, key)
+      const parsed = parseCustomParameterValue(rawValue, entry.type, key)
+      const existing = next[key]
+      // The `tools` field is a true set across the OpenAI/OpenRouter/Anthropic
+      // family: built-in (hosted) provider tools must coexist with agent
+      // function-calling tools in the same array slot. Overwrite semantics
+      // would silently drop the agent's tools whenever a user adds e.g.
+      // `tools=[{type:"openrouter:web_search"}]` via custom parameters, so for
+      // this one key we append instead of replace.
+      //
+      // Other array-typed request fields (`messages`, `stop_sequences`,
+      // `modalities`, etc.) are NOT free-form sets — appending would corrupt
+      // their semantics — so they intentionally stay on overwrite semantics.
+      if (key === 'tools' && Array.isArray(parsed) && Array.isArray(existing)) {
+        next[key] = [...existing, ...parsed]
+      } else {
+        next[key] = parsed
+      }
     }
+
     return next as T
   }
 }

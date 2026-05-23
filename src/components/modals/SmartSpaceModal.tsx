@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { usePlugin } from '../../contexts/plugin-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 import { ObsidianButton } from '../common/ObsidianButton'
 import { ObsidianSetting } from '../common/ObsidianSetting'
 import { ObsidianTextArea } from '../common/ObsidianTextArea'
@@ -35,12 +35,12 @@ function SmartSpaceComponent({
 
   return (
     <>
-      <div className="smtcmp-modal-input-container">
+      <div className="yolo-modal-input-container">
         <ObsidianTextArea
           value={instruction}
           placeholder={t('chat.customContinuePromptPlaceholder') ?? ''}
           onChange={(v) => setInstruction(v)}
-          inputClassName="smtcmp-instruction-textarea"
+          inputClassName="yolo-instruction-textarea"
         />
       </div>
 
@@ -63,7 +63,7 @@ export class SmartSpaceModal extends ReactModal<SmartSpaceModalProps> {
     editor,
   }: {
     app: App
-    plugin: SmartComposerPlugin
+    plugin: YoloPlugin
     editor: Editor
   }) {
     super({

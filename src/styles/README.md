@@ -17,8 +17,8 @@ anti-pattern that forces everyone who comes later to work around it or get tripp
 ## 2. Naming Prefixes
 
 - New CSS classes -> always use the `yolo-` prefix.
-- Existing `smtcmp-*` -> do not mass-rename (external themes / CSS snippets may target them).
-- When an old component is **fully replaced** by a new abstraction, delete the related `smtcmp-*` dead code (delete, not rename).
+- Existing `yolo-*` -> do not mass-rename (external themes / CSS snippets may target them).
+- When an old component is **fully replaced** by a new abstraction, delete the related `yolo-*` dead code (delete, not rename).
 
 ## 3. Popover / Dropdown Specific Conventions
 

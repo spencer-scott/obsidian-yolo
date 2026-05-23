@@ -5,6 +5,7 @@ import {
   renderCurrentFilePointerInjection,
 } from './currentFilePointerContext'
 import { renderEditorSnapshotInjection } from './editorSnapshotContext'
+import { renderTodoListInjection } from './todoListContext'
 import type { ContextualInjection } from './types'
 
 export type {
@@ -12,9 +13,11 @@ export type {
   CurrentFilePointerInjection,
   EditorSnapshotInjection,
   EditorSnapshotSelection,
+  TodoListInjection,
 } from './types'
 export { renderCurrentFilePointerInjection } from './currentFilePointerContext'
 export { renderEditorSnapshotInjection } from './editorSnapshotContext'
+export { renderTodoListInjection } from './todoListContext'
 
 export type RenderContextualInjectionContext = CurrentFilePointerRenderContext
 
@@ -27,6 +30,8 @@ export async function renderContextualInjection(
       return renderCurrentFilePointerInjection(injection, ctx)
     case 'editor-snapshot':
       return renderEditorSnapshotInjection(injection)
+    case 'todo-list':
+      return renderTodoListInjection(injection)
   }
 }
 

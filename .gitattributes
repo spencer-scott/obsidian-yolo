@@ -1,0 +1,14 @@
+# Normalize line endings on checkin/checkout so Windows contributors don't
+# trip the `endOfLine` Prettier rule. Default Prettier `endOfLine` is `lf`,
+# which matches what Git stores in the index here.
+* text=auto eol=lf
+
+# Keep binary-ish artifacts as-is.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text eol=lf
+*.ico binary
+*.woff binary
+*.woff2 binary

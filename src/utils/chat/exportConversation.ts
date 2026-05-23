@@ -276,7 +276,8 @@ function toolResponseToMarkdownSnippet(response: ToolCallResponse): string {
   if (
     response.status === ToolCallResponseStatus.PendingApproval ||
     response.status === ToolCallResponseStatus.Rejected ||
-    response.status === ToolCallResponseStatus.Running
+    response.status === ToolCallResponseStatus.Running ||
+    response.status === ToolCallResponseStatus.AwaitingUserInput
   ) {
     return `(${response.status})`
   }

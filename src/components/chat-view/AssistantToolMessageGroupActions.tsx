@@ -19,6 +19,12 @@ import {
   ChatAssistantMessage,
 } from '../../types/chat'
 
+import {
+  LLMDebugIconButton,
+  getLLMDebugTraceIdsForMessages,
+  hasLLMDebugCacheForTraceIds,
+  hasLLMDebugMetadataForMessages,
+} from './LLMDebugButton'
 import { getToolMessageContent } from './ToolMessage'
 
 function ActionIconButton({
@@ -132,7 +138,7 @@ function InsertButton({ messages }: { messages: AssistantToolMessageGroup }) {
       }
 
       const groupElement = buttonRef.current?.closest(
-        '.smtcmp-assistant-tool-message-group',
+        '.yolo-assistant-tool-message-group',
       )
       if (!groupElement) {
         return null
@@ -258,7 +264,23 @@ export default function AssistantToolMessageGroupActions({
   const isBranchDisabled = isDisabled || !onBranch
   const isEditDisabled = isDisabled || !onEdit || isEditing
   const isDeleteDisabled = isDisabled || !onDelete
-  const hasMoreActions = showBranch || showEdit || showDelete
+  const debugTraceIds = useMemo(
+    () => getLLMDebugTraceIdsForMessages(messages),
+    [messages],
+  )
+  const hasDebugCache = useMemo(
+    () => hasLLMDebugCacheForTraceIds(debugTraceIds),
+    [debugTraceIds],
+  )
+  // Surface the Debug entry even when the live cache is gone (e.g. after
+  // Obsidian restart) so the user understands data was captured but expired,
+  // rather than the entry silently disappearing from the more-actions menu.
+  const hadDebugTrace = useMemo(
+    () => hasLLMDebugMetadataForMessages(messages),
+    [messages],
+  )
+  const showDebugEntry = hasDebugCache || hadDebugTrace
+  const hasMoreActions = showBranch || showEdit || showDelete || showDebugEntry
 
   useEffect(() => {
     if (!isMoreOpen) {
@@ -299,7 +321,7 @@ export default function AssistantToolMessageGroupActions({
   return (
     <div
       ref={containerRef}
-      className={`smtcmp-assistant-message-actions${
+      className={`yolo-assistant-message-actions${
         isMoreOpen ? ' is-more-open' : ''
       }`}
     >
@@ -315,18 +337,27 @@ export default function AssistantToolMessageGroupActions({
       {showInsert && <InsertButton messages={messages} />}
       {showCopy && <CopyButton messages={messages} />}
       {hasMoreActions ? (
-        <div className="smtcmp-assistant-message-more-group">
+        <div className="yolo-assistant-message-more-group">
           <div
-            className={`smtcmp-assistant-message-inline-actions${
+            className={`yolo-assistant-message-inline-actions${
               isMoreOpen ? ' is-open' : ''
             }`}
             aria-hidden={isMoreOpen ? undefined : 'true'}
           >
-            <div className="smtcmp-assistant-message-inline-actions-inner">
+            <div className="yolo-assistant-message-inline-actions-inner">
+              {showDebugEntry && (
+                <LLMDebugIconButton
+                  messages={messages}
+                  traceIds={debugTraceIds}
+                  className="clickable-icon yolo-assistant-message-action-btn"
+                  tabIndex={isMoreOpen ? undefined : -1}
+                  onOpen={() => setIsMoreOpen(false)}
+                />
+              )}
               {showBranch && (
                 <ActionIconButton
                   label={branchLabel}
-                  className="clickable-icon smtcmp-assistant-message-action-btn"
+                  className="clickable-icon yolo-assistant-message-action-btn"
                   disabled={isBranchDisabled}
                   tabIndex={isMoreOpen ? undefined : -1}
                   onClick={() => {
@@ -340,7 +371,7 @@ export default function AssistantToolMessageGroupActions({
               {showEdit && (
                 <ActionIconButton
                   label={editLabel}
-                  className="clickable-icon smtcmp-assistant-message-action-btn"
+                  className="clickable-icon yolo-assistant-message-action-btn"
                   disabled={isEditDisabled}
                   tabIndex={isMoreOpen ? undefined : -1}
                   onClick={() => {
@@ -354,7 +385,7 @@ export default function AssistantToolMessageGroupActions({
               {showDelete && (
                 <ActionIconButton
                   label={deleteLabel}
-                  className="clickable-icon smtcmp-assistant-message-action-btn"
+                  className="clickable-icon yolo-assistant-message-action-btn"
                   disabled={isDeleteDisabled}
                   tabIndex={isMoreOpen ? undefined : -1}
                   onClick={() => {
@@ -375,7 +406,7 @@ export default function AssistantToolMessageGroupActions({
               }
               setIsMoreOpen((current) => !current)
             }}
-            className={`clickable-icon smtcmp-assistant-message-action-btn smtcmp-assistant-message-more-button${
+            className={`clickable-icon yolo-assistant-message-action-btn yolo-assistant-message-more-button${
               isMoreOpen ? ' is-open' : ''
             }`}
             aria-label={t('sidebar.chatList.moreActions', 'More actions')}

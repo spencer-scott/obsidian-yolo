@@ -7,7 +7,7 @@ import * as z from 'zod'
 
 import { useLanguage } from '../../../contexts/language-context'
 import { validateServerName } from '../../../core/mcp/tool-name-utils'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import {
   McpServerParameters,
   getMcpServerNamesFromInput,
@@ -20,12 +20,12 @@ import { ObsidianTextInput } from '../../common/ObsidianTextInput'
 import { ReactModal } from '../../common/ReactModal'
 
 type McpServerFormComponentProps = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   serverId?: string
 }
 
 export class AddMcpServerModal extends ReactModal<McpServerFormComponentProps> {
-  constructor(app: App, plugin: SmartComposerPlugin) {
+  constructor(app: App, plugin: YoloPlugin) {
     super({
       app: app,
       Component: McpServerFormComponent,
@@ -39,7 +39,7 @@ export class AddMcpServerModal extends ReactModal<McpServerFormComponentProps> {
 }
 
 export class EditMcpServerModal extends ReactModal<McpServerFormComponentProps> {
-  constructor(app: App, plugin: SmartComposerPlugin, editServerId: string) {
+  constructor(app: App, plugin: YoloPlugin, editServerId: string) {
     super({
       app: app,
       Component: McpServerFormComponent,
@@ -255,9 +255,9 @@ function McpServerFormComponent({
         />
       </ObsidianSetting>
 
-      <div className="setting-item smtcmp-settings-textarea-header smtcmp-mcp-parameters-header">
+      <div className="setting-item yolo-settings-textarea-header yolo-mcp-parameters-header">
         <div className="setting-item-info">
-          <div className="smtcmp-mcp-parameters-title-row">
+          <div className="yolo-mcp-parameters-title-row">
             <div className="setting-item-name">
               {t('settings.mcp.parametersField', 'Parameters')}
             </div>
@@ -265,33 +265,33 @@ function McpServerFormComponent({
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
                   <button
-                    className="smtcmp-mcp-parameters-info-icon"
+                    className="yolo-mcp-parameters-info-icon"
                     type="button"
                   >
                     <Info size={16} />
-                    <span className="smtcmp-mcp-sr-only">
+                    <span className="yolo-mcp-sr-only">
                       {t('settings.mcp.parametersFormatHelp', 'Format help')}
                     </span>
                   </button>
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
                   <Tooltip.Content
-                    className="smtcmp-tooltip-content smtcmp-tooltip-content--wide"
+                    className="yolo-tooltip-content yolo-tooltip-content--wide"
                     side="bottom"
                     align="start"
                     sideOffset={6}
                     collisionPadding={12}
                   >
-                    <div className="smtcmp-mcp-parameters-tooltip">
-                      <div className="smtcmp-mcp-parameters-tooltip-title">
+                    <div className="yolo-mcp-parameters-tooltip">
+                      <div className="yolo-mcp-parameters-tooltip-title">
                         {t(
                           'settings.mcp.parametersTooltipTitle',
                           'Format examples',
                         )}
                       </div>
 
-                      <div className="smtcmp-mcp-parameters-tooltip-line">
-                        <span className="smtcmp-mcp-parameters-tooltip-keyword">
+                      <div className="yolo-mcp-parameters-tooltip-line">
+                        <span className="yolo-mcp-parameters-tooltip-keyword">
                           {t(
                             'settings.mcp.parametersTooltipPreferred',
                             'Preferred',
@@ -300,8 +300,8 @@ function McpServerFormComponent({
                         {' stdio: {"transport":"stdio","command":"npx",...}'}
                       </div>
 
-                      <div className="smtcmp-mcp-parameters-tooltip-line">
-                        <span className="smtcmp-mcp-parameters-tooltip-keyword">
+                      <div className="yolo-mcp-parameters-tooltip-line">
+                        <span className="yolo-mcp-parameters-tooltip-keyword">
                           {t(
                             'settings.mcp.parametersTooltipPreferred',
                             'Preferred',
@@ -312,8 +312,8 @@ function McpServerFormComponent({
                         }
                       </div>
 
-                      <div className="smtcmp-mcp-parameters-tooltip-line">
-                        <span className="smtcmp-mcp-parameters-tooltip-keyword">
+                      <div className="yolo-mcp-parameters-tooltip-line">
+                        <span className="yolo-mcp-parameters-tooltip-keyword">
                           {t(
                             'settings.mcp.parametersTooltipCompatible',
                             'Compatible',
@@ -322,8 +322,8 @@ function McpServerFormComponent({
                         {' {"mcpServers":{"name":{...}}}'}
                       </div>
 
-                      <div className="smtcmp-mcp-parameters-tooltip-line">
-                        <span className="smtcmp-mcp-parameters-tooltip-keyword">
+                      <div className="yolo-mcp-parameters-tooltip-line">
+                        <span className="yolo-mcp-parameters-tooltip-keyword">
                           {t(
                             'settings.mcp.parametersTooltipCompatible',
                             'Compatible',
@@ -332,7 +332,7 @@ function McpServerFormComponent({
                         {' {"id":"name","parameters":{...}}'}
                       </div>
 
-                      <div className="smtcmp-mcp-parameters-tooltip-tip">
+                      <div className="yolo-mcp-parameters-tooltip-tip">
                         {t(
                           'settings.mcp.parametersTooltipTip',
                           'Tip: if mcpServers contains one server, Name will auto-fill.',
@@ -356,16 +356,16 @@ function McpServerFormComponent({
         value={parameters}
         placeholder={PARAMETERS_PLACEHOLDER}
         onChange={(e) => setParameters(e.target.value)}
-        className="smtcmp-mcp-server-modal-textarea"
+        className="yolo-mcp-server-modal-textarea"
         maxRows={20}
         minRows={PARAMETERS_PLACEHOLDER.split('\n').length}
       />
       {validationError !== null ? (
-        <div className="smtcmp-mcp-server-modal-validation smtcmp-mcp-server-modal-validation--error">
+        <div className="yolo-mcp-server-modal-validation yolo-mcp-server-modal-validation--error">
           {validationError}
         </div>
       ) : (
-        <div className="smtcmp-mcp-server-modal-validation smtcmp-mcp-server-modal-validation--success">
+        <div className="yolo-mcp-server-modal-validation yolo-mcp-server-modal-validation--success">
           {t('settings.mcp.validParameters', 'Valid parameters')}
         </div>
       )}

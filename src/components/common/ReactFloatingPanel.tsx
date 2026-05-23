@@ -3,7 +3,7 @@ import { Root, createRoot } from 'react-dom/client'
 
 import { LanguageProvider } from '../../contexts/language-context'
 import { PluginProvider } from '../../contexts/plugin-context'
-import SmartComposerPlugin from '../../main'
+import YoloPlugin from '../../main'
 
 export type FloatingPanelOptions = {
   title?: string
@@ -18,7 +18,7 @@ export type FloatingPanelOptions = {
 type FloatingPanelProps<T extends Record<string, unknown>> = {
   Component: React.ComponentType<T & { onClose: () => void }>
   props: T
-  plugin?: SmartComposerPlugin
+  plugin?: YoloPlugin
   options?: FloatingPanelOptions
 }
 
@@ -28,7 +28,7 @@ export class ReactFloatingPanel<T extends Record<string, unknown>> {
   private Component: React.ComponentType<T & { onClose: () => void }>
   private props: T
   private options?: FloatingPanelOptions
-  private plugin?: SmartComposerPlugin
+  private plugin?: YoloPlugin
 
   constructor({ Component, props, options, plugin }: FloatingPanelProps<T>) {
     this.Component = Component
@@ -41,7 +41,7 @@ export class ReactFloatingPanel<T extends Record<string, unknown>> {
     if (this.container) return
 
     this.container = document.createElement('div')
-    this.container.className = 'smtcmp-floating-panel-container'
+    this.container.className = 'yolo-floating-panel-container'
     document.body.appendChild(this.container)
 
     this.root = createRoot(this.container)
@@ -70,18 +70,18 @@ export class ReactFloatingPanel<T extends Record<string, unknown>> {
       const panelRef = useRef<HTMLDivElement>(null)
       const panelStyleVars = useMemo(() => {
         const vars: Record<string, string | undefined> = {
-          '--smtcmp-panel-top': `${Math.round(pos.y)}px`,
-          '--smtcmp-panel-left': `${Math.round(pos.x)}px`,
-          '--smtcmp-panel-width': `${Math.round(size.width)}px`,
+          '--yolo-panel-top': `${Math.round(pos.y)}px`,
+          '--yolo-panel-left': `${Math.round(pos.x)}px`,
+          '--yolo-panel-width': `${Math.round(size.width)}px`,
         }
-        vars['--smtcmp-panel-height'] =
+        vars['--yolo-panel-height'] =
           typeof size.height === 'number'
             ? `${Math.round(size.height)}px`
             : undefined
         return vars
       }, [pos.x, pos.y, size.height, size.width])
 
-      const panelClassName = 'smtcmp-floating-panel'
+      const panelClassName = 'yolo-floating-panel'
       const shouldCloseOnEscape = options?.closeOnEscape ?? true
       const shouldCloseOnOutsideClick = options?.closeOnOutsideClick ?? true
 
@@ -170,31 +170,31 @@ export class ReactFloatingPanel<T extends Record<string, unknown>> {
             {/* Minimal headerless mode: add a thin drag handle on top */}
             {options?.minimal ? (
               <div
-                className="smtcmp-floating-panel-drag-handle"
+                className="yolo-floating-panel-drag-handle"
                 onPointerDown={onHeaderPointerDown}
                 onPointerMove={onHeaderPointerMove}
                 onPointerUp={onHeaderPointerUp}
               />
             ) : (
               <div
-                className="smtcmp-floating-panel-header"
+                className="yolo-floating-panel-header"
                 onPointerDown={onHeaderPointerDown}
                 onPointerMove={onHeaderPointerMove}
                 onPointerUp={onHeaderPointerUp}
               >
-                <div className="smtcmp-floating-panel-title">
+                <div className="yolo-floating-panel-title">
                   {options?.title ?? ''}
                 </div>
                 <button
                   aria-label="Close"
-                  className="clickable-icon smtcmp-floating-panel-close"
+                  className="clickable-icon yolo-floating-panel-close"
                   onClick={onClose}
                 >
                   ✕
                 </button>
               </div>
             )}
-            <div className="smtcmp-floating-panel-body">
+            <div className="yolo-floating-panel-body">
               <this.Component {...componentProps} />
             </div>
 
@@ -203,7 +203,7 @@ export class ReactFloatingPanel<T extends Record<string, unknown>> {
               onPointerDown={onResizePointerDown}
               onPointerMove={onResizePointerMove}
               onPointerUp={onResizePointerUp}
-              className="smtcmp-floating-panel-resize-handle"
+              className="yolo-floating-panel-resize-handle"
               aria-label="Resize"
             />
           </div>

@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useLanguage } from '../../../contexts/language-context'
 import { extractEmbeddingVector } from '../../../core/llm/embedding-utils'
 import { getProviderClient } from '../../../core/llm/manager'
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { EmbeddingModel } from '../../../types/embedding-model.types'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
@@ -12,12 +12,12 @@ import { ObsidianTextInput } from '../../common/ObsidianTextInput'
 import { ReactModal } from '../../common/ReactModal'
 
 type EditEmbeddingModelModalComponentProps = {
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
   model: EmbeddingModel
 }
 
 export class EditEmbeddingModelModal extends ReactModal<EditEmbeddingModelModalComponentProps> {
-  constructor(app: App, plugin: SmartComposerPlugin, model: EmbeddingModel) {
+  constructor(app: App, plugin: YoloPlugin, model: EmbeddingModel) {
     super({
       app: app,
       Component: EditEmbeddingModelModalComponent,

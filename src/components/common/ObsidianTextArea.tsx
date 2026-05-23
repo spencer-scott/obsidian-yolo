@@ -75,7 +75,7 @@ export function ObsidianTextArea({
     if (!textAreaComponent || !autoResize) return
     const inputEl = textAreaComponent.inputEl
     inputEl.setCssProps({
-      '--smtcmp-textarea-auto-height': 'auto',
+      '--yolo-textarea-auto-height': 'auto',
     })
 
     const nextHeight = maxAutoResizeHeight
@@ -83,8 +83,8 @@ export function ObsidianTextArea({
       : inputEl.scrollHeight
 
     inputEl.setCssProps({
-      '--smtcmp-textarea-auto-height': `${nextHeight}px`,
-      '--smtcmp-textarea-auto-overflow-y':
+      '--yolo-textarea-auto-height': `${nextHeight}px`,
+      '--yolo-textarea-auto-overflow-y':
         maxAutoResizeHeight && inputEl.scrollHeight > maxAutoResizeHeight
           ? 'auto'
           : 'hidden',
@@ -127,7 +127,7 @@ export function ObsidianTextArea({
   return (
     <div
       ref={containerRef}
-      className={`smtcmp-textarea-container${containerClassName ? ' ' + containerClassName : ''}`}
+      className={`yolo-textarea-container${containerClassName ? ' ' + containerClassName : ''}`}
     />
   )
 }

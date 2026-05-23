@@ -21,4 +21,5 @@ export type QuickAskShowOptions = {
   editSelectionFrom?: { line: number; ch: number }
   selectionScope?: QuickAskSelectionScope
   autoSend?: boolean
+  initialAssistantId?: string
 }

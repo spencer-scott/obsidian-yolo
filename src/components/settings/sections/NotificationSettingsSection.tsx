@@ -101,14 +101,14 @@ export function NotificationSettingsSection() {
   }
 
   return (
-    <div className="smtcmp-models-block-content">
+    <div className="yolo-models-block-content">
       <ObsidianSetting
         name={t('settings.etc.notificationsEnabled', 'Enable notifications')}
         desc={t(
           'settings.etc.notificationsEnabledDesc',
           'Enable or disable reminders for Agent tasks.',
         )}
-        className="smtcmp-models-select-card"
+        className="yolo-models-select-card"
       >
         <ObsidianToggle
           value={settings.notificationOptions.enabled ?? false}
@@ -123,7 +123,7 @@ export function NotificationSettingsSection() {
               'settings.etc.notificationChannelDesc',
               'Choose to use sound, system notifications, or both.',
             )}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianDropdown
               value={settings.notificationOptions.channel ?? 'sound'}
@@ -147,7 +147,7 @@ export function NotificationSettingsSection() {
               'settings.etc.notificationTimingDesc',
               'Choose to always notify, or only when Obsidian is unfocused.',
             )}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianDropdown
               value={settings.notificationOptions.timing ?? 'when-unfocused'}
@@ -170,7 +170,7 @@ export function NotificationSettingsSection() {
               'settings.etc.notificationApprovalRequiredDesc',
               'Notify when YOLO pauses and waits for your approval on tool calls.',
             )}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianToggle
               value={
@@ -185,7 +185,7 @@ export function NotificationSettingsSection() {
               'settings.etc.notificationTaskCompletedDesc',
               'Notify when the current Agent task ends and is no longer waiting for approval.',
             )}
-            className="smtcmp-models-select-card"
+            className="yolo-models-select-card"
           >
             <ObsidianToggle
               value={settings.notificationOptions.notifyOnTaskCompleted ?? true}

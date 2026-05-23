@@ -1,7 +1,7 @@
 import {
   DEFAULT_TAB_COMPLETION_OPTIONS,
   type SettingMigration,
-  type SmartComposerSettings,
+  type YoloSettings,
 } from '../setting.types'
 
 const cloneDefaults = () => ({ ...DEFAULT_TAB_COMPLETION_OPTIONS })
@@ -12,7 +12,7 @@ export const migrateFrom24To25: SettingMigration['migrate'] = (data) => {
 
   const continuationOptionsRaw = newData.continuationOptions
   const continuationOptions:
-    | SmartComposerSettings['continuationOptions']
+    | YoloSettings['continuationOptions']
     | Record<string, unknown>
     | undefined =
     continuationOptionsRaw && typeof continuationOptionsRaw === 'object'

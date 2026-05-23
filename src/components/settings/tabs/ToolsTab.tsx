@@ -1,12 +1,12 @@
 import { App } from 'obsidian'
 import React from 'react'
 
-import SmartComposerPlugin from '../../../main'
+import YoloPlugin from '../../../main'
 import { McpSection } from '../sections/McpSection'
 
 type ToolsTabProps = {
   app: App
-  plugin: SmartComposerPlugin
+  plugin: YoloPlugin
 }
 
 export function ToolsTab({ app, plugin }: ToolsTabProps) {
