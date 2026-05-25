@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./scripts/update-yolo.sh --check      # Check for upstream updates only
 # =============================================================================
 
-REPO_DIR="${REPO_DIR:-$HOME/Developer/obsidian-yolo}"
+REPO_DIR="${REPO_DIR:-$HOME/Documents/obsidian/plugins/obsidian-yolo}"
 VAULT_DIR="${VAULT_DIR:-$HOME/Documents/obsidian}"
 PLUGIN_DIR="$VAULT_DIR/.obsidian/plugins/yolo"
 BRANCH="english-translation"
