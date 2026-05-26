@@ -163,8 +163,10 @@ function BlockBadge({
 }) {
   const Icon = getMentionableIcon(mentionable)
   const { t } = useLanguage()
-  const { count } = getBlockMentionableCountInfo(mentionable.content)
-  const unitLabel = t('common.characters', 'chars')
+  const info = getBlockMentionableCountInfo(mentionable.content)
+  const count = mentionable.contentCount ?? info.count
+  const unit = mentionable.contentUnit ?? info.unit
+  const unitLabel = t(`common.${unit}`, unit)
 
   // PDF selection: show "Page N" instead of character count
   const suffix =
@@ -248,8 +250,10 @@ function AssistantQuoteBadge({
 }) {
   const Icon = getMentionableIcon(mentionable)
   const { t } = useLanguage()
-  const { count } = getBlockMentionableCountInfo(mentionable.content)
-  const unitLabel = t('common.characters', 'chars')
+  const info = getBlockMentionableCountInfo(mentionable.content)
+  const count = mentionable.contentCount ?? info.count
+  const unit = mentionable.contentUnit ?? info.unit
+  const unitLabel = t(`common.${unit}`, unit)
   const quoteLabel = t('chat.assistantQuote.badge', 'Reply quote')
 
   return (

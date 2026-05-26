@@ -15,11 +15,13 @@ import { useSettings } from '../../../contexts/settings-context'
 import {
   BUILTIN_TOOL_CATEGORY_I18N,
   BUILTIN_TOOL_CATEGORY_ORDER,
+  type BuiltinToolCategory,
   FILE_OPS_GROUP_TOOL_NAME,
   MEMORY_OPS_GROUP_TOOL_NAME,
   WEB_OPS_GROUP_TOOL_NAME,
   WEB_OPS_SPLIT_ACTION_TOOL_NAMES,
   getBuiltinToolCategory,
+  getBuiltinToolDisplayIndex,
   getBuiltinToolUiMeta,
 } from '../../../core/agent/builtinToolUiMeta'
 import {
@@ -31,7 +33,15 @@ import {
   getExplicitlyEnabledAssistantToolNames,
   isAssistantToolEnabled,
 } from '../../../core/agent/tool-preferences'
-import { isLoadToolSchemasToolName } from '../../../core/agent/tool-selection'
+import {
+  applyDynamicToolDescriptions,
+  isLoadToolSchemasToolName,
+} from '../../../core/agent/tool-selection'
+import {
+  getJsSandboxSettings,
+  hasAnyJsSandboxCapEnabled,
+} from '../../../core/mcp/jsSandboxSettings'
+import { JS_SANDBOX_TOOL_NAME } from '../../../core/mcp/jsSandboxTool'
 import {
   LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
@@ -355,6 +365,7 @@ export function AgentsSectionContent({
   const tabsNavRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const localFsServerName = getLocalFileToolServerName()
+  const jsSandboxFullToolName = `${localFsServerName}__${JS_SANDBOX_TOOL_NAME}`
 
   const updateTabsGlider = useCallback(() => {
     const nav = tabsNavRef.current
@@ -799,7 +810,22 @@ export function AgentsSectionContent({
         if (rb !== undefined) return 1
         return a.localeCompare(b)
       })
-      .map(([key, value]) => ({ key, ...value }))
+      .map(([key, value]) => {
+        const builtinCategory = key.startsWith('__builtin:')
+          ? (key.slice('__builtin:'.length) as BuiltinToolCategory)
+          : null
+        const tools = builtinCategory
+          ? value.tools.slice().sort((toolA, toolB) => {
+              const idA = parseToolName(toolA.fullName).toolName
+              const idB = parseToolName(toolB.fullName).toolName
+              return (
+                getBuiltinToolDisplayIndex(builtinCategory, idA) -
+                getBuiltinToolDisplayIndex(builtinCategory, idB)
+              )
+            })
+          : value.tools
+        return { key, ...value, tools }
+      })
   }, [
     availableTools,
     draftAgent?.includeBuiltinTools,
@@ -898,8 +924,16 @@ export function AgentsSectionContent({
         : { agentId: currentAgentId, value: null, perTool: new Map() },
     )
 
+    // Resolve per-agent dynamic descriptions (js_eval's varies with the
+    // enabled extension capabilities) before estimating, so the token count
+    // tracks capability toggles instead of the static default the cached
+    // tool list carries. Same bridge selectAllowedTools uses at request time.
+    const resolvedTools = applyDynamicToolDescriptions(eligibleTools, {
+      jsSandboxSettings: getJsSandboxSettings(settings),
+    })
+
     void Promise.all(
-      eligibleTools.map((tool) =>
+      resolvedTools.map((tool) =>
         estimateToolDefaultContextTokens(tool).then(async (count) => {
           const disclosureMode = getAssistantToolDisclosureMode(
             draftAgent,
@@ -1471,10 +1505,27 @@ export function AgentsSectionContent({
                                 getAssistantToolApprovalMode(
                                   draftAgent,
                                   target,
+                                  {
+                                    jsSandboxSettings:
+                                      getJsSandboxSettings(settings),
+                                  },
                                 ) === 'full_access',
                             )
                               ? 'full_access'
                               : 'require_approval'
+                            // When JS isolated execution has any sensitive
+                            // capability enabled in the global settings,
+                            // `getAssistantToolApprovalMode` forces
+                            // require_approval regardless of the saved
+                            // preference. Surface that lock in the UI as a
+                            // read-only badge instead of a stale dropdown.
+                            const approvalLocked =
+                              hasAnyJsSandboxCapEnabled(
+                                getJsSandboxSettings(settings),
+                              ) &&
+                              tool.toggleTargets.some(
+                                (target) => target === jsSandboxFullToolName,
+                              )
 
                             return (
                               <div
@@ -1493,18 +1544,27 @@ export function AgentsSectionContent({
                                   {selected && (
                                     <>
                                       <div className="yolo-agent-tool-select">
-                                        <SimpleSelect
-                                          value={approvalMode}
-                                          options={toolApprovalOptions}
-                                          onChange={(value) =>
-                                            setToolApprovalMode(
-                                              tool.toggleTargets,
-                                              value as AssistantToolApprovalMode,
-                                            )
-                                          }
-                                          align="end"
-                                          contentClassName="yolo-agent-tool-select-menu"
-                                        />
+                                        {approvalLocked ? (
+                                          <span className="yolo-agent-tool-forced-approval">
+                                            {t(
+                                              'settings.agent.toolApprovalForced',
+                                              'Approval required',
+                                            )}
+                                          </span>
+                                        ) : (
+                                          <SimpleSelect
+                                            value={approvalMode}
+                                            options={toolApprovalOptions}
+                                            onChange={(value) =>
+                                              setToolApprovalMode(
+                                                tool.toggleTargets,
+                                                value as AssistantToolApprovalMode,
+                                              )
+                                            }
+                                            align="end"
+                                            contentClassName="yolo-agent-tool-select-menu"
+                                          />
+                                        )}
                                       </div>
                                     </>
                                   )}

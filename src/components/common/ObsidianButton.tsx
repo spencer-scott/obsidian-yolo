@@ -7,6 +7,7 @@ type ObsidianButtonProps = {
   text?: string
   icon?: string
   tooltip?: string
+  className?: string
   onClick: () => void
   cta?: boolean
   warning?: boolean
@@ -17,6 +18,7 @@ export function ObsidianButton({
   text,
   icon,
   tooltip,
+  className,
   onClick,
   cta,
   warning,
@@ -64,10 +66,14 @@ export function ObsidianButton({
     if (text) buttonComponent.setButtonText(text)
     if (icon) buttonComponent.setIcon(icon)
     if (tooltip) buttonComponent.setTooltip(tooltip)
+    if (className) buttonComponent.buttonEl.addClass(className)
     if (cta) buttonComponent.setCta()
     if (warning) buttonComponent.setWarning()
     buttonComponent.setDisabled(!!disabled)
-  }, [buttonComponent, text, icon, tooltip, cta, warning, disabled])
+    return () => {
+      if (className) buttonComponent.buttonEl.removeClass(className)
+    }
+  }, [buttonComponent, text, icon, tooltip, className, cta, warning, disabled])
 
   return <div ref={containerRef} />
 }

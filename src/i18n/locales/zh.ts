@@ -54,6 +54,7 @@ export const zh: TranslationKeys = {
     on: '开',
     off: '关',
     noResults: '未找到匹配项',
+    configure: '配置',
   },
 
   sidebar: {
@@ -231,6 +232,9 @@ export const zh: TranslationKeys = {
       duplicate: '复制',
       copySuffix: '（副本）',
       dragHandleAria: '拖拽排序',
+      fixedActionHint: '内置指令',
+      hideFixedAction: '在 Cursor Chat 中隐藏',
+      showFixedAction: '在 Cursor Chat 中显示',
     },
     chatPreferences: {
       title: '聊天偏好',
@@ -410,29 +414,30 @@ export const zh: TranslationKeys = {
       builtinMemoryOpsLabel: '记忆工具集',
       builtinMemoryOpsDesc: '新增、更新、删除记忆',
       builtinMemoryAddLabel: '新增记忆',
-      builtinMemoryAddDesc: '向全局或助手记忆新增一条内容，并自动分配编号。',
+      builtinMemoryAddDesc: '向全局或助手记忆新增一条内容，并自动分配编号',
       builtinMemoryUpdateLabel: '更新记忆',
-      builtinMemoryUpdateDesc: '根据编号更新已有记忆内容。',
+      builtinMemoryUpdateDesc: '根据编号更新已有记忆内容',
       builtinMemoryDeleteLabel: '删除记忆',
-      builtinMemoryDeleteDesc: '根据编号删除已有记忆内容。',
+      builtinMemoryDeleteDesc: '根据编号删除已有记忆内容',
       builtinOpenSkillLabel: '加载技能',
       builtinOpenSkillDesc: '加载技能 Markdown',
       builtinWebSearchLabel: '联网搜索',
       builtinWebSearchDesc:
-        '通过配置的搜索服务进行网页搜索，返回带摘要的结果列表。',
+        '通过配置的搜索服务进行网页搜索，返回带摘要的结果列表',
       builtinWebScrapeLabel: '抓取网页',
-      builtinWebScrapeDesc: '通过配置的搜索服务抓取单个 URL 的完整正文。',
+      builtinWebScrapeDesc: '通过配置的搜索服务抓取单个 URL 的完整正文',
       builtinWebOpsLabel: '联网搜索工具集',
       builtinWebOpsDesc: '网页搜索与正文抓取',
+      builtinJsEvalLabel: 'JavaScript 执行',
+      builtinJsEvalDesc: '在隔离环境中执行 JavaScript 代码',
       builtinDelegateExternalAgentLabel: '派遣外部 Agent',
       builtinDelegateExternalAgentDesc:
-        '将复杂任务派遣给本机已安装的 CLI Agent（Codex / Claude Code）。',
+        '将复杂任务派遣给本机已安装的 CLI Agent（Codex / Claude Code）',
       builtinTodoWriteLabel: '任务清单',
       builtinTodoWriteDesc:
-        '让 Agent 自己拆分并跟踪多步任务的进度（仅 Agent 模式）。',
+        '让 Agent 自己拆分并跟踪多步任务的进度（仅 Agent 模式）',
       builtinAskUserQuestionLabel: '向用户提问',
-      builtinAskUserQuestionDesc:
-        '在缺少必要信息时向用户提问，等待回答后继续。',
+      builtinAskUserQuestionDesc: '在缺少必要信息时向用户提问，等待回答后继续',
       editorDefaultName: '新建 Agent',
       editorIntro: '配置此 Agent 的能力、模型与行为。',
       editorTabProfile: '资料',
@@ -473,6 +478,7 @@ export const zh: TranslationKeys = {
       toolApproval: '审批',
       toolApprovalFullAccess: '完全放行',
       toolApprovalRequire: '需要审批',
+      toolApprovalForced: '强制审批',
       toolDisclosureAlways: '常驻上下文',
       toolDisclosureOnDemand: '按需披露',
       editorEnabled: '已启用',
@@ -534,6 +540,46 @@ export const zh: TranslationKeys = {
       autoContextCompactionThresholdRatioPercent: '上下文窗口占用（%）',
       autoContextCompactionThresholdRatioPercentDesc:
         '当 prompt_tokens 除以当前聊天模型配置的最大上下文窗口达到该比例时触发（需在模型中填写 max context）。',
+      jsSandboxExtTitle: '扩展能力',
+      jsSandboxAllowFetch: '允许网络请求',
+      jsSandboxAllowFetchDesc:
+        '允许脚本发起浏览器网络请求；遇到浏览器跨域限制时，可使用单独的 $fetch 宿主请求。',
+      jsSandboxAllowFetchRisk:
+        '风险：脚本可访问浏览器能到达的任何 URL —— 公开 API、你的本地网络、内网服务，乃至 LLM 服务本身。脚本中持有的任何数据（包括你传进来的 vault 内容）都可能被外发。仅在你完全信任此 Agent 时开启。',
+      jsSandboxAllowFetchConfirm:
+        '开启后，脚本可以请求浏览器允许访问的网络地址；遇到浏览器跨域限制时，也可以使用单独的 YOLO 宿主请求。仅在你信任此 Agent 时继续。是否继续？',
+      jsSandboxAllowVaultRead: '允许读取库文件',
+      jsSandboxAllowVaultReadDesc:
+        '允许脚本按路径读取任意库文件。此能力不受 Agent 目录限制约束。风险：脚本可能将笔记内容传递给外部服务。',
+      jsSandboxAllowVaultReadConfirm:
+        '开启后，AI 生成的脚本可按路径读取 vault 中任意文件，内容将进入 LLM 上下文。请确认您信任此 Agent 生成的脚本后再继续。',
+      jsSandboxAllowDbQuery: '允许知识库查询',
+      jsSandboxAllowDbQueryDesc:
+        '允许脚本查询向量数据库（语义搜索、关键词搜索、路径查找）。此能力不受 Agent 目录限制约束。',
+      jsSandboxAllowDbQueryConfirm:
+        '开启后，AI 生成的脚本可搜索 vault 索引并获取文件内容。是否继续？',
+      jsSandboxAllowExternalScripts: '允许加载外部脚本',
+      jsSandboxAllowExternalScriptsDesc:
+        '允许脚本加载并运行远程 JavaScript，同时打开这些脚本常用的浏览器能力。',
+      jsSandboxAllowExternalScriptsRisk:
+        '极高风险：Agent 可以以浏览器标签页同等权限拉取并执行任意远程 JavaScript，等同于在你的 Obsidian 进程内运行陌生人写的代码。脚本接触到的 vault 内容都可能被外发。仅在完全信任此 Agent 和代码来源时开启。',
+      jsSandboxAllowExternalScriptsConfirm:
+        '开启后，Agent 可以在 Obsidian 内加载并运行远程 JavaScript。这个能力很强也很危险；仅在你完全信任此 Agent 和代码来源时继续。是否继续？',
+      jsSandboxConfirmEnableTitle: '开启扩展能力',
+      jsExecApprovalForced: '启用后强制审批',
+      jsSandboxTimeoutMs: '执行超时（毫秒）',
+      jsSandboxTimeoutMsDesc: '单次脚本调用的最大运行时间。范围 {min}–{max}。',
+      jsSandboxOutputMaxKb: '工具结果大小上限（KB）',
+      jsSandboxOutputMaxKbDesc:
+        '返回给模型的 JSON 结果上限。超过部分会被截断并附带提示。过大的响应会消耗模型上下文 token，可能超出上下文窗口并增加成本。范围 {min}–{max} KB。',
+      jsSandboxVaultReadMaxKb: '读取大小上限（KB）',
+      jsSandboxVaultReadMaxKbDesc:
+        '单次读取的返回上限。文本超出会被截断并附带提示；较大的二进制文件会直接拒绝。范围 {min}–{max} KB。',
+      jsSandboxDbMaxLimit: '单次查询最大行数',
+      jsSandboxDbMaxLimitDesc: '知识库查询单次返回行数的上限。范围 1–100。',
+    },
+    jsSandbox: {
+      openSettings: '配置 JavaScript 执行',
     },
     webSearch: {
       modalTitle: '联网搜索设置',
@@ -1312,6 +1358,7 @@ export const zh: TranslationKeys = {
     },
     sendMessage: '发送消息',
     newChat: '新建聊天',
+    untitledConversation: '新对话',
     continueResponse: '继续生成',
     stopGeneration: '停止生成',
     queueMessage: {
@@ -1556,7 +1603,7 @@ export const zh: TranslationKeys = {
       reject: '拒绝',
       abort: '停止执行',
       alwaysAllowThisTool: '始终允许此工具',
-      allowForThisChat: '仅本次对话允许',
+      allowForThisChat: '本对话内允许',
     },
     toolSummary: {
       todoWrite: {

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../contexts/language-context'
 import type { AgentConversationRunSummary } from '../../core/agent/service'
 import type { ChatConversationMetadata } from '../../database/json/chat/types'
+import { getConversationDisplayTitle } from '../../hooks/useChatHistory'
 import { useChatManager } from '../../hooks/useJsonManagers'
 import type { SerializedChatMessage } from '../../types/chat'
 import type { ContentPart } from '../../types/llm/request'
@@ -65,6 +66,7 @@ function TitleInput({
 
 function ChatListItem({
   title,
+  displayTitle,
   runSummary,
   isFocused,
   shouldScrollIntoView,
@@ -86,6 +88,7 @@ function ChatListItem({
   onCloseMoreMenu,
 }: {
   title: string
+  displayTitle?: string
   runSummary?: AgentConversationRunSummary
   isFocused: boolean
   shouldScrollIntoView: boolean
@@ -165,7 +168,7 @@ function ChatListItem({
           }`}
         >
           <span className="yolo-chat-list-dropdown-item-title-text">
-            {title}
+            {displayTitle ?? title}
           </span>
           {runSummary &&
           (runSummary.isRunning || runSummary.isWaitingApproval) ? (
@@ -423,16 +426,23 @@ export function ChatListDropdown({
     [searchQuery],
   )
 
+  const untitledFallback = t('chat.untitledConversation', 'New chat')
+  const getDisplayTitle = useCallback(
+    (chat: ChatConversationMetadata) =>
+      getConversationDisplayTitle(chat.title, untitledFallback),
+    [untitledFallback],
+  )
+
   const titleMatches = useMemo(() => {
     if (!normalizedQuery) return new Set<string>()
     const matches = new Set<string>()
     chatList.forEach((chat) => {
-      if (chat.title.toLowerCase().includes(normalizedQuery)) {
+      if (getDisplayTitle(chat).toLowerCase().includes(normalizedQuery)) {
         matches.add(chat.id)
       }
     })
     return matches
-  }, [chatList, normalizedQuery])
+  }, [chatList, normalizedQuery, getDisplayTitle])
 
   const pinnedSortedChatList = useMemo(() => {
     if (chatList.length === 0) return chatList
@@ -804,6 +814,7 @@ export function ChatListDropdown({
                 <ChatListItem
                   key={chat.id}
                   title={chat.title}
+                  displayTitle={getDisplayTitle(chat)}
                   runSummary={runSummariesByConversationId.get(chat.id)}
                   isFocused={
                     focusedConversationId === chat.id && !isHoveringArchiveRow

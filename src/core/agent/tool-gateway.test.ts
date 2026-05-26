@@ -12,6 +12,7 @@ describe('AgentToolGateway', () => {
   it('auto executes tools with full access', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn().mockReturnValue(true),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -67,6 +68,7 @@ describe('AgentToolGateway', () => {
           inputSchema: { type: 'object', properties: {} },
         },
       ]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -118,6 +120,7 @@ describe('AgentToolGateway', () => {
   it('keeps tools pending when approval is required', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn().mockReturnValue(false),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -153,6 +156,7 @@ describe('AgentToolGateway', () => {
   it('allows conversation-level approval to bypass per-tool approval', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn().mockReturnValue(true),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -184,6 +188,7 @@ describe('AgentToolGateway', () => {
         status: ToolCallResponseStatus.Success,
         data: { type: 'text', text: '{}' },
       }),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -229,6 +234,7 @@ describe('AgentToolGateway', () => {
   it('rejects tool calls when tools are disabled', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn(),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -259,6 +265,7 @@ describe('AgentToolGateway', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn().mockReturnValue(true),
       callTool,
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -356,6 +363,7 @@ describe('AgentToolGateway', () => {
   it('rejects tool calls outside the allowed tool list', () => {
     const mcpManager = {
       isToolExecutionAllowed: jest.fn(),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const gateway = new AgentToolGateway(mcpManager, {
@@ -398,6 +406,7 @@ describe('AgentToolGateway', () => {
             inputSchema: realToolSchema,
           },
         ]),
+        getJsSandboxSettings: jest.fn().mockReturnValue({}),
       }) as unknown as McpManager
 
     const buildGateway = (mcpManager: McpManager, apiType?: 'gemini') =>

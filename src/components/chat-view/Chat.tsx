@@ -17,7 +17,6 @@ import type { CSSProperties } from 'react'
 import { flushSync } from 'react-dom'
 import { v4 as uuidv4 } from 'uuid'
 
-import { DEFAULT_UNTITLED_CONVERSATION_TITLE } from '../../constants'
 import { useApp } from '../../contexts/app-context'
 import { useLanguage } from '../../contexts/language-context'
 import { useMcp } from '../../contexts/mcp-context'
@@ -32,11 +31,15 @@ import { DEFAULT_ASSISTANT_ID } from '../../core/agent/default-assistant'
 import type { AgentConversationRunSummary } from '../../core/agent/service'
 import { materializeTextEditPlan } from '../../core/edits/textEditEngine'
 import { parseTextEditPlan } from '../../core/edits/textEditPlan'
+import { captureLLMDebugOperation } from '../../core/llm/debugCapture'
 import { readEditReviewSnapshot } from '../../database/json/chat/editReviewSnapshotStore'
 import type { ChatLeafPlacement } from '../../features/chat/chatLeafSessionManager'
 import { selectionHighlightController } from '../../features/editor/selection-highlight/selectionHighlightController'
 import { useChatHighlightSession } from '../../features/editor/selection-highlight/useChatHighlightSession'
-import { useChatHistory } from '../../hooks/useChatHistory'
+import {
+  getConversationDisplayTitle,
+  useChatHistory,
+} from '../../hooks/useChatHistory'
 import { useChatManager } from '../../hooks/useJsonManagers'
 import type { ApplyViewState } from '../../types/apply-view.types'
 import type {
@@ -254,6 +257,26 @@ const updateToolCallResponseInMessages = ({
       ),
     }
   })
+
+const findDebugTraceIdForToolCall = (
+  messages: ChatMessage[],
+  toolCallId: string,
+): string | undefined => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role !== 'assistant') {
+      continue
+    }
+    const matches = message.toolCallRequests?.some(
+      (toolCall) => toolCall.id === toolCallId,
+    )
+    if (matches) {
+      return message.metadata?.llmDebugTraceId
+    }
+  }
+
+  return undefined
+}
 
 const offsetToSelectionPosition = (content: string, offset: number) => {
   const clampedOffset = Math.max(0, Math.min(offset, content.length))
@@ -594,16 +617,15 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null)
   const [currentConversationId, setCurrentConversationId] =
     useState<string>(uuidv4())
+  const untitledFallback = t('chat.untitledConversation', 'New chat')
   const currentConversationTitle = useMemo(() => {
-    if (!currentConversationId) {
-      return DEFAULT_UNTITLED_CONVERSATION_TITLE
-    }
-
-    return (
-      chatList.find((conversation) => conversation.id === currentConversationId)
-        ?.title ?? DEFAULT_UNTITLED_CONVERSATION_TITLE
-    )
-  }, [chatList, currentConversationId])
+    const rawTitle = currentConversationId
+      ? chatList.find(
+          (conversation) => conversation.id === currentConversationId,
+        )?.title
+      : undefined
+    return getConversationDisplayTitle(rawTitle, untitledFallback)
+  }, [chatList, currentConversationId, untitledFallback])
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>(
     initialReasoningLevel,
   )
@@ -824,16 +846,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   // Per-conversation model id (do NOT write back to global settings)
   const conversationModelIdRef = useRef<Map<string, string>>(new Map())
-  const [conversationModelId, setConversationModelId] = useState<string>(
-    () => {
-      const initialAssistantId =
-        settings.currentAssistantId ?? DEFAULT_ASSISTANT_ID
-      const initialAssistant = settings.assistants.find(
-        (assistant) => assistant.id === initialAssistantId,
-      )
-      return initialAssistant?.modelId ?? settings.chatModelId
-    },
-  )
+  const [conversationModelId, setConversationModelId] = useState<string>(() => {
+    const initialAssistantId =
+      settings.currentAssistantId ?? DEFAULT_ASSISTANT_ID
+    const initialAssistant = settings.assistants.find(
+      (assistant) => assistant.id === initialAssistantId,
+    )
+    return initialAssistant?.modelId ?? settings.chatModelId
+  })
 
   const currentConversationModel = useMemo(() => {
     return (
@@ -2394,9 +2414,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         return
       }
 
-      const sourceTitle =
-        chatList.find((chat) => chat.id === currentConversationId)?.title ??
-        t('chat.newChat', 'New chat')
+      const sourceTitle = getConversationDisplayTitle(
+        chatList.find((chat) => chat.id === currentConversationId)?.title,
+        t('chat.untitledConversation', 'New chat'),
+      )
       const branchTitle = `${sourceTitle} (copy)`
 
       const newConversationId = uuidv4()
@@ -2627,27 +2648,42 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           )
         }
 
-        const result = await mcpManager.callTool({
-          name: request.name,
-          args,
-          id: request.id,
-          conversationId,
-          conversationMessages: runningMessages,
-          roundId: toolMessageId,
-          // Pass the model that produced this tool call (recorded as
-          // branchModelId on the tool message when the LLM turn ran), not the
-          // current conversation model — the user may have switched models
-          // after the call was generated but before approving it, and we
-          // need capability-gated resolution (e.g. fs_read modality) to
-          // match the model whose schema the call was emitted under.
-          // Falls back to the conversation model for legacy tool messages
-          // without branchModelId metadata.
-          chatModelId:
-            toolMessage.metadata?.branchModelId ?? conversationModelId,
-          workspaceScope:
-            chatMode === 'agent'
-              ? selectedAssistant?.workspaceScope
-              : undefined,
+        const result = await captureLLMDebugOperation({
+          traceId: findDebugTraceIdForToolCall(runningMessages, request.id),
+          transportMode: 'mcp',
+          url: `mcp://${request.name}`,
+          method: 'callTool',
+          requestBody: {
+            name: request.name,
+            args,
+            id: request.id,
+            conversationId,
+            roundId: toolMessageId,
+            chatModelId:
+              toolMessage.metadata?.branchModelId ?? conversationModelId,
+          },
+          responseContentType: 'application/json',
+          run: () =>
+            mcpManager.callTool({
+              name: request.name,
+              args,
+              id: request.id,
+              conversationId,
+              conversationMessages: runningMessages,
+              roundId: toolMessageId,
+              // Pass the model that produced this tool call (recorded as
+              // branchModelId on the tool message when the LLM turn ran), not
+              // the current conversation model. The user may have switched
+              // models before approving it, so capability-gated resolution must
+              // match the schema used when the call was emitted.
+              chatModelId:
+                toolMessage.metadata?.branchModelId ?? conversationModelId,
+              workspaceScope:
+                chatMode === 'agent'
+                  ? selectedAssistant?.workspaceScope
+                  : undefined,
+            }),
+          getResponseBody: (response) => response,
         })
 
         const resolvedMessages = updateToolCallResponseInMessages({

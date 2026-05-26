@@ -310,10 +310,21 @@ export function getBlockMentionableCountInfo(
   return { count, unit }
 }
 
+export type MentionableUnitLabels = Partial<
+  Record<MentionableBlockUnit, string>
+>
+
+function resolveUnitLabel(
+  unit: MentionableBlockUnit,
+  unitLabels?: MentionableUnitLabels,
+): string {
+  return unitLabels?.[unit] ?? unit
+}
+
 export function getMentionableName(
   mentionable: Mentionable,
   options?: {
-    unitLabel?: string
+    unitLabels?: MentionableUnitLabels
     currentFileLabel?: string
   },
 ): string {
@@ -323,17 +334,17 @@ export function getMentionableName(
     case 'folder':
       return mentionable.folder.name
     case 'block': {
-      const count =
-        mentionable.contentCount ??
-        getBlockMentionableCountInfo(mentionable.content).count
-      const unitLabel = options?.unitLabel ?? 'chars'
+      const info = getBlockMentionableCountInfo(mentionable.content)
+      const count = mentionable.contentCount ?? info.count
+      const unit = mentionable.contentUnit ?? info.unit
+      const unitLabel = resolveUnitLabel(unit, options?.unitLabels)
       return `${mentionable.file.name} (${count} ${unitLabel})`
     }
     case 'assistant-quote': {
-      const count =
-        mentionable.contentCount ??
-        getBlockMentionableCountInfo(mentionable.content).count
-      const unitLabel = options?.unitLabel ?? 'chars'
+      const info = getBlockMentionableCountInfo(mentionable.content)
+      const count = mentionable.contentCount ?? info.count
+      const unit = mentionable.contentUnit ?? info.unit
+      const unitLabel = resolveUnitLabel(unit, options?.unitLabels)
       return `Assistant quote (${count} ${unitLabel})`
     }
     case 'url':

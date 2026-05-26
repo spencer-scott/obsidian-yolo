@@ -61,6 +61,7 @@ export const estimateContinuationRequestContextTokens = async ({
     toolPreferences,
     apiType,
     enableToolDisclosure,
+    jsSandboxSettings: mcpManager.getJsSandboxSettings(),
   })
 
   const requestMessages = await requestContextBuilder.generateRequestMessages({

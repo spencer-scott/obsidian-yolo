@@ -168,6 +168,7 @@ export const estimateContextBreakdown = async ({
     toolPreferences,
     apiType,
     enableToolDisclosure,
+    jsSandboxSettings: mcpManager.getJsSandboxSettings(),
   })
 
   const sections = await requestContextBuilder.generateRequestSections({

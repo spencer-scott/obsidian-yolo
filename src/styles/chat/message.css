@@ -1330,10 +1330,6 @@ button.yolo-llm-debug-modal-button:focus-visible {
   /* Pin box-sizing so `100cqi` and flex content area agree unambiguously
      (border included in width, padding outside content area). */
   box-sizing: border-box;
-  box-shadow:
-    0 1px 3px
-      color-mix(in srgb, var(--background-modifier-box-shadow) 15%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
   /* Establish a query container so the toggle can adapt to its own
      rendered width (used by the @container rule at the bottom) AND so
      descendants can read its content inline-size via `100cqi`. */

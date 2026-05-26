@@ -2,6 +2,8 @@ import type { AssistantToolPreference } from '../../types/assistant.types'
 import type { RequestTool } from '../../types/llm/request'
 import type { McpTool } from '../../types/mcp.types'
 import type { LLMProviderApiType } from '../../types/provider.types'
+import { type JsSandboxSettings } from '../mcp/jsSandboxSettings'
+import { JS_SANDBOX_TOOL_NAME, getJsSandboxTool } from '../mcp/jsSandboxTool'
 import {
   LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
@@ -140,6 +142,34 @@ export const buildRequestTools = (
   }))
 }
 
+/**
+ * Rewrite tools whose schema depends on global settings. Currently only
+ * `js_eval`, whose description and `timeoutMs` input bound both name the
+ * exact `settings.jsSandbox` values in effect (network / vault read / $db /
+ * external scripts + per-call timeout cap).
+ *
+ * The tool list from `listAvailableTools` is cached and settings-agnostic —
+ * this is the single bridge that rebuilds the live tool spec. Every consumer
+ * that surfaces a tool description/schema to the model OR estimates its
+ * token cost must route through here, otherwise the shown/estimated surface
+ * drifts from what the request actually sends.
+ */
+export function applyDynamicToolDescriptions(
+  tools: McpTool[],
+  ctx: { jsSandboxSettings: JsSandboxSettings },
+): McpTool[] {
+  const jsSandboxFqn = `${getLocalFileToolServerName()}${McpManager.TOOL_NAME_DELIMITER}${JS_SANDBOX_TOOL_NAME}`
+  return tools.map((tool) => {
+    if (tool.name !== jsSandboxFqn) return tool
+    const live = getJsSandboxTool(ctx.jsSandboxSettings)
+    return {
+      ...tool,
+      description: live.description,
+      inputSchema: live.inputSchema,
+    }
+  })
+}
+
 export const selectAllowedTools = ({
   availableTools,
   allowedToolNames,
@@ -148,6 +178,7 @@ export const selectAllowedTools = ({
   toolPreferences,
   apiType,
   enableToolDisclosure = true,
+  jsSandboxSettings = {},
 }: {
   availableTools: McpTool[]
   allowedToolNames?: string[]
@@ -156,6 +187,7 @@ export const selectAllowedTools = ({
   toolPreferences?: Record<string, AssistantToolPreference>
   apiType?: LLMProviderApiType | null
   enableToolDisclosure?: boolean
+  jsSandboxSettings?: JsSandboxSettings
 }): {
   filteredTools: McpTool[]
   hasTools: boolean
@@ -170,18 +202,21 @@ export const selectAllowedTools = ({
     ? new Set(allowedSkillNames.map((name) => name.toLowerCase()))
     : undefined
 
-  const filteredTools = availableTools.filter((tool) => {
-    if (!enableToolDisclosure && isLoadToolSchemasToolName(tool.name)) {
-      return false
-    }
+  const filteredTools = applyDynamicToolDescriptions(
+    availableTools.filter((tool) => {
+      if (!enableToolDisclosure && isLoadToolSchemasToolName(tool.name)) {
+        return false
+      }
 
-    return isToolAllowed({
-      toolName: tool.name,
-      allowedToolNames: normalizedAllowedToolNames,
-      allowedSkillIds: normalizedAllowedSkillIds,
-      allowedSkillNames: normalizedAllowedSkillNames,
-    })
-  })
+      return isToolAllowed({
+        toolName: tool.name,
+        allowedToolNames: normalizedAllowedToolNames,
+        allowedSkillIds: normalizedAllowedSkillIds,
+        allowedSkillNames: normalizedAllowedSkillNames,
+      })
+    }),
+    { jsSandboxSettings },
+  )
   const assistantLike = {
     toolPreferences,
     enabledToolNames: normalizedAllowedToolNames

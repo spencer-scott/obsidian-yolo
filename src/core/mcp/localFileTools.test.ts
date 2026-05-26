@@ -894,7 +894,7 @@ describe('local fs tool action helpers', () => {
       args: {
         mode: 'keyword',
         scope: 'files',
-        query: 'workflow process flow',
+        query: 'workflow special overview',
         maxResults: 10,
       },
     })
@@ -904,12 +904,15 @@ describe('local fs tool action helpers', () => {
       throw new Error('expected success')
     }
 
+    // Jan matches all three tokens (workflow + special + overview).
+    // Feb matches two (workflow + special) — no 'overview' in its filename.
+    // General-Note matches none and is correctly excluded.
     expect(JSON.parse(result.text)).toEqual({
       tool: 'fs_search',
       requestedMode: 'keyword',
       effectiveMode: 'keyword',
       scope: 'files',
-      query: 'workflow process flow',
+      query: 'workflow special overview',
       path: '',
       results: [
         {

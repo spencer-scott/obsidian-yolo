@@ -163,6 +163,19 @@
   gap: 4px;
 }
 
+.yolo-agent-tool-forced-approval {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
 .yolo-agent-tool-select .yolo-simple-select__trigger {
   width: auto;
   min-width: 0;
@@ -1740,4 +1753,291 @@ button.yolo-agent-chip--more:hover {
   display: block;
   width: 14px;
   height: 14px;
+}
+
+.yolo-js-exec-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 48px));
+}
+
+.yolo-js-exec-modal .modal-title {
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.yolo-js-exec-modal .modal-content {
+  padding: var(--size-4-2) var(--size-4-5) var(--size-4-4);
+}
+
+.yolo-js-exec-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-4);
+}
+
+.yolo-js-exec-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+}
+
+.yolo-js-exec-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--size-4-3);
+}
+
+.yolo-js-exec-section-head h3 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-large);
+  line-height: 1.3;
+}
+
+.yolo-js-exec-setting.setting-item,
+.yolo-js-exec-cap-setting.setting-item {
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.yolo-js-exec-timeout.setting-item {
+  align-items: center;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent;
+}
+
+.yolo-js-exec-timeout .setting-item-info {
+  padding-right: var(--size-4-4);
+}
+
+.yolo-js-exec-timeout input[type='number'] {
+  width: 132px;
+  text-align: right;
+}
+
+.yolo-js-exec-setting-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.yolo-js-exec-risk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--text-warning, var(--text-normal));
+  background: color-mix(
+    in srgb,
+    var(--color-yellow, #d6a100) 12%,
+    var(--background-primary)
+  );
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--color-yellow, #d6a100) 24%,
+      var(--background-modifier-border)
+    );
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}
+
+.yolo-js-exec-cap-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+
+.yolo-js-exec-cap-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: var(--size-4-3);
+  padding: var(--size-4-3) var(--size-4-4);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.yolo-js-exec-cap-card.is-enabled {
+  border-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 28%,
+    var(--background-modifier-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 5%,
+    var(--background-primary)
+  );
+}
+
+.yolo-js-exec-cap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.yolo-js-exec-cap-card.is-enabled .yolo-js-exec-cap-icon {
+  color: var(--text-accent);
+  border-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 28%,
+    var(--background-modifier-border)
+  );
+}
+
+.yolo-js-exec-cap-body {
+  min-width: 0;
+}
+
+/* Red risk warning block beneath the capability toggle. Shown for high-risk
+   caps (network, external scripts) so the user can't miss the warning when
+   skimming. */
+.yolo-js-exec-cap-risk {
+  display: flex;
+  gap: var(--size-2-2);
+  align-items: flex-start;
+  margin-top: var(--size-2-2);
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: 6px;
+  color: var(--text-error);
+  background: color-mix(
+    in srgb,
+    var(--color-red, var(--text-error)) 8%,
+    var(--background-primary)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--color-red, var(--text-error)) 30%, transparent);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.45;
+}
+
+.yolo-js-exec-cap-risk > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.yolo-js-exec-cap-setting.setting-item {
+  align-items: flex-start;
+}
+
+.yolo-js-exec-cap-setting .setting-item-name,
+.yolo-js-exec-timeout .setting-item-name {
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-medium);
+}
+
+.yolo-js-exec-cap-setting .setting-item-description,
+.yolo-js-exec-timeout .setting-item-description {
+  max-width: 560px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.yolo-js-exec-nested {
+  margin-top: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3) var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.yolo-js-exec-nested .setting-item,
+.yolo-js-exec-cap-card .setting-item {
+  padding: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.yolo-js-exec-nested .setting-item:not(:last-child) {
+  margin-bottom: var(--size-4-3);
+}
+
+.yolo-js-exec-nested > .setting-item:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* The timeout / output-size rows inside the top section need the same
+   vertical breathing room as the bordered cap-card rows. Without this
+   the rows touch each other because `.yolo-js-exec-setting.setting-item`
+   forces padding: 0. */
+.yolo-js-exec-modal .yolo-js-exec-section > .setting-item + .setting-item {
+  margin-top: var(--size-4-3);
+}
+
+.yolo-js-exec-nested .setting-item-control input[type='number'] {
+  width: 96px;
+  text-align: right;
+}
+
+.yolo-js-exec-textarea-header.setting-item {
+  margin-top: var(--size-4-2) !important;
+  margin-bottom: var(--size-2-2) !important;
+}
+
+.yolo-js-exec-textarea.setting-item {
+  display: block;
+  padding: 0;
+  border: 0 !important;
+}
+
+.yolo-js-exec-textarea textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .yolo-js-exec-modal {
+    width: calc(100vw - 16px);
+  }
+
+  .yolo-js-exec-section-head {
+    flex-direction: column;
+  }
+
+  .yolo-js-exec-cap-card {
+    grid-template-columns: 1fr;
+  }
+
+  .yolo-js-exec-cap-setting.setting-item,
+  .yolo-js-exec-timeout.setting-item {
+    align-items: stretch;
+  }
+}
+
+.yolo-js-exec-config-button {
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+}
+
+.yolo-js-exec-config-button svg {
+  width: 18px;
+  height: 18px;
 }

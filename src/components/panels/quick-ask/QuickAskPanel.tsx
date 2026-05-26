@@ -83,6 +83,7 @@ import { getChatSurfacePreset } from '../../chat-view/chat-surface-presets'
 import { SharedConversationSurface } from '../../chat-view/SharedConversationSurface'
 import { useAutoScroll } from '../../chat-view/useAutoScroll'
 import UserMessageItem from '../../chat-view/UserMessageItem'
+import { YoloDropdownContent } from '../../common/popover'
 
 import { AssistantSelectMenu } from './AssistantSelectMenu'
 import { ModeSelect, QuickAskMode } from './ModeSelect'
@@ -268,8 +269,12 @@ export function QuickAskPanel({
   const hasDockedRef = useRef(false)
   const enableAutoDock =
     settings.continuationOptions.quickAskAutoDockToTopRight ?? true
-  const mentionableUnitLabel = useMemo(
-    () => t('common.characters', 'chars'),
+  const mentionableUnitLabels = useMemo(
+    () => ({
+      characters: t('common.characters', 'chars'),
+      words: t('common.words', 'words'),
+      wordsCharacters: t('common.wordsCharacters', 'words/chars'),
+    }),
     [t],
   )
   const [mode, setMode] = useState<QuickAskMode>(() =>
@@ -1359,7 +1364,7 @@ export function QuickAskPanel({
       const editorState = createQuickAskEditorState({
         prompt: initialInput ?? '',
         mentionables: initialMentionables ?? [],
-        mentionableUnitLabel,
+        mentionableUnitLabels,
       })
       editor.setEditorState(editor.parseEditorState(editorState))
       // setEditorState resets the selection and blurs contentEditable; restore focus/cursor here
@@ -1370,7 +1375,7 @@ export function QuickAskPanel({
     return () => {
       cancelled = true
     }
-  }, [autoSend, initialInput, initialMentionables, mentionableUnitLabel])
+  }, [autoSend, initialInput, initialMentionables, mentionableUnitLabels])
 
   // Submit edit mode - generate a text edit plan and open ApplyView
   const submitEditMode = useCallback(
@@ -1657,7 +1662,7 @@ export function QuickAskPanel({
       const editorState = createQuickAskEditorState({
         prompt,
         mentionables: mentionablesToInsert,
-        mentionableUnitLabel,
+        mentionableUnitLabels,
       })
       editor.setEditorState(editor.parseEditorState(editorState))
       void submitMessage(editorState, mentionablesToInsert)
@@ -1671,7 +1676,7 @@ export function QuickAskPanel({
     autoSend,
     initialMentionables,
     initialPrompt,
-    mentionableUnitLabel,
+    mentionableUnitLabels,
     executionMode,
     submitEditDirect,
     submitEditMode,
@@ -2338,37 +2343,36 @@ export function QuickAskPanel({
                 )}
               </button>
             </DropdownMenu.Trigger>
-            <DropdownMenu.Portal
-              container={
-                assistantTriggerRef.current?.ownerDocument?.body ?? undefined
-              }
+            <YoloDropdownContent
+              anchorRef={assistantTriggerRef}
+              variant="smart-space"
+              minWidth={200}
+              maxWidth={300}
+              side="top"
+              align="start"
+              sideOffset={8}
+              collisionPadding={8}
+              avoidCollisions={false}
+              onCloseAutoFocus={(e) => e.preventDefault()}
             >
-              <DropdownMenu.Content
-                side="top"
-                align="start"
-                sideOffset={8}
-                className="yolo-quick-ask-assistant-dropdown"
-                onCloseAutoFocus={(e) => e.preventDefault()}
-              >
-                <AssistantSelectMenu
-                  assistants={assistants}
-                  currentAssistantId={selectedAssistant?.id}
-                  onSelect={(assistant) => {
-                    setSelectedAssistant(assistant)
-                    void setSettings({
-                      ...settings,
-                      quickAskAssistantId: assistant?.id,
-                    })
-                    setIsAssistantMenuOpen(false)
-                    requestAnimationFrame(() => {
-                      contentEditableRef.current?.focus()
-                    })
-                  }}
-                  onClose={() => setIsAssistantMenuOpen(false)}
-                  compact
-                />
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
+              <AssistantSelectMenu
+                assistants={assistants}
+                currentAssistantId={selectedAssistant?.id}
+                onSelect={(assistant) => {
+                  setSelectedAssistant(assistant)
+                  void setSettings({
+                    ...settings,
+                    quickAskAssistantId: assistant?.id,
+                  })
+                  setIsAssistantMenuOpen(false)
+                  requestAnimationFrame(() => {
+                    contentEditableRef.current?.focus()
+                  })
+                }}
+                onClose={() => setIsAssistantMenuOpen(false)}
+                compact
+              />
+            </YoloDropdownContent>
           </DropdownMenu.Root>
 
           <div className="yolo-quick-ask-model-select yolo-smart-space-model-select">

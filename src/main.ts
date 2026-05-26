@@ -101,6 +101,7 @@ import {
 import { TabCompletionController } from './features/editor/tab-completion/tabCompletionController'
 import { WriteAssistController } from './features/editor/write-assist/writeAssistController'
 import { enablePdfScreenshotFeature } from './features/pdf-screenshot'
+import { isUntitledConversationTitle } from './hooks/useChatHistory'
 import { Language, createTranslationFunction } from './i18n'
 import {
   YoloSettings,
@@ -842,6 +843,7 @@ export default class YoloPlugin extends Plugin {
       const { persistConversationMessages } =
         createAgentConversationPersistence(this.app, () => this.settings)
       this.agentService = new AgentService({
+        getSettings: () => this.settings,
         persistConversationMessages,
       })
       // Start listening for async external agent task-completed events (desktop-only, no-op on mobile)
@@ -1420,9 +1422,8 @@ export default class YoloPlugin extends Plugin {
   }
 
   private resolveAgentConversationTitle(title: string | undefined): string {
-    const normalizedTitle = title?.trim()
-    if (normalizedTitle) {
-      return normalizedTitle
+    if (!isUntitledConversationTitle(title)) {
+      return title!.trim()
     }
 
     return this.t(

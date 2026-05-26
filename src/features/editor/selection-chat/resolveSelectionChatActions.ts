@@ -30,6 +30,8 @@ const FIXED_ACTION_IDS = new Set([
   'add-to-sidebar',
 ])
 
+const FIXED_ACTION_ORDER = ['custom-rewrite', 'custom-ask', 'add-to-sidebar']
+
 const resolveMode = (
   id: string,
   mode?: SelectionActionMode,
@@ -100,27 +102,62 @@ export function resolveSelectionChatActions(
     },
   ]
 
+  const fixedActionLookup = new Map(
+    defaultActions
+      .filter((action) => FIXED_ACTION_IDS.has(action.id))
+      .map((action) => [action.id, action]),
+  )
+
   const customActions = settings.continuationOptions?.selectionChatActions
-  const resolved: SelectionActionPreset[] = customActions
-    ? customActions
+  // Defensive: collapse any accidental duplicate fixed-action ids to the first
+  // occurrence so a single hide/show toggle behaves predictably.
+  const dedupedCustomActions = customActions
+    ? (() => {
+        const seenFixed = new Set<string>()
+        return customActions.filter((action) => {
+          if (!FIXED_ACTION_IDS.has(action.id)) return true
+          if (seenFixed.has(action.id)) return false
+          seenFixed.add(action.id)
+          return true
+        })
+      })()
+    : undefined
+  const resolved: SelectionActionPreset[] = dedupedCustomActions
+    ? dedupedCustomActions
         .filter((action) => action.enabled)
-        .map((action) => ({
-          id: action.id,
-          label: action.label,
-          instruction: action.instruction,
-          mode: resolveMode(action.id, action.mode),
-          rewriteBehavior: resolveRewriteBehavior(
-            action.id,
-            resolveMode(action.id, action.mode),
-            action.rewriteBehavior,
-          ),
-          assistantId: action.assistantId,
-        }))
+        .map((action) => {
+          // Fixed actions: ignore stored label/instruction/mode and use built-in defaults.
+          const fixed = fixedActionLookup.get(action.id)
+          if (fixed) return fixed
+          return {
+            id: action.id,
+            label: action.label,
+            instruction: action.instruction,
+            mode: resolveMode(action.id, action.mode),
+            rewriteBehavior: resolveRewriteBehavior(
+              action.id,
+              resolveMode(action.id, action.mode),
+              action.rewriteBehavior,
+            ),
+            assistantId: action.assistantId,
+          }
+        })
     : defaultActions
 
-  const merged = defaultActions
-    .filter((action) => FIXED_ACTION_IDS.has(action.id))
-    .concat(resolved.filter((action) => !FIXED_ACTION_IDS.has(action.id)))
+  // Back-compat: if user data omits any fixed action id entirely (e.g. legacy
+  // configs predating this feature, or a non-disabled item just missing),
+  // prepend the missing ones in their canonical order so they keep showing up.
+  const presentIds = new Set(resolved.map((action) => action.id))
+  const customActionIds = new Set(
+    (dedupedCustomActions ?? []).map((action) => action.id),
+  )
+  const missingFixed = FIXED_ACTION_ORDER.filter(
+    (id) => !presentIds.has(id) && !customActionIds.has(id),
+  )
+    .map((id) => fixedActionLookup.get(id))
+    .filter((action): action is SelectionActionPreset => action !== undefined)
+
+  const merged = [...missingFixed, ...resolved]
 
   return merged.map((action) => {
     const label = action.label?.trim() || action.id

@@ -104,6 +104,7 @@ describe('AgentLlmTurnExecutor', () => {
 
     const mcpManager = {
       listAvailableTools: jest.fn().mockResolvedValue([]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const executor = new AgentLlmTurnExecutor({
@@ -213,6 +214,7 @@ describe('AgentLlmTurnExecutor', () => {
           },
         },
       ]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     const observedAssistantMessages: ChatAssistantMessage[] = []
@@ -281,6 +283,7 @@ describe('AgentLlmTurnExecutor', () => {
 
     const mcpManager = {
       listAvailableTools: jest.fn().mockResolvedValue([]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     mockExecuteSingleTurn.mockRejectedValue(new Error('network exploded'))
@@ -335,6 +338,7 @@ describe('AgentLlmTurnExecutor', () => {
 
     const mcpManager = {
       listAvailableTools: jest.fn().mockResolvedValue([]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
     const abortController = new AbortController()
     abortController.abort()
@@ -389,6 +393,7 @@ describe('AgentLlmTurnExecutor', () => {
 
     const mcpManager = {
       listAvailableTools: jest.fn().mockResolvedValue([]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     mockExecuteSingleTurn.mockImplementation(async ({ onStreamDelta }) => {
@@ -459,6 +464,7 @@ describe('AgentLlmTurnExecutor', () => {
           },
         },
       ]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     mockExecuteSingleTurn.mockResolvedValue({
@@ -516,6 +522,7 @@ describe('AgentLlmTurnExecutor', () => {
           },
         },
       ]),
+      getJsSandboxSettings: jest.fn().mockReturnValue({}),
     } as unknown as McpManager
 
     mockExecuteSingleTurn.mockResolvedValue({

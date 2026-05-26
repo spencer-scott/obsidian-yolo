@@ -238,6 +238,34 @@ const tabCompletionOptionsSchema = z
   })
   .catch({ ...DEFAULT_TAB_COMPLETION_OPTIONS })
 
+export const jsSandboxSettingsSchema = z.object({
+  allowDbQuery: z.boolean().optional(),
+  allowFetch: z.boolean().optional(),
+  fetchMode: z.enum(['whitelist', 'blacklist']).optional(),
+  fetchDomains: z.array(z.string()).optional(),
+  fetchMaxConcurrent: z.number().optional(),
+  fetchMaxResponseKb: z.number().optional(),
+  allowVaultRead: z.boolean().optional(),
+  // Maximum size (in KB) returned by $vault.readText / $vault.readBinary.
+  // Files exceeding this are truncated (text) or refused (binary).
+  vaultReadMaxKb: z.number().optional(),
+  allowExternalScripts: z.boolean().optional(),
+  // Execution timeout cap, in milliseconds. The LLM may pass a smaller
+  // timeoutMs in its tool args, but the host clamps the effective value
+  // to this cap. Undefined means use the built-in default.
+  timeoutMs: z.number().optional(),
+  // Maximum rows returned by $db.search / $db.find. The LLM may request a
+  // smaller limit per call but never larger. Undefined falls back to a
+  // built-in default.
+  dbQueryMaxLimit: z.number().optional(),
+  // Maximum size (in KB) of the tool's serialized JSON result returned to
+  // the model. Output above this is truncated with a prefix. Undefined
+  // uses the built-in default. Host enforces a hard ceiling.
+  outputMaxKb: z.number().optional(),
+})
+
+export type JsSandboxSettings = z.infer<typeof jsSandboxSettingsSchema>
+
 const tabCompletionTriggerSchema = z
   .object({
     id: z.string(),
@@ -302,6 +330,12 @@ export const yoloSettingsSchema = z.object({
       builtinToolOptions: {},
       enableToolDisclosure: false,
     }),
+
+  // JS sandbox (js_eval) configuration. Global because the capability surface
+  // (network / vault read / $db / external scripts) is sensitive enough that
+  // we don't want it implicitly varying per agent — toggling any extension
+  // capability forces approval for every agent that has js_eval enabled.
+  jsSandbox: jsSandboxSettingsSchema.catch({}),
 
   // Web search configuration (built-in agent tool)
   webSearch: webSearchSettingsSchema.catch({

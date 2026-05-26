@@ -57,6 +57,7 @@ export type TranslationKeys = {
     on?: string
     off?: string
     noResults?: string
+    configure?: string
   }
 
   sidebar?: {
@@ -340,6 +341,8 @@ export type TranslationKeys = {
       builtinWebScrapeDesc?: string
       builtinWebOpsLabel?: string
       builtinWebOpsDesc?: string
+      builtinJsEvalLabel?: string
+      builtinJsEvalDesc?: string
       builtinDelegateExternalAgentLabel?: string
       builtinDelegateExternalAgentDesc?: string
       builtinTodoWriteLabel?: string
@@ -383,6 +386,7 @@ export type TranslationKeys = {
       toolApproval?: string
       toolApprovalFullAccess?: string
       toolApprovalRequire?: string
+      toolApprovalForced?: string
       toolDisclosureAlways?: string
       toolDisclosureOnDemand?: string
       editorEnabled?: string
@@ -436,6 +440,44 @@ export type TranslationKeys = {
       autoContextCompactionThresholdTokensDesc?: string
       autoContextCompactionThresholdRatioPercent?: string
       autoContextCompactionThresholdRatioPercentDesc?: string
+      jsSandboxExtTitle?: string
+      jsSandboxAllowFetch?: string
+      jsSandboxAllowFetchDesc?: string
+      jsSandboxAllowFetchRisk?: string
+      jsSandboxAllowFetchConfirm?: string
+      jsSandboxFetchMode?: string
+      jsSandboxFetchModeDesc?: string
+      jsSandboxFetchModeBlacklist?: string
+      jsSandboxFetchModeWhitelist?: string
+      jsSandboxFetchDomains?: string
+      jsSandboxFetchDomainsDesc?: string
+      jsSandboxAllowVaultRead?: string
+      jsSandboxAllowVaultReadDesc?: string
+      jsSandboxAllowVaultReadConfirm?: string
+      jsSandboxAllowDbQuery?: string
+      jsSandboxAllowDbQueryDesc?: string
+      jsSandboxAllowDbQueryConfirm?: string
+      jsSandboxAllowExternalScripts?: string
+      jsSandboxAllowExternalScriptsDesc?: string
+      jsSandboxAllowExternalScriptsRisk?: string
+      jsSandboxAllowExternalScriptsConfirm?: string
+      jsSandboxConfirmEnableTitle?: string
+      jsExecApprovalForced?: string
+      jsSandboxTimeoutMs?: string
+      jsSandboxTimeoutMsDesc?: string
+      jsSandboxOutputMaxKb?: string
+      jsSandboxOutputMaxKbDesc?: string
+      jsSandboxFetchMaxConcurrent?: string
+      jsSandboxFetchMaxConcurrentDesc?: string
+      jsSandboxFetchMaxResponseKb?: string
+      jsSandboxFetchMaxResponseKbDesc?: string
+      jsSandboxVaultReadMaxKb?: string
+      jsSandboxVaultReadMaxKbDesc?: string
+      jsSandboxDbMaxLimit?: string
+      jsSandboxDbMaxLimitDesc?: string
+    }
+    jsSandbox?: {
+      openSettings?: string
     }
     webSearch?: {
       modalTitle?: string
@@ -1125,6 +1167,9 @@ export type TranslationKeys = {
       duplicate: string
       copySuffix?: string
       dragHandleAria?: string
+      fixedActionHint?: string
+      hideFixedAction?: string
+      showFixedAction?: string
     }
   }
 
@@ -1186,6 +1231,7 @@ export type TranslationKeys = {
     }
     sendMessage: string
     newChat: string
+    untitledConversation?: string
     continueResponse?: string
     stopGeneration?: string
     queueMessage?: {

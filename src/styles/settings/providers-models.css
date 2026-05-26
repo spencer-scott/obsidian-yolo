@@ -126,6 +126,10 @@
 }
 
 .yolo-provider-section {
+  /* Enable container queries so the header's hide-pill rule reacts to
+     the card's own width, not the viewport. Required because the
+     settings modal can be narrow on desktop even when viewport is wide. */
+  container-type: inline-size;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   background: var(--background-primary);
@@ -194,6 +198,7 @@
   all: unset;
   flex: 0 1 auto;
   min-width: 0;
+  max-inline-size: min(320px, 42%);
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
@@ -296,9 +301,8 @@
 .yolo-provider-base-url-btn {
   all: unset;
   display: inline-flex;
-  flex: 0 0 auto;
-  min-width: auto;
-  max-width: none;
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 12px;
   line-height: 1.2;
   margin: 0;
@@ -311,7 +315,7 @@
 
 .yolo-provider-base-url-text {
   display: block;
-  max-width: 260px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -353,12 +357,20 @@
 
 .yolo-provider-secondary-trigger {
   all: unset;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   cursor: pointer;
+}
+
+/* Hide the model-count pill when the card itself is narrow (settings
+   modal can be narrow on desktop even when viewport is wide). Same info
+   stays available inside the expanded card body. */
+@container (max-width: 520px) {
+  .yolo-provider-header > .yolo-provider-secondary-trigger {
+    display: none;
+  }
 }
 
 .yolo-provider-header > .yolo-provider-secondary-trigger {
@@ -379,7 +391,8 @@
 .yolo-provider-actions {
   display: flex;
   gap: var(--size-4-1);
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
 }
 
 .yolo-provider-delete-confirm {

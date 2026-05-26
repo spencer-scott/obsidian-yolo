@@ -194,8 +194,12 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
   ) => {
     const app = useApp()
     const { t } = useLanguage()
-    const mentionableUnitLabel = useMemo(
-      () => t('common.characters', 'chars'),
+    const mentionableUnitLabels = useMemo(
+      () => ({
+        characters: t('common.characters', 'chars'),
+        words: t('common.words', 'words'),
+        wordsCharacters: t('common.wordsCharacters', 'words/chars'),
+      }),
       [t],
     )
     const { settings, setSettings } = useSettings()
@@ -671,7 +675,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
           const mentionNode = $createMentionNode(
             getMentionableName(mentionable, {
-              unitLabel: mentionableUnitLabel,
+              unitLabels: mentionableUnitLabels,
             }),
             serialized,
           )
@@ -717,7 +721,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       inlineMentionables,
       isEditorReady,
       mentionDisplayMode,
-      mentionableUnitLabel,
+      mentionableUnitLabels,
     ])
 
     useEffect(() => {
@@ -859,7 +863,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               nodesToInsert.push(
                 $createMentionNode(
                   getMentionableName(mentionable, {
-                    unitLabel: mentionableUnitLabel,
+                    unitLabels: mentionableUnitLabels,
                   }),
                   serializeMentionable(mentionable),
                 ),
@@ -888,7 +892,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         setMentionables([...mentionables, ...newMentionableImages])
         // Keep collapsed by default, do not auto-expand newly added badges
       },
-      [currentModel, mentionableUnitLabel, mentionables, setMentionables, t],
+      [currentModel, mentionableUnitLabels, mentionables, setMentionables, t],
     )
 
     const handleCreatePdfMentionables = useCallback(
@@ -910,7 +914,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               nodesToInsert.push(
                 $createMentionNode(
                   getMentionableName(mentionable, {
-                    unitLabel: mentionableUnitLabel,
+                    unitLabels: mentionableUnitLabels,
                   }),
                   serializeMentionable(mentionable),
                 ),
@@ -938,7 +942,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         }
         setMentionables([...mentionables, ...newMentionablePdfs])
       },
-      [mentionableUnitLabel, mentionables, setMentionables],
+      [mentionableUnitLabels, mentionables, setMentionables],
     )
 
     const handleUploadFiles = useCallback(

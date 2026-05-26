@@ -7,6 +7,7 @@ import { editorStateToPlainText } from '../components/chat-view/chat-input/utils
 import {
   DEFAULT_CHAT_TITLE_PROMPT,
   DEFAULT_UNTITLED_CONVERSATION_TITLE,
+  LEGACY_UNTITLED_CONVERSATION_TITLES,
 } from '../constants'
 import { useApp } from '../contexts/app-context'
 import { useLanguage } from '../contexts/language-context'
@@ -42,10 +43,9 @@ import {
 
 import { useChatManager } from './useJsonManagers'
 
-const LEGACY_UNTITLED_CONVERSATION_TITLES = new Set([
-  'New Message',
-  DEFAULT_UNTITLED_CONVERSATION_TITLE,
-])
+const LEGACY_UNTITLED_TITLE_SET = new Set<string>(
+  LEGACY_UNTITLED_CONVERSATION_TITLES,
+)
 const AUTO_TITLE_TIMEOUT_MS = 10000
 const AUTO_TITLE_MAX_RETRIES = 2
 const AUTO_TITLE_FAILURE_COOLDOWN_MS = 5 * 60 * 1000
@@ -53,8 +53,17 @@ const AUTO_TITLE_WAIT_CONVERSATION_RETRIES = 15
 const AUTO_TITLE_WAIT_CONVERSATION_INTERVAL_MS = 200
 const CHAT_HISTORY_UPDATED_EVENT = 'yolo:chat-history-updated'
 
-const isUntitledConversationTitle = (title: string): boolean =>
-  LEGACY_UNTITLED_CONVERSATION_TITLES.has(title)
+export const isUntitledConversationTitle = (
+  title: string | null | undefined,
+): boolean => {
+  const normalized = title?.trim() ?? ''
+  return normalized.length === 0 || LEGACY_UNTITLED_TITLE_SET.has(normalized)
+}
+
+export const getConversationDisplayTitle = (
+  title: string | null | undefined,
+  fallback: string,
+): string => (isUntitledConversationTitle(title) ? fallback : title!.trim())
 
 const formatSelectedSkillsForTitleInput = (
   selectedSkills: ChatSelectedSkill[],
@@ -274,7 +283,9 @@ export function useChatHistory(): UseChatHistory {
             : { touchUpdatedAt: options.touchUpdatedAt },
         )
       } else {
-        // Default title is "New Conversation"; it will be auto-renamed by the conversation naming model after the first user message is saved
+        // Persist an empty-string sentinel; the conversation naming model will
+        // rename it after the first user message is saved. While still unnamed,
+        // the display layer renders a localized title for the current language.
         const defaultTitle = DEFAULT_UNTITLED_CONVERSATION_TITLE
 
         await chatManager.createChat({

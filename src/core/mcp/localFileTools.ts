@@ -1,4 +1,11 @@
-import { App, FileSystemAdapter, TFile, TFolder, normalizePath } from 'obsidian'
+import {
+  App,
+  FileSystemAdapter,
+  TFile,
+  TFolder,
+  normalizePath,
+  requestUrl,
+} from 'obsidian'
 
 import { upsertEditReviewSnapshot } from '../../database/json/chat/editReviewSnapshotStore'
 import { saveExternalAgentProgress } from '../../database/json/chat/externalAgentProgressStore'
@@ -62,6 +69,25 @@ import {
   runWebSearch,
 } from '../web-search'
 
+import {
+  type JsSandboxSettings,
+  getJsSandboxSettings,
+} from './jsSandboxSettings'
+import {
+  JS_SANDBOX_FETCH_DEFAULT_MAX_CONCURRENT,
+  JS_SANDBOX_FETCH_DEFAULT_MAX_RESPONSE_KB,
+  JS_SANDBOX_FETCH_HARD_MAX_CONCURRENT,
+  JS_SANDBOX_FETCH_HARD_MAX_RESPONSE_KB,
+  JS_SANDBOX_FETCH_MIN_CONCURRENT,
+  JS_SANDBOX_FETCH_MIN_RESPONSE_KB,
+  JS_SANDBOX_TOOL_NAME,
+  JS_SANDBOX_VAULT_READ_DEFAULT_MAX_KB,
+  JS_SANDBOX_VAULT_READ_HARD_MAX_KB,
+  JS_SANDBOX_VAULT_READ_MIN_KB,
+  JsSandboxProxyHandlers,
+  callJsSandboxTool,
+  getJsSandboxTool,
+} from './jsSandboxTool'
 import { parseToolName } from './tool-name-utils'
 
 export { recoverLikelyEscapedBackslashSequences }
@@ -130,6 +156,7 @@ export const LOCAL_FILE_TOOL_SHORT_NAMES = [
   'open_skill',
   'web_search',
   'web_scrape',
+  JS_SANDBOX_TOOL_NAME,
   'delegate_external_agent',
   'load_tool_schemas',
   'todo_write',
@@ -1044,6 +1071,7 @@ export function getLocalFileTools(options?: {
         required: ['url'],
       },
     },
+    getJsSandboxTool(),
     {
       name: 'delegate_external_agent',
       description:
@@ -4015,6 +4043,22 @@ export async function callLocalFileTool({
         }
       }
 
+      case JS_SANDBOX_TOOL_NAME: {
+        const jsSandboxSettings = getJsSandboxSettings(settings)
+        const proxyHandlers = buildJsSandboxProxyHandlers(
+          app,
+          jsSandboxSettings,
+          getRagEngine,
+        )
+        return callJsSandboxTool({
+          app,
+          args,
+          signal,
+          jsSandboxSettings,
+          proxyHandlers,
+        })
+      }
+
       case 'memory_add': {
         if (args.items !== undefined) {
           const items = getRecordArrayArg(args, 'items')
@@ -4448,4 +4492,383 @@ function executeTodoWrite({
     status: ToolCallResponseStatus.Success,
     text: 'Todos updated. Continue tracking your progress with the todo list.',
   }
+}
+
+const JS_SANDBOX_DB_DEFAULT_MAX_LIMIT = 20
+const JS_SANDBOX_DB_HARD_MAX_LIMIT = 100
+const JS_SANDBOX_DB_FIND_MAX_SCANNED_FILES = 500
+const JS_SANDBOX_DB_FIND_MAX_FILE_BYTES = 256 * 1024
+
+const MIME_TYPES_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  avif: 'image/avif',
+  ico: 'image/x-icon',
+  pdf: 'application/pdf',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+  flac: 'audio/flac',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  zip: 'application/zip',
+  json: 'application/json',
+  csv: 'text/csv',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+}
+
+function guessMimeTypeFromExtension(extension: string | undefined): string {
+  if (!extension) return 'application/octet-stream'
+  return (
+    MIME_TYPES_BY_EXT[extension.toLowerCase()] ?? 'application/octet-stream'
+  )
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function readHeaderRecord(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined
+  }
+  const headers: Record<string, string> = {}
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'string') {
+      headers[key] = item
+    }
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined
+}
+
+function readRequestBody(value: unknown): string | ArrayBuffer | undefined {
+  if (typeof value === 'string' || value instanceof ArrayBuffer) {
+    return value
+  }
+  return undefined
+}
+
+function normalizeFetchDomain(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase()
+  if (!trimmed) {
+    return null
+  }
+  try {
+    return new URL(
+      trimmed.includes('://') ? trimmed : `https://${trimmed}`,
+    ).hostname.replace(/^\.+|\.+$/g, '')
+  } catch {
+    return trimmed.split('/')[0]?.replace(/^\.+|\.+$/g, '') || null
+  }
+}
+
+function isDomainMatch(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`)
+}
+
+function assertJsSandboxFetchAllowed(
+  url: string,
+  mode: 'whitelist' | 'blacklist',
+  domains: string[],
+): void {
+  let hostname: string
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('$fetch only supports http(s) URLs')
+    }
+    hostname = parsed.hostname.toLowerCase()
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('$fetch')) {
+      throw error
+    }
+    throw new Error(`invalid $fetch URL: ${url}`)
+  }
+
+  if (domains.length === 0) {
+    if (mode === 'whitelist') {
+      throw new Error('$fetch whitelist is empty')
+    }
+    return
+  }
+
+  const matched = domains.some((domain) => isDomainMatch(hostname, domain))
+  if (mode === 'whitelist' && !matched) {
+    throw new Error(`$fetch blocked by whitelist: ${hostname}`)
+  }
+  if (mode === 'blacklist' && matched) {
+    throw new Error(`$fetch blocked by blacklist: ${hostname}`)
+  }
+}
+
+function buildJsSandboxProxyHandlers(
+  app: App,
+  config: JsSandboxSettings,
+  getRagEngine?: () => Promise<RAGEngine>,
+): JsSandboxProxyHandlers {
+  const handlers: JsSandboxProxyHandlers = {}
+
+  if (config.allowVaultRead) {
+    const configuredVaultKb =
+      typeof config.vaultReadMaxKb === 'number' &&
+      Number.isFinite(config.vaultReadMaxKb)
+        ? Math.floor(config.vaultReadMaxKb)
+        : JS_SANDBOX_VAULT_READ_DEFAULT_MAX_KB
+    const vaultReadMaxKb = Math.min(
+      JS_SANDBOX_VAULT_READ_HARD_MAX_KB,
+      Math.max(JS_SANDBOX_VAULT_READ_MIN_KB, configuredVaultKb),
+    )
+    const vaultReadMaxBytes = vaultReadMaxKb * 1024
+    handlers.vaultReadConfig = { maxKb: vaultReadMaxKb }
+    handlers.vaultReadText = async (path: string) => {
+      const normalized = normalizePath(path)
+      const file = app.vault.getAbstractFileByPath(normalized)
+      // Contract: return null ONLY when the file truly does not exist
+      // (a legitimate "missing" signal the model can branch on). Folder
+      // paths and read failures throw with a reason so the script doesn't
+      // collapse two distinct cases into the same null.
+      if (file === null) {
+        return null
+      }
+      if (!(file instanceof TFile)) {
+        throw new Error(`vault.readText: "${path}" is a folder, not a file`)
+      }
+      try {
+        const vault = app.vault as {
+          cachedRead?: (f: TFile) => Promise<string>
+          read: (f: TFile) => Promise<string>
+        }
+        const text = vault.cachedRead
+          ? await vault.cachedRead(file)
+          : await vault.read(file)
+        if (text.length > vaultReadMaxBytes) {
+          return (
+            text.slice(0, vaultReadMaxBytes) +
+            `\n\n... [truncated by host: file is ${text.length} bytes, vaultReadMaxKb cap is ${vaultReadMaxKb} KB. Slice or stream in chunks if you need more.]`
+          )
+        }
+        return text
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        throw new Error(`vault.readText: ${reason}`)
+      }
+    }
+
+    handlers.vaultReadBinary = async (path: string) => {
+      const normalized = normalizePath(path)
+      const file = app.vault.getAbstractFileByPath(normalized)
+      // Same contract as readText: null only for "file does not exist".
+      if (file === null) {
+        return null
+      }
+      if (!(file instanceof TFile)) {
+        throw new Error(`vault.readBinary: "${path}" is a folder, not a file`)
+      }
+      const buffer = await app.vault.readBinary(file).catch((error) => {
+        const reason = error instanceof Error ? error.message : String(error)
+        throw new Error(`vault.readBinary: ${reason}`)
+      })
+      const bytes = new Uint8Array(buffer)
+      if (bytes.length > vaultReadMaxBytes) {
+        // Binary truncation would yield an invalid file; refuse instead so
+        // the model gets a clear signal rather than corrupted base64.
+        throw new Error(
+          `vault.readBinary refused: file is ${bytes.length} bytes, vaultReadMaxKb cap is ${vaultReadMaxKb} KB`,
+        )
+      }
+      // Convert in 32KB chunks to avoid `String.fromCharCode(...arr)` blowing the call-stack on large files.
+      let binary = ''
+      const chunkSize = 0x8000
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+        binary += String.fromCharCode.apply(null, Array.from(chunk))
+      }
+      const base64 = btoa(binary)
+      return {
+        base64,
+        mimeType: guessMimeTypeFromExtension(file.extension),
+        byteLength: bytes.length,
+      }
+    }
+  }
+
+  if (config.allowFetch || config.allowExternalScripts) {
+    const configuredMaxConcurrent =
+      typeof config.fetchMaxConcurrent === 'number' &&
+      Number.isFinite(config.fetchMaxConcurrent) &&
+      config.fetchMaxConcurrent > 0
+        ? Math.floor(config.fetchMaxConcurrent)
+        : JS_SANDBOX_FETCH_DEFAULT_MAX_CONCURRENT
+    const configuredMaxResponseKb =
+      typeof config.fetchMaxResponseKb === 'number' &&
+      Number.isFinite(config.fetchMaxResponseKb) &&
+      config.fetchMaxResponseKb > 0
+        ? Math.floor(config.fetchMaxResponseKb)
+        : JS_SANDBOX_FETCH_DEFAULT_MAX_RESPONSE_KB
+    const maxConcurrent = Math.min(
+      JS_SANDBOX_FETCH_HARD_MAX_CONCURRENT,
+      Math.max(JS_SANDBOX_FETCH_MIN_CONCURRENT, configuredMaxConcurrent),
+    )
+    const maxResponseKb = Math.min(
+      JS_SANDBOX_FETCH_HARD_MAX_RESPONSE_KB,
+      Math.max(JS_SANDBOX_FETCH_MIN_RESPONSE_KB, configuredMaxResponseKb),
+    )
+    const fetchMode = config.fetchMode ?? 'blacklist'
+    const fetchDomains = (config.fetchDomains ?? [])
+      .map(normalizeFetchDomain)
+      .filter((domain): domain is string => Boolean(domain))
+
+    handlers.fetchConfig = {
+      fetchMode,
+      fetchDomains,
+      maxConcurrent,
+      maxResponseKb,
+    }
+    handlers.hostFetch = async (
+      url: string,
+      init?: Record<string, unknown>,
+    ) => {
+      assertJsSandboxFetchAllowed(url, fetchMode, fetchDomains)
+      const response = await requestUrl({
+        url,
+        method: readString(init?.method) ?? 'GET',
+        headers: readHeaderRecord(init?.headers),
+        body: readRequestBody(init?.body),
+        contentType: readString(init?.contentType),
+        throw: false,
+      })
+      const bytes = new Uint8Array(response.arrayBuffer)
+      if (bytes.byteLength > maxResponseKb * 1024) {
+        throw new Error(
+          `$fetch response exceeded ${maxResponseKb} KB (${bytes.byteLength} bytes)`,
+        )
+      }
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: '',
+        headers: response.headers,
+        body: response.arrayBuffer,
+        byteLength: bytes.byteLength,
+      }
+    }
+  }
+
+  if (config.allowDbQuery && getRagEngine) {
+    const configuredLimit =
+      typeof config.dbQueryMaxLimit === 'number' &&
+      Number.isFinite(config.dbQueryMaxLimit) &&
+      config.dbQueryMaxLimit > 0
+        ? Math.min(
+            JS_SANDBOX_DB_HARD_MAX_LIMIT,
+            Math.floor(config.dbQueryMaxLimit),
+          )
+        : JS_SANDBOX_DB_DEFAULT_MAX_LIMIT
+
+    const clampLimit = (raw: unknown): number => {
+      if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+        return Math.min(10, configuredLimit)
+      }
+      return Math.min(configuredLimit, Math.floor(raw))
+    }
+
+    handlers.dbQuery = async (
+      method: 'search' | 'find' | 'get',
+      params: Record<string, unknown>,
+    ) => {
+      if (method === 'search') {
+        const engine = await getRagEngine()
+        const query = typeof params.query === 'string' ? params.query : ''
+        const limit = clampLimit(params.limit)
+        const results = await engine.processQuery({ query, limit })
+        return results
+      }
+
+      if (method === 'find') {
+        const keywordRaw =
+          typeof params.keyword === 'string' ? params.keyword : ''
+        const keyword = keywordRaw.trim()
+        if (!keyword) return []
+        const needle = keyword.toLowerCase()
+        const limit = clampLimit(params.limit)
+
+        const files = app.vault.getMarkdownFiles()
+        const matches: Array<{ path: string; excerpt: string }> = []
+        let scanned = 0
+        for (const file of files) {
+          if (matches.length >= limit) break
+          if (scanned >= JS_SANDBOX_DB_FIND_MAX_SCANNED_FILES) break
+          if (file.stat.size > JS_SANDBOX_DB_FIND_MAX_FILE_BYTES) continue
+          scanned++
+          let text: string
+          try {
+            const vault = app.vault as {
+              cachedRead?: (f: TFile) => Promise<string>
+              read: (f: TFile) => Promise<string>
+            }
+            text = vault.cachedRead
+              ? await vault.cachedRead(file)
+              : await vault.read(file)
+          } catch {
+            continue
+          }
+          const hitIndex = text.toLowerCase().indexOf(needle)
+          if (hitIndex < 0) continue
+          const start = Math.max(0, hitIndex - 60)
+          const end = Math.min(text.length, hitIndex + needle.length + 60)
+          const excerpt =
+            (start > 0 ? '…' : '') +
+            text.slice(start, end).replace(/\s+/g, ' ').trim() +
+            (end < text.length ? '…' : '')
+          matches.push({ path: file.path, excerpt })
+        }
+        return matches
+      }
+
+      if (method === 'get') {
+        const path = typeof params.path === 'string' ? params.path : ''
+        if (!path) return null
+        const file = app.vault.getAbstractFileByPath(normalizePath(path))
+        if (!(file instanceof TFile)) return null
+        try {
+          const vault = app.vault as {
+            cachedRead?: (f: TFile) => Promise<string>
+            read: (f: TFile) => Promise<string>
+          }
+          const content = vault.cachedRead
+            ? await vault.cachedRead(file)
+            : await vault.read(file)
+          const frontmatter =
+            app.metadataCache.getFileCache(file)?.frontmatter ?? {}
+          return { content, frontmatter }
+        } catch {
+          return null
+        }
+      }
+
+      throw new Error(`unknown db method: ${method}`)
+    }
+  }
+
+  if (config.allowExternalScripts) {
+    handlers.externalScript = async (url: string) => {
+      const response = await requestUrl({ url, throw: false })
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`failed to fetch script: ${response.status}`)
+      }
+      return response.text
+    }
+  }
+
+  return handlers
 }

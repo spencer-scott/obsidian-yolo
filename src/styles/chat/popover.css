@@ -1695,6 +1695,14 @@ button.yolo-chat-list-dropdown-archive-toggle:focus-visible
     z-index: 3;
   }
 
+  /* Lift the floating toolbar above Obsidian's mobile navbar (back / menu, etc.). */
+  body.is-mobile & .yolo-apply-toolbar {
+    bottom: calc(
+      var(--size-4-3) + var(--yolo-apply-toolbar-mobile-offset, 48px) +
+        var(--safe-area-inset-bottom, 0px)
+    );
+  }
+
   .yolo-apply-toolbar-pill {
     pointer-events: auto;
     display: flex;
@@ -1712,7 +1720,6 @@ button.yolo-chat-list-dropdown-archive-toggle:focus-visible
     );
     border: 1px solid
       color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(12px);
   }
 

@@ -53,14 +53,21 @@ export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
     })
   }, [toggleComponent])
 
+  // Re-sync the underlying Obsidian ToggleComponent on every render. This
+  // matters when the user toggles, the parent receives `onChange(v)` but
+  // chooses NOT to commit the change (e.g., gates it behind a confirmation
+  // modal). The React `value` prop stays the same, so a dependency-checked
+  // effect would skip — leaving the DOM toggle visually drifted from the
+  // source of truth. Checking `getValue()` first keeps this cheap when in sync.
   useEffect(() => {
     if (!toggleComponent) return
+    if (toggleComponent.getValue() === value) return
     isSyncingRef.current = true
     toggleComponent.setValue(value)
     queueMicrotask(() => {
       isSyncingRef.current = false
     })
-  }, [toggleComponent, value])
+  })
 
   return <div ref={containerRef} className="yolo-display-contents" />
 }

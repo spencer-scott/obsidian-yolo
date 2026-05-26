@@ -54,6 +54,7 @@ export const en: TranslationKeys = {
     on: 'On',
     off: 'Off',
     noResults: 'No matches found',
+    configure: 'Configure',
   },
 
   sidebar: {
@@ -264,6 +265,9 @@ export const en: TranslationKeys = {
       duplicate: 'Duplicate',
       copySuffix: ' (copy)',
       dragHandleAria: 'Drag to reorder',
+      fixedActionHint: 'Built-in action',
+      hideFixedAction: 'Hide from Cursor Chat',
+      showFixedAction: 'Show in Cursor Chat',
     },
     chatPreferences: {
       title: 'Chat preferences',
@@ -419,7 +423,7 @@ export const en: TranslationKeys = {
       manageSkills: 'Manage skills',
       enableToolDisclosure: 'Enable on-demand tool loading (Beta)',
       enableToolDisclosureDesc:
-        'Optional tools start as short descriptions, then load full details when needed. Recommended when you have many MCP tools enabled. Note: this mechanism relies on the model\'s own tool-use capability — some models may not reliably recognize tools loaded this way.',
+        "Optional tools start as short descriptions, then load full details when needed. Recommended when you have many MCP tools enabled. Note: this mechanism relies on the model's own tool-use capability — some models may not reliably recognize tools loaded this way.",
       expandDescription: 'Expand',
       collapseDescription: 'Collapse',
       viewAllTools: 'View all tools',
@@ -469,6 +473,8 @@ export const en: TranslationKeys = {
         'Fetch the full content of a single URL through a configured search provider.',
       builtinWebOpsLabel: 'Web Search Toolset',
       builtinWebOpsDesc: 'Web search and page scraping',
+      builtinJsEvalLabel: 'JavaScript Execution',
+      builtinJsEvalDesc: 'Run JavaScript in an isolated environment.',
       builtinDelegateExternalAgentLabel: 'Delegate to External Agent',
       builtinDelegateExternalAgentDesc:
         'Delegate complex tasks to a CLI agent installed locally (Codex / Claude Code).',
@@ -520,6 +526,7 @@ export const en: TranslationKeys = {
       toolApproval: 'Approval',
       toolApprovalFullAccess: 'Full access',
       toolApprovalRequire: 'Require approval',
+      toolApprovalForced: 'Approval required',
       toolDisclosureAlways: 'In context',
       toolDisclosureOnDemand: 'On demand',
       editorEnabled: 'Enabled',
@@ -572,16 +579,58 @@ export const en: TranslationKeys = {
       autoContextCompactionBlockTitle: 'Context compaction',
       autoContextCompaction: 'Automatic context compaction',
       autoContextCompactionDesc:
-        'When the last assistant reply’s prompt token usage crosses the threshold, compact older history before your next message is sent (not during the reply).',
+        "When the last assistant reply's prompt token usage crosses the threshold, compact older history before your next message is sent (not during the reply).",
       autoContextCompactionThresholdMode: 'Compaction threshold mode',
       autoContextCompactionModeTokens: 'Absolute prompt tokens',
       autoContextCompactionModeRatio: 'Fraction of context window',
       autoContextCompactionThresholdTokens: 'Prompt token threshold',
       autoContextCompactionThresholdTokensDesc:
-        'Trigger when the last reply’s reported prompt_tokens is at least this value.',
+        "Trigger when the last reply's reported prompt_tokens is at least this value.",
       autoContextCompactionThresholdRatioPercent: 'Context window usage (%)',
       autoContextCompactionThresholdRatioPercentDesc:
-        'Trigger when prompt_tokens divided by the chat model’s max context window reaches this percentage. Requires max context tokens on the model.',
+        "Trigger when prompt_tokens divided by the chat model's max context window reaches this percentage. Requires max context tokens on the model.",
+      jsSandboxExtTitle: 'Extension capabilities',
+      jsSandboxAllowFetch: 'Allow Network Fetch',
+      jsSandboxAllowFetchDesc:
+        'Allow browser network requests, plus a separate $fetch helper for requests that need YOLO to bypass cross-origin limits.',
+      jsSandboxAllowFetchRisk:
+        'Risk: scripts can reach any URL the browser can — public APIs, your local network, internal services, and the LLM provider itself. Data in the script (including vault contents you pass in) can be exfiltrated. Only enable for agents you fully trust.',
+      jsSandboxAllowFetchConfirm:
+        'Enabling network requests lets scripts contact browser-accessible addresses and use a separate YOLO host request helper when browser cross-origin limits block a response. Only enable this for an agent you trust. Continue?',
+      jsSandboxAllowVaultRead: 'Allow Vault Read',
+      jsSandboxAllowVaultReadDesc:
+        'Let scripts read any vault file by path. This capability is not constrained by the agent directory scope. Risk: scripts could pass note contents to external services.',
+      jsSandboxAllowVaultReadConfirm:
+        "Enabling vault read lets AI-generated scripts read any file in the vault by path. This data passes through the LLM context. Only enable if you trust this agent's scripts. Continue?",
+      jsSandboxAllowDbQuery: 'Allow Knowledge Base Query',
+      jsSandboxAllowDbQueryDesc:
+        'Let scripts query the vector database (semantic search, keyword search, path lookup). This capability is not constrained by the agent directory scope.',
+      jsSandboxAllowDbQueryConfirm:
+        'Enabling knowledge base query lets AI-generated scripts search your vault index and retrieve file contents. Continue?',
+      jsSandboxAllowExternalScripts: 'Allow External Scripts',
+      jsSandboxAllowExternalScriptsDesc:
+        'Allow scripts to load and run remote JavaScript, and open the broader browser capabilities needed by those scripts.',
+      jsSandboxAllowExternalScriptsRisk:
+        'EXTREME RISK: the agent can pull in and execute arbitrary remote JavaScript with the same privileges as your browser tab. This is functionally equivalent to running untrusted code from the internet. Anything in the vault that you pass into a script can be exfiltrated. Only enable for agents and code sources you fully trust.',
+      jsSandboxAllowExternalScriptsConfirm:
+        'Enabling external scripts lets the agent load and run remote JavaScript inside Obsidian. This is powerful and risky: only continue if you fully trust this agent and the code source.',
+      jsSandboxConfirmEnableTitle: 'Enable extension capability',
+      jsExecApprovalForced: 'Forced approval when enabled',
+      jsSandboxTimeoutMs: 'Execution timeout (ms)',
+      jsSandboxTimeoutMsDesc:
+        'Maximum runtime for a single script call. Range {min}–{max}.',
+      jsSandboxOutputMaxKb: 'Max tool result size (KB)',
+      jsSandboxOutputMaxKbDesc:
+        'Upper bound on the JSON result returned to the model. Larger output is truncated to a prefix. Oversized responses consume model context tokens and can exceed the context window, driving up cost. Range {min}–{max} KB.',
+      jsSandboxVaultReadMaxKb: 'Max read size (KB)',
+      jsSandboxVaultReadMaxKbDesc:
+        'Per-call read limit. Larger text is shortened with a notice; larger binary files are refused. Range {min}–{max} KB.',
+      jsSandboxDbMaxLimit: 'Max rows per query',
+      jsSandboxDbMaxLimitDesc:
+        'Upper bound on knowledge base results returned per query. Range 1–100.',
+    },
+    jsSandbox: {
+      openSettings: 'Configure JavaScript execution',
     },
     webSearch: {
       modalTitle: 'Web search settings',
@@ -836,7 +885,7 @@ export const en: TranslationKeys = {
         'Allow the model to fetch links mentioned in the conversation as context.',
       openRouterWebSearchEngine: 'Search engine',
       openRouterWebSearchEngineDesc:
-        'Auto lets OpenRouter pick (default). Native uses the model provider’s built-in search. Exa / Firecrawl / Parallel force the corresponding engine. Firecrawl requires your own API key configured in the OpenRouter dashboard.',
+        "Auto lets OpenRouter pick (default). Native uses the model provider's built-in search. Exa / Firecrawl / Parallel force the corresponding engine. Firecrawl requires your own API key configured in the OpenRouter dashboard.",
       openRouterWebSearchEngineAuto: 'Auto (default)',
       openRouterWebSearchEngineNative: 'Native',
       openRouterWebSearchEngineExa: 'Exa',
@@ -1398,6 +1447,7 @@ export const en: TranslationKeys = {
     },
     sendMessage: 'Send message',
     newChat: 'New chat',
+    untitledConversation: 'New chat',
     continueResponse: 'Continue response',
     stopGeneration: 'Stop generation',
     queueMessage: {
@@ -1406,7 +1456,7 @@ export const en: TranslationKeys = {
       blockedApproval:
         'Approve or reject the pending tool call before sending a new message.',
       blockedAwaitingInput:
-        'Answer the agent’s question in the chat before sending a new message.',
+        "Answer the agent's question in the chat before sending a new message.",
       abortedRestoredOne: 'Queued message restored to the input box',
       abortedRestoredMany:
         'Restored the latest queued message to the input box ({{count}} dropped)',
@@ -1793,9 +1843,9 @@ export const en: TranslationKeys = {
     reviewTitle: 'Review changes',
     changesResolved: 'Changes resolved',
     acceptAllIncoming: 'Accept all incoming',
-    keepAllChanges: 'Keep all changes',
+    keepAllChanges: 'Keep all',
     rejectAll: 'Reject all',
-    revertAllChanges: 'Revert all changes',
+    revertAllChanges: 'Revert all',
     prevChange: 'Previous change',
     nextChange: 'Next change',
     reset: 'Reset',

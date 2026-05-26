@@ -737,6 +737,7 @@ export function useChatStreamManager({
         const effectiveCompactionForRequest = compactionOverride ?? compaction
         const baseInput = {
           messages: chatMessages,
+          assistantId: selectedAssistant?.id,
           requestContextBuilder,
           mcpManager,
           compaction: effectiveCompactionForRequest,

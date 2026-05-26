@@ -1,9 +1,12 @@
 import {
+  getAssistantToolApprovalMode,
   getDefaultEnabledForTool,
   getEnabledAssistantToolNames,
   getExplicitlyEnabledAssistantToolNames,
   isAssistantToolEnabled,
 } from './tool-preferences'
+
+const JS_SANDBOX_FQN = 'yolo_local__js_eval'
 
 describe('tool-preferences defaults', () => {
   describe('getDefaultEnabledForTool', () => {
@@ -21,6 +24,7 @@ describe('tool-preferences defaults', () => {
       expect(getDefaultEnabledForTool('yolo_local__context_compact')).toBe(
         false,
       )
+      expect(getDefaultEnabledForTool('yolo_local__js_eval')).toBe(false)
     })
 
     it('returns false for third-party MCP tools', () => {
@@ -125,6 +129,7 @@ describe('tool-preferences defaults', () => {
       expect(result).toContain('yolo_local__load_tool_schemas')
       expect(result).not.toContain('yolo_local__context_prune_tool_results')
       expect(result).not.toContain('yolo_local__context_compact')
+      expect(result).not.toContain('yolo_local__js_eval')
     })
 
     it('explicit disable removes a tool from the result', () => {
@@ -190,6 +195,59 @@ describe('tool-preferences defaults', () => {
       })
       expect(withFlag).toContain('yolo_local__fs_read')
       expect(withoutFlag).toContain('yolo_local__fs_read')
+    })
+  })
+
+  describe('getAssistantToolApprovalMode (js_eval global cap override)', () => {
+    const assistant = {
+      toolPreferences: {
+        [JS_SANDBOX_FQN]: {
+          enabled: true,
+          approvalMode: 'full_access' as const,
+        },
+      },
+      enabledToolNames: [],
+    }
+
+    it('keeps the saved full_access mode when no extension capability is on', () => {
+      expect(
+        getAssistantToolApprovalMode(assistant, JS_SANDBOX_FQN, {
+          jsSandboxSettings: {},
+        }),
+      ).toBe('full_access')
+    })
+
+    it('forces require_approval when any extension capability is on globally', () => {
+      for (const cap of [
+        'allowFetch',
+        'allowVaultRead',
+        'allowDbQuery',
+        'allowExternalScripts',
+      ] as const) {
+        expect(
+          getAssistantToolApprovalMode(assistant, JS_SANDBOX_FQN, {
+            jsSandboxSettings: { [cap]: true },
+          }),
+        ).toBe('require_approval')
+      }
+    })
+
+    it('does not override approval mode for other tools', () => {
+      const withFsRead = {
+        toolPreferences: {
+          ...assistant.toolPreferences,
+          yolo_local__fs_read: {
+            enabled: true,
+            approvalMode: 'full_access' as const,
+          },
+        },
+        enabledToolNames: [],
+      }
+      expect(
+        getAssistantToolApprovalMode(withFsRead, 'yolo_local__fs_read', {
+          jsSandboxSettings: { allowFetch: true },
+        }),
+      ).toBe('full_access')
     })
   })
 

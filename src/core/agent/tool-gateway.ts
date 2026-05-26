@@ -98,7 +98,7 @@ export class AgentToolGateway {
     // violation in the error message so the model has enough signal to retry;
     // `useDefaults: false` keeps validation side-effect free so we never
     // rewrite the model's arguments behind its back.
-    this.ajv = new Ajv({ strict: false, allErrors: true, useDefaults: false })
+    this.ajv = new Ajv({ allErrors: true, useDefaults: false })
   }
 
   private isOnDemandToolName(toolName: string): boolean {
@@ -292,14 +292,6 @@ export class AgentToolGateway {
     } catch {
       return true
     }
-  }
-
-  async listTools({
-    includeBuiltinTools,
-  }: {
-    includeBuiltinTools: boolean
-  }): Promise<McpTool[]> {
-    return this.mcpManager.listAvailableTools({ includeBuiltinTools })
   }
 
   createToolMessage({
@@ -904,6 +896,7 @@ export class AgentToolGateway {
               : undefined,
           },
           request.name,
+          { jsSandboxSettings: this.mcpManager.getJsSandboxSettings() },
         ) === 'full_access',
     })
   }
@@ -942,6 +935,7 @@ export class AgentToolGateway {
               : undefined,
           },
           toolName,
+          { jsSandboxSettings: this.mcpManager.getJsSandboxSettings() },
         ) === 'require_approval'
       )
     } catch {

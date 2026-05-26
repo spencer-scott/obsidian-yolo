@@ -1,5 +1,6 @@
 import { App } from 'obsidian'
 
+import { useLanguage } from '../../contexts/language-context'
 import { ReactModal } from '../common/ReactModal'
 
 export type ConfirmModalOptions = {
@@ -17,10 +18,17 @@ type ConfirmModalComponentProps = {
   cancelText?: string
   onConfirm: () => void
   onCancel?: () => void
+  settledRef: { current: boolean }
 }
 
 export class ConfirmModal extends ReactModal<ConfirmModalComponentProps> {
+  // Shared between the React component and the modal's `onClose` so dismissal
+  // via the close button or ESC key can fall through to onCancel.
+  private settledRef = { current: false }
+  private cancelHandler?: () => void
+
   constructor(app: App, options: ConfirmModalOptions) {
+    const settledRef = { current: false }
     super({
       app: app,
       Component: ConfirmModalComponent,
@@ -30,11 +38,22 @@ export class ConfirmModal extends ReactModal<ConfirmModalComponentProps> {
         cancelText: options.cancelText,
         onConfirm: options.onConfirm,
         onCancel: options.onCancel,
+        settledRef,
       },
       options: {
         title: options.title,
       },
     })
+    this.settledRef = settledRef
+    this.cancelHandler = options.onCancel
+  }
+
+  onClose() {
+    if (!this.settledRef.current) {
+      this.settledRef.current = true
+      this.cancelHandler?.()
+    }
+    super.onClose()
   }
 }
 
@@ -44,8 +63,10 @@ function ConfirmModalComponent({
   cancelText,
   onConfirm,
   onCancel,
+  settledRef,
   onClose,
 }: ConfirmModalComponentProps & { onClose: () => void }) {
+  const { t } = useLanguage()
   return (
     <div>
       <div className="yolo-prewrap">{message}</div>
@@ -53,6 +74,7 @@ function ConfirmModalComponent({
         <button
           className="mod-warning"
           onClick={() => {
+            settledRef.current = true
             try {
               onConfirm()
             } finally {
@@ -60,11 +82,12 @@ function ConfirmModalComponent({
             }
           }}
         >
-          {ctaText ?? 'Confirm'}
+          {ctaText ?? t('common.confirm', 'Confirm')}
         </button>
         <button
           className="mod-cancel"
           onClick={() => {
+            settledRef.current = true
             try {
               onCancel?.()
             } finally {
@@ -72,7 +95,7 @@ function ConfirmModalComponent({
             }
           }}
         >
-          {cancelText ?? 'Cancel'}
+          {cancelText ?? t('common.cancel', 'Cancel')}
         </button>
       </div>
     </div>

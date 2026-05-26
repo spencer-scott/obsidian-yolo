@@ -652,6 +652,13 @@ const getLocalToolSummaryText = ({
     return url ? truncateText(url, 80) : undefined
   }
 
+  if (toolName === 'js_eval') {
+    const code =
+      typeof argumentsObject?.code === 'string' ? argumentsObject.code : ''
+    const preview = code.trim().replace(/\s+/g, ' ')
+    return preview ? truncateText(preview, 80) : undefined
+  }
+
   if (toolName === 'load_tool_schemas') {
     const servers = asStringArray(argumentsObject?.servers)
     if (!servers || servers.length === 0) {

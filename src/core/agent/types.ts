@@ -31,6 +31,7 @@ export type AgentRuntimeRunInput = {
   messages: ChatMessage[]
   requestMessages?: ChatMessage[]
   conversationId: string
+  assistantId?: string
   branchId?: string
   sourceUserMessageId?: string
   branchLabel?: string

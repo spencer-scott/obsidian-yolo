@@ -28,7 +28,11 @@ describe('createQuickAskEditorState', () => {
     const editorState = createQuickAskEditorState({
       prompt: 'explain',
       mentionables: [selectionMentionable],
-      mentionableUnitLabel: 'chars',
+      mentionableUnitLabels: {
+        characters: 'chars',
+        words: 'words',
+        wordsCharacters: 'words/chars',
+      },
     })
 
     const paragraph = editorState.root.children[0] as unknown as {
@@ -38,8 +42,8 @@ describe('createQuickAskEditorState', () => {
     expect(paragraph?.type).toBe('paragraph')
     expect(paragraph?.children[0]).toMatchObject({
       type: 'mention',
-      mentionName: 'test.md (4 chars)',
+      mentionName: 'test.md (4 words)',
     })
-    expect(editorStateToPlainText(editorState)).toBe('@test.md (4 chars) explain')
+    expect(editorStateToPlainText(editorState)).toBe('@test.md (4 words) explain')
   })
 })

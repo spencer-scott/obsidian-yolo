@@ -5,10 +5,7 @@ import { Root, createRoot } from 'react-dom/client'
 
 import type { ChatProps, ChatRef } from './components/chat-view/Chat'
 import ChatSidebarTabs from './components/chat-view/ChatSidebarTabs'
-import {
-  CHAT_VIEW_TYPE,
-  DEFAULT_UNTITLED_CONVERSATION_TITLE,
-} from './constants'
+import { CHAT_VIEW_TYPE } from './constants'
 import { AppProvider } from './contexts/app-context'
 import { ChatViewProvider } from './contexts/chat-view-context'
 import { DarkModeProvider } from './contexts/dark-mode-context'
@@ -20,6 +17,7 @@ import { PluginProvider } from './contexts/plugin-context'
 import { RAGProvider } from './contexts/rag-context'
 import { SettingsProvider } from './contexts/settings-context'
 import type { PendingChatOpenPayload } from './features/chat/chatLeafSessionManager'
+import { getConversationDisplayTitle } from './hooks/useChatHistory'
 import YoloPlugin from './main'
 import { ConversationOverrideSettings } from './types/conversation-settings.types'
 import { MentionableBlockData, MentionableImage } from './types/mentionable'
@@ -339,8 +337,10 @@ export class ChatView extends ItemView {
   }
 
   private updateDisplayTitle(conversationTitle?: string): void {
-    const nextTitle =
-      conversationTitle?.trim() || DEFAULT_UNTITLED_CONVERSATION_TITLE
+    const nextTitle = getConversationDisplayTitle(
+      conversationTitle,
+      this.plugin.t('chat.untitledConversation', 'New chat'),
+    )
 
     if (this.displayTitle === nextTitle) {
       return

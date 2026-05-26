@@ -122,6 +122,12 @@ export const BUILTIN_TOOL_UI_META: Record<string, BuiltinToolUiMeta> = {
     descFallback:
       'Fetch the full content of a single URL through a configured search provider.',
   },
+  js_eval: {
+    labelKey: 'settings.agent.builtinJsEvalLabel',
+    descKey: 'settings.agent.builtinJsEvalDesc',
+    labelFallback: 'JavaScript Execution',
+    descFallback: 'Run JavaScript in an isolated environment.',
+  },
   delegate_external_agent: {
     labelKey: 'settings.agent.builtinDelegateExternalAgentLabel',
     descKey: 'settings.agent.builtinDelegateExternalAgentDesc',
@@ -173,6 +179,7 @@ const BUILTIN_TOOL_CATEGORY_MAP: Record<string, BuiltinToolCategory> = {
   [MEMORY_OPS_GROUP_TOOL_NAME]: 'context',
   [WEB_OPS_GROUP_TOOL_NAME]: 'external',
   open_skill: 'external',
+  js_eval: 'external',
   delegate_external_agent: 'external',
 }
 
@@ -180,6 +187,28 @@ export const getBuiltinToolCategory = (
   toolName: string,
 ): BuiltinToolCategory | null => {
   return BUILTIN_TOOL_CATEGORY_MAP[toolName] ?? null
+}
+
+// Explicit display order within each category. Tools not listed here fall
+// back to the natural order from tool registration. Used by the agent tools
+// modal so the UI stays stable when registration order changes.
+const BUILTIN_TOOL_DISPLAY_ORDER: Record<BuiltinToolCategory, string[]> = {
+  vault: [],
+  context: [],
+  external: [
+    'open_skill',
+    WEB_OPS_GROUP_TOOL_NAME,
+    'js_eval',
+    'delegate_external_agent',
+  ],
+}
+
+export const getBuiltinToolDisplayIndex = (
+  category: BuiltinToolCategory,
+  toolName: string,
+): number => {
+  const idx = BUILTIN_TOOL_DISPLAY_ORDER[category].indexOf(toolName)
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
 }
 
 export const BUILTIN_TOOL_CATEGORY_I18N: Record<

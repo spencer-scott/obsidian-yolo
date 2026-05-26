@@ -23,7 +23,10 @@ import {
   registerLLMDebugTraceForTurn,
   updateLLMDebugTrace,
 } from '../llm/debugCapture'
-import { getLocalFileToolServerName } from '../mcp/localFileTools'
+import {
+  LOCAL_FILE_TOOL_SHORT_NAMES,
+  getLocalFileToolServerName,
+} from '../mcp/localFileTools'
 import { McpManager } from '../mcp/mcpManager'
 
 import { CONTEXT_COMPACT_TOOL_NAME } from './compaction'
@@ -75,23 +78,8 @@ type AgentLlmTurnExecutorOutput = {
 
 export class AgentLlmTurnExecutor {
   private static readonly LOCAL_TOOL_NAMES = new Set([
-    'fs_list',
-    'fs_search',
-    'fs_read',
-    'context_prune_tool_results',
+    ...LOCAL_FILE_TOOL_SHORT_NAMES,
     CONTEXT_COMPACT_TOOL_NAME,
-    'fs_edit',
-    'fs_create_file',
-    'fs_delete_file',
-    'fs_create_dir',
-    'fs_delete_dir',
-    'fs_move',
-    'memory_add',
-    'memory_update',
-    'memory_delete',
-    'open_skill',
-    'todo_write',
-    'ask_user_question',
   ])
 
   constructor(private readonly input: AgentLlmTurnExecutorInput) {}
@@ -119,6 +107,7 @@ export class AgentLlmTurnExecutor {
       toolPreferences: this.input.toolPreferences,
       apiType: this.input.apiType,
       enableToolDisclosure: this.input.enableToolDisclosure,
+      jsSandboxSettings: this.input.mcpManager.getJsSandboxSettings(),
     })
     const requestMessages =
       await this.input.requestContextBuilder.generateRequestMessages({

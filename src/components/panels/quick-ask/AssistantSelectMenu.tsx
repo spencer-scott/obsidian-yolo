@@ -29,8 +29,8 @@ export function AssistantSelectMenu({
     return 0
   })
 
-  const listRef = useRef<HTMLUListElement>(null)
-  const itemRefs = useRef<(HTMLLIElement | null)[]>([])
+  const listRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([])
 
   // Total items = "No Assistant" + all assistants
   const totalItems = assistants.length + 1
@@ -86,7 +86,7 @@ export function AssistantSelectMenu({
           {t('quickAsk.selectAssistant', 'Select an assistant')}
         </div>
       )}
-      <ul
+      <div
         ref={listRef}
         className="yolo-quick-ask-assistant-list"
         tabIndex={0}
@@ -95,7 +95,7 @@ export function AssistantSelectMenu({
         aria-activedescendant={`assistant-item-${selectedIndex}`}
       >
         {/* No Assistant option */}
-        <li
+        <div
           ref={(el) => (itemRefs.current[0] = el)}
           id="assistant-item-0"
           className={`yolo-quick-ask-assistant-item ${
@@ -127,7 +127,7 @@ export function AssistantSelectMenu({
               <Check size={12} />
             </div>
           )}
-        </li>
+        </div>
 
         {/* Assistant options */}
         {assistants.map((assistant, index) => {
@@ -136,7 +136,7 @@ export function AssistantSelectMenu({
           const isSelected = selectedIndex === itemIndex
 
           return (
-            <li
+            <div
               key={assistant.id}
               ref={(el) => (itemRefs.current[itemIndex] = el)}
               id={`assistant-item-${itemIndex}`}
@@ -166,10 +166,10 @@ export function AssistantSelectMenu({
                   <Check size={12} />
                 </div>
               )}
-            </li>
+            </div>
           )
         })}
-      </ul>
+      </div>
       {!compact && (
         <div className="yolo-quick-ask-assistant-menu-hint">
           {t(

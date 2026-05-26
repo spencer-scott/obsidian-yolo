@@ -56,6 +56,36 @@ type DefaultActionConfig = {
   allowEmptyInstruction?: boolean
 }
 
+// Fixed actions are built-in entries that always exist; users can reorder and
+// hide them but cannot edit their label/instruction. They live in the same
+// `selectionChatActions` array as a sortable placeholder.
+const FIXED_ACTION_CONFIGS: DefaultActionConfig[] = [
+  {
+    id: 'custom-rewrite',
+    labelKey: 'selection.actions.customRewrite',
+    labelFallback: 'Custom rewrite',
+    mode: 'rewrite',
+    rewriteBehavior: 'custom',
+    allowEmptyInstruction: true,
+  },
+  {
+    id: 'custom-ask',
+    labelKey: 'selection.actions.customAsk',
+    labelFallback: 'Custom question',
+    mode: 'ask',
+    allowEmptyInstruction: true,
+  },
+  {
+    id: 'add-to-sidebar',
+    labelKey: 'selection.actions.addToSidebar',
+    labelFallback: 'Add to sidebar',
+    mode: 'chat-input',
+    allowEmptyInstruction: true,
+  },
+]
+
+const FIXED_ACTION_IDS = new Set(FIXED_ACTION_CONFIGS.map((c) => c.id))
+
 const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
   {
     id: 'explain',
@@ -77,11 +107,9 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
   },
 ]
 
-const FIXED_ACTION_IDS = new Set(['custom-rewrite'])
-
-const DEFAULT_ACTION_LOOKUP: Record<string, DefaultActionConfig> =
+const ALL_KNOWN_ACTION_LOOKUP: Record<string, DefaultActionConfig> =
   Object.fromEntries(
-    DEFAULT_ACTION_CONFIGS.map((config) => [config.id, config]),
+    [...FIXED_ACTION_CONFIGS, ...DEFAULT_ACTION_CONFIGS].map((c) => [c.id, c]),
   )
 
 const resolveSelectionActionMode = (
@@ -124,7 +152,7 @@ const generateId = () => {
 const getDefaultSelectionChatActions = (
   t: TranslateFn,
 ): SelectionChatAction[] => {
-  return DEFAULT_ACTION_CONFIGS.map((config) => {
+  return [...FIXED_ACTION_CONFIGS, ...DEFAULT_ACTION_CONFIGS].map((config) => {
     const label = t(config.labelKey, config.labelFallback)
     return {
       id: config.id,
@@ -135,6 +163,47 @@ const getDefaultSelectionChatActions = (
       rewriteBehavior: config.rewriteBehavior,
     }
   })
+}
+
+/**
+ * Ensure the user's stored actions include all fixed actions. Missing fixed
+ * actions are prepended in canonical order with `enabled: true`. Returns the
+ * synthesised list along with a flag indicating whether anything was added.
+ */
+const withFixedActionsBackfilled = (
+  actions: SelectionChatAction[],
+  t: TranslateFn,
+): { list: SelectionChatAction[]; backfilled: boolean } => {
+  // Defensive dedup: collapse any duplicate fixed-action ids (from dirty legacy
+  // data) to the first occurrence so hide/show and reorder behave predictably.
+  const seenFixed = new Set<string>()
+  const deduped = actions.filter((a) => {
+    if (!FIXED_ACTION_IDS.has(a.id)) return true
+    if (seenFixed.has(a.id)) return false
+    seenFixed.add(a.id)
+    return true
+  })
+  const dedupedChanged = deduped.length !== actions.length
+
+  const presentIds = new Set(deduped.map((a) => a.id))
+  const missingConfigs = FIXED_ACTION_CONFIGS.filter(
+    (c) => !presentIds.has(c.id),
+  )
+  if (missingConfigs.length === 0) {
+    return { list: deduped, backfilled: dedupedChanged }
+  }
+  const missing = missingConfigs.map((config) => {
+    const label = t(config.labelKey, config.labelFallback)
+    return {
+      id: config.id,
+      label,
+      instruction: '',
+      enabled: true,
+      mode: config.mode ?? 'ask',
+      rewriteBehavior: config.rewriteBehavior,
+    }
+  })
+  return { list: [...missing, ...deduped], backfilled: true }
 }
 
 type SelectionChatActionsSettingsProps = {
@@ -257,19 +326,26 @@ export function SelectionChatActionsSettingsContent() {
     }),
   )
 
-  const selectionChatActions = (
+  const rawActions =
     settings.continuationOptions.selectionChatActions ||
     getDefaultSelectionChatActions(t)
-  ).map((action) => {
-    const config = DEFAULT_ACTION_LOOKUP[action.id]
+  const { list: backfilledActions } = withFixedActionsBackfilled(rawActions, t)
+  const selectionChatActions = backfilledActions.map((action) => {
+    const isFixed = FIXED_ACTION_IDS.has(action.id)
+    const config = ALL_KNOWN_ACTION_LOOKUP[action.id]
     let label = action.label
     let instruction = action.instruction
-    const mode = resolveSelectionActionMode(action)
-    const rewriteBehavior = resolveRewriteBehavior(action, mode)
+    const mode = isFixed
+      ? (config?.mode ?? resolveSelectionActionMode(action))
+      : resolveSelectionActionMode(action)
+    const rewriteBehavior = isFixed
+      ? config?.rewriteBehavior
+      : resolveRewriteBehavior(action, mode)
 
     if (config) {
       const localizedLabel = t(config.labelKey, config.labelFallback)
       if (
+        isFixed ||
         label === config.labelFallback ||
         label === localizedLabel ||
         !label
@@ -277,6 +353,7 @@ export function SelectionChatActionsSettingsContent() {
         label = localizedLabel
       }
       if (
+        !isFixed &&
         (mode !== 'rewrite' || rewriteBehavior === 'preset') &&
         (instruction === config.labelFallback ||
           instruction === localizedLabel ||
@@ -290,15 +367,13 @@ export function SelectionChatActionsSettingsContent() {
       ...action,
       label,
       instruction,
-      enabled: true,
+      // Fixed actions preserve user's enabled choice (hide/show toggle);
+      // editable actions are always enabled in storage.
+      enabled: isFixed ? (action.enabled ?? true) : true,
       mode,
       rewriteBehavior,
     }
   })
-
-  const editableActions = selectionChatActions.filter(
-    (action: SelectionChatAction) => !FIXED_ACTION_IDS.has(action.id),
-  )
 
   const getInstructionDesc = (mode: SelectionChatActionMode) =>
     mode === 'rewrite'
@@ -333,8 +408,10 @@ export function SelectionChatActionsSettingsContent() {
     return hasLabel && hasInstruction
   }
 
-  const actionIds = editableActions.map((action) => action.id)
+  const actionIds = selectionChatActions.map((action) => action.id)
 
+  // Persist a full action list. Fixed actions keep their stored enabled state
+  // (hidden when false); editable actions are always enabled.
   const handleSaveActions = async (newActions: SelectionChatAction[]) => {
     await setSettings({
       ...settings,
@@ -342,7 +419,9 @@ export function SelectionChatActionsSettingsContent() {
         ...settings.continuationOptions,
         selectionChatActions: newActions.map((action) => ({
           ...action,
-          enabled: true,
+          enabled: FIXED_ACTION_IDS.has(action.id)
+            ? (action.enabled ?? true)
+            : true,
         })),
       },
     })
@@ -378,12 +457,15 @@ export function SelectionChatActionsSettingsContent() {
 
     let newActions: SelectionChatAction[]
     if (isAddingAction) {
-      newActions = [...editableActions, { ...editingAction, enabled: true }]
+      newActions = [
+        ...selectionChatActions,
+        { ...editingAction, enabled: true },
+      ]
     } else {
-      newActions = editableActions.map((action) =>
+      newActions = selectionChatActions.map((action) =>
         action.id === editingAction.id
           ? { ...editingAction, enabled: true }
-          : { ...action, enabled: true },
+          : action,
       )
     }
 
@@ -397,11 +479,25 @@ export function SelectionChatActionsSettingsContent() {
   }
 
   const handleDeleteAction = async (id: string) => {
-    const newActions = editableActions.filter((action) => action.id !== id)
+    // Editable actions are removed; fixed actions can't reach this path.
+    const newActions = selectionChatActions.filter((action) => action.id !== id)
     try {
       await handleSaveActions(newActions)
     } catch (error: unknown) {
       console.error('Failed to delete Cursor Chat quick action', error)
+    }
+  }
+
+  const handleToggleFixedAction = async (id: string) => {
+    const newActions = selectionChatActions.map((action) =>
+      action.id === id
+        ? { ...action, enabled: !(action.enabled ?? true) }
+        : action,
+    )
+    try {
+      await handleSaveActions(newActions)
+    } catch (error: unknown) {
+      console.error('Failed to toggle Cursor Chat fixed action', error)
     }
   }
 
@@ -412,7 +508,7 @@ export function SelectionChatActionsSettingsContent() {
       label: `${action.label}${t('settings.selectionChat.copySuffix', ' (copy)')}`,
       enabled: true,
     }
-    const newActions = [...editableActions, newAction]
+    const newActions = [...selectionChatActions, newAction]
     try {
       await handleSaveActions(newActions)
     } catch (error: unknown) {
@@ -442,17 +538,17 @@ export function SelectionChatActionsSettingsContent() {
       return
     }
 
-    const oldIndex = editableActions.findIndex(
+    const oldIndex = selectionChatActions.findIndex(
       (action) => action.id === active.id,
     )
-    const newIndex = editableActions.findIndex(
+    const newIndex = selectionChatActions.findIndex(
       (action) => action.id === over.id,
     )
     if (oldIndex < 0 || newIndex < 0) {
       return
     }
 
-    const reorderedActions = arrayMove(editableActions, oldIndex, newIndex)
+    const reorderedActions = arrayMove(selectionChatActions, oldIndex, newIndex)
 
     try {
       await handleSaveActions(reorderedActions)
@@ -676,7 +772,7 @@ export function SelectionChatActionsSettingsContent() {
           strategy={verticalListSortingStrategy}
         >
           <div className="yolo-quick-actions-list">
-            {editableActions.map((action) => {
+            {selectionChatActions.map((action) => {
               const isEditing =
                 !isAddingAction && editingAction?.id === action.id
               return (
@@ -689,6 +785,7 @@ export function SelectionChatActionsSettingsContent() {
                   setIsAddingAction={setIsAddingAction}
                   handleDuplicateAction={handleDuplicateAction}
                   handleDeleteAction={handleDeleteAction}
+                  handleToggleFixedAction={handleToggleFixedAction}
                   handleSaveAction={handleSaveAction}
                   actionModeOptions={actionModeOptions}
                   actionRewriteTypeOptions={actionRewriteTypeOptions}
@@ -721,6 +818,7 @@ type QuickActionItemProps = {
   setIsAddingAction: React.Dispatch<React.SetStateAction<boolean>>
   handleDuplicateAction: (action: SelectionChatAction) => void | Promise<void>
   handleDeleteAction: (id: string) => void | Promise<void>
+  handleToggleFixedAction: (id: string) => void | Promise<void>
   handleSaveAction: () => void | Promise<void>
   actionModeOptions: Record<SelectionChatActionMode, string>
   actionRewriteTypeOptions: Record<SelectionChatActionRewriteBehavior, string>
@@ -741,6 +839,7 @@ function QuickActionItem({
   setIsAddingAction,
   handleDuplicateAction,
   handleDeleteAction,
+  handleToggleFixedAction,
   handleSaveAction,
   actionModeOptions,
   actionRewriteTypeOptions,
@@ -767,6 +866,17 @@ function QuickActionItem({
   }
 
   const currentEditing = isEditing ? editingAction : null
+  const isFixed = FIXED_ACTION_IDS.has(action.id)
+  const isHidden = isFixed && action.enabled === false
+  const itemClassName = [
+    'yolo-quick-action-item',
+    isEditing ? 'editing' : '',
+    isDragging ? 'yolo-quick-action-dragging' : '',
+    isFixed ? 'yolo-quick-action-item--fixed' : '',
+    isHidden ? 'yolo-quick-action-item--hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <>
@@ -774,7 +884,7 @@ function QuickActionItem({
         ref={setNodeRef}
         style={style}
         data-action-id={action.id}
-        className={`yolo-quick-action-item ${isEditing ? 'editing' : ''} ${isDragging ? 'yolo-quick-action-dragging' : ''}`}
+        className={itemClassName}
         {...attributes}
       >
         <div className="yolo-quick-action-drag-handle">
@@ -789,33 +899,60 @@ function QuickActionItem({
         <div className="yolo-quick-action-content">
           <div className="yolo-quick-action-header">
             <span className="yolo-quick-action-label">{action.label}</span>
+            {isFixed && (
+              <span className="yolo-quick-action-fixed-hint">
+                {t('settings.selectionChat.fixedActionHint', 'Built-in action')}
+              </span>
+            )}
           </div>
         </div>
         <div className="yolo-quick-action-controls">
-          <ObsidianButton
-            onClick={() => {
-              if (isEditing) {
-                setEditingAction(null)
-              } else {
-                setEditingAction(action)
-                setIsAddingAction(false)
+          {isFixed ? (
+            <ObsidianButton
+              onClick={() => void handleToggleFixedAction(action.id)}
+              icon={isHidden ? 'eye' : 'eye-off'}
+              tooltip={
+                isHidden
+                  ? t(
+                      'settings.selectionChat.showFixedAction',
+                      'Show in Cursor Chat',
+                    )
+                  : t(
+                      'settings.selectionChat.hideFixedAction',
+                      'Hide from Cursor Chat',
+                    )
               }
-            }}
-            icon={isEditing ? 'x' : 'pencil'}
-            tooltip={
-              isEditing ? t('common.cancel', 'Cancel') : t('common.edit', 'Edit')
-            }
-          />
-          <ObsidianButton
-            onClick={() => void handleDuplicateAction(action)}
-            icon="copy"
-            tooltip={t('settings.selectionChat.duplicate', 'Duplicate')}
-          />
-          <ObsidianButton
-            onClick={() => void handleDeleteAction(action.id)}
-            icon="trash-2"
-            tooltip={t('common.delete', 'Delete')}
-          />
+            />
+          ) : (
+            <>
+              <ObsidianButton
+                onClick={() => {
+                  if (isEditing) {
+                    setEditingAction(null)
+                  } else {
+                    setEditingAction(action)
+                    setIsAddingAction(false)
+                  }
+                }}
+                icon={isEditing ? 'x' : 'pencil'}
+                tooltip={
+                  isEditing
+                    ? t('common.cancel', 'Cancel')
+                    : t('common.edit', 'Edit')
+                }
+              />
+              <ObsidianButton
+                onClick={() => void handleDuplicateAction(action)}
+                icon="copy"
+                tooltip={t('settings.selectionChat.duplicate', 'Duplicate')}
+              />
+              <ObsidianButton
+                onClick={() => void handleDeleteAction(action.id)}
+                icon="trash-2"
+                tooltip={t('common.delete', 'Delete')}
+              />
+            </>
+          )}
         </div>
       </div>
 

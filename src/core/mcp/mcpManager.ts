@@ -27,6 +27,11 @@ import {
 } from '../web-search'
 
 import { InvalidToolNameException, McpNotAvailableException } from './exception'
+import {
+  type JsSandboxSettings,
+  getJsSandboxSettings,
+} from './jsSandboxSettings'
+import { disposeJsSandbox } from './jsSandboxTool'
 // eslint-disable-next-line import/order -- false positive: sibling group is contiguous; rule miscounts the blank line above this group
 import {
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
@@ -233,6 +238,7 @@ export class McpManager {
     this.subscribers.clear()
     this.activeToolCalls.clear()
     this.reconnectAttempts.clear()
+    disposeJsSandbox()
   }
 
   private loadRemoteTransportModule(): Promise<RemoteTransportModule> {
@@ -245,6 +251,16 @@ export class McpManager {
 
   public getServers() {
     return this.servers
+  }
+
+  /**
+   * Snapshot of the global JS sandbox configuration. Exposed so the agent
+   * runtime, tool gateway, and context estimators can read the same source
+   * the proxy handler uses at execution time — keeping the LLM-facing
+   * description and actual capability set in lockstep.
+   */
+  public getJsSandboxSettings(): JsSandboxSettings {
+    return getJsSandboxSettings(this.settings)
   }
 
   public subscribeServersChange(callback: (servers: McpServerState[]) => void) {
@@ -692,6 +708,7 @@ export class McpManager {
       requestArgs,
     })
     allowedTools.add(allowanceKey)
+    allowedTools.add(requestToolName)
   }
 
   public isToolExecutionAllowed({
@@ -731,7 +748,12 @@ export class McpManager {
         requestArgs,
       })
       if (
-        this.allowedToolsByConversation.get(conversationId)?.has(allowanceKey)
+        this.allowedToolsByConversation
+          .get(conversationId)
+          ?.has(allowanceKey) ||
+        this.allowedToolsByConversation
+          .get(conversationId)
+          ?.has(requestToolName)
       ) {
         return true
       }

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { useSettings } from '../../contexts/settings-context'
+import { resolveSelectionChatActions } from '../../features/editor/selection-chat/resolveSelectionChatActions'
 
 import type { SelectionInfo } from './SelectionManager'
 
@@ -18,8 +19,6 @@ export type SelectionAction = {
   assistantId?: string
   handler: () => void | Promise<void>
 }
-
-type SelectionActionPreset = Omit<SelectionAction, 'handler'>
 
 type SelectionActionsMenuProps = {
   selection: SelectionInfo
@@ -55,136 +54,32 @@ export function SelectionActionsMenu({
   const [isVisible, setIsVisible] = useState(false)
   const showTimerRef = useRef<number | null>(null)
 
-  const defaultActions = useMemo<SelectionActionPreset[]>(
-    () => [
-      {
-        id: 'custom-rewrite',
-        label: t('selection.actions.customRewrite', 'Custom rewrite'),
-        instruction: '',
-        mode: 'rewrite' as const,
-        rewriteBehavior: 'custom' as const,
-      },
-      {
-        id: 'custom-ask',
-        label: t('selection.actions.customAsk', 'Custom question'),
-        instruction: '',
-        mode: 'ask' as const,
-      },
-      {
-        id: 'add-to-sidebar',
-        label: t('selection.actions.addToSidebar', 'Add to sidebar'),
-        instruction: '',
-        mode: 'chat-input' as const,
-      },
-      {
-        id: 'explain',
-        label: t('selection.actions.explain', 'Explain in depth'),
-        instruction: t('selection.actions.explain', 'Explain in depth'),
-        mode: 'ask' as const,
-      },
-      {
-        id: 'suggest',
-        label: t('selection.actions.suggest', 'Provide suggestions'),
-        instruction: t('selection.actions.suggest', 'Provide suggestions'),
-        mode: 'ask' as const,
-      },
-      {
-        id: 'translate-to-chinese',
-        label: t('selection.actions.translateToChinese', 'Translate to Chinese'),
-        instruction: t('selection.actions.translateToChinese', 'Translate to Chinese'),
-        mode: 'ask' as const,
-      },
-    ],
-    [t],
-  )
-
   const actions: SelectionAction[] = useMemo(() => {
-    const customActions = settings?.continuationOptions?.selectionChatActions
-    const resolvedActions: SelectionActionPreset[] = customActions
-      ? customActions
-          .filter((action) => action.enabled)
-          .map((action) => ({
-            id: action.id,
-            label: action.label,
-            instruction: action.instruction,
-            mode:
-              action.mode ??
-              (action.id === 'rewrite' || action.id === 'custom-rewrite'
-                ? 'rewrite'
-                : action.id === 'chat-send'
-                  ? 'chat-send'
-                  : action.id === 'chat-input' || action.id === 'add-to-sidebar'
-                    ? 'chat-input'
-                    : 'ask'),
-            rewriteBehavior: action.rewriteBehavior,
-            assistantId: action.assistantId,
-          }))
-      : defaultActions
-
-    const fixedActionIds = new Set([
-      'custom-rewrite',
-      'custom-ask',
-      'add-to-sidebar',
-    ])
-    const allDisplayActions = defaultActions
-      .filter((action) => fixedActionIds.has(action.id))
-      .concat(
-        resolvedActions.filter((action) => !fixedActionIds.has(action.id)),
-      )
-
+    if (!settings) return []
+    const resolved = resolveSelectionChatActions(settings, t)
     // PDF selections have no writable target: filter out all rewrite-mode actions.
     const displayActions =
       source === 'pdf'
-        ? allDisplayActions.filter((action) => action.mode !== 'rewrite')
-        : allDisplayActions
+        ? resolved.filter((action) => action.mode !== 'rewrite')
+        : resolved
 
-    return displayActions.map((action) => {
-      const label = action.label?.trim() || ''
-      const mode: SelectionActionMode =
-        action.mode ??
-        (action.id === 'rewrite' || action.id === 'custom-rewrite'
-          ? 'rewrite'
-          : action.id === 'chat-send'
-            ? 'chat-send'
-            : action.id === 'chat-input' || action.id === 'add-to-sidebar'
-              ? 'chat-input'
-              : 'ask')
-      const rewriteBehavior: SelectionActionRewriteBehavior | undefined =
-        mode === 'rewrite'
-          ? (action.rewriteBehavior ??
-            (action.id === 'custom-rewrite' ? 'custom' : 'preset'))
-          : undefined
-      const rawInstruction = action.instruction?.trim() || ''
-      const resolvedInstruction =
-        mode === 'rewrite' ||
-        action.id === 'custom-ask' ||
-        mode === 'chat-input' ||
-        mode === 'chat-send'
-          ? rawInstruction
-          : rawInstruction || label || action.id
-      return {
-        id: action.id,
-        label: label || action.id,
-        instruction: resolvedInstruction,
-        mode,
-        rewriteBehavior,
-        assistantId: action.assistantId,
-        handler: () =>
-          onAction(
-            action.id,
-            resolvedInstruction,
-            mode,
-            rewriteBehavior,
-            action.assistantId,
-          ),
-      }
-    })
-  }, [
-    defaultActions,
-    onAction,
-    settings?.continuationOptions?.selectionChatActions,
-    source,
-  ])
+    return displayActions.map((action) => ({
+      id: action.id,
+      label: action.label,
+      instruction: action.instruction,
+      mode: action.mode,
+      rewriteBehavior: action.rewriteBehavior,
+      assistantId: action.assistantId,
+      handler: () =>
+        onAction(
+          action.id,
+          action.instruction,
+          action.mode,
+          action.rewriteBehavior,
+          action.assistantId,
+        ),
+    }))
+  }, [settings, t, source, onAction])
 
   const getMenuSize = useCallback(() => {
     const measuredWidth = menuRef.current?.offsetWidth ?? 0

@@ -6,6 +6,7 @@ import type {
 
 import type { Mentionable } from '../../../../types/mentionable'
 import {
+  type MentionableUnitLabels,
   getMentionableName,
   serializeMentionable,
 } from '../../../../utils/chat/mentionable'
@@ -14,7 +15,7 @@ import type { SerializedMentionNode } from '../../../chat-view/chat-input/plugin
 type CreateQuickAskEditorStateOptions = {
   prompt: string
   mentionables: Mentionable[]
-  mentionableUnitLabel: string
+  mentionableUnitLabels: MentionableUnitLabels
 }
 
 function createTextNode(text: string): SerializedTextNode {
@@ -31,10 +32,10 @@ function createTextNode(text: string): SerializedTextNode {
 
 function createMentionNode(
   mentionable: Mentionable,
-  mentionableUnitLabel: string,
+  mentionableUnitLabels: MentionableUnitLabels,
 ): SerializedMentionNode {
   const mentionName = getMentionableName(mentionable, {
-    unitLabel: mentionableUnitLabel,
+    unitLabels: mentionableUnitLabels,
   })
 
   return {
@@ -48,12 +49,12 @@ function createMentionNode(
 export function createQuickAskEditorState({
   prompt,
   mentionables,
-  mentionableUnitLabel,
+  mentionableUnitLabels,
 }: CreateQuickAskEditorStateOptions): SerializedEditorState {
   const children: Array<SerializedTextNode | SerializedMentionNode> = []
 
   mentionables.forEach((mentionable) => {
-    children.push(createMentionNode(mentionable, mentionableUnitLabel))
+    children.push(createMentionNode(mentionable, mentionableUnitLabels))
     children.push(createTextNode(' '))
   })
 

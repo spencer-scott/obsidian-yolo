@@ -263,6 +263,9 @@ export const it: TranslationKeys = {
       duplicate: 'Duplica',
       copySuffix: '(copia)',
       dragHandleAria: 'Trascina per riordinare',
+      fixedActionHint: 'Azione predefinita',
+      hideFixedAction: 'Nascondi in Cursor Chat',
+      showFixedAction: 'Mostra in Cursor Chat',
     },
     chatPreferences: {
       title: 'Preferenze chat',
@@ -461,6 +464,9 @@ export const it: TranslationKeys = {
         'Recupera il contenuto completo di un singolo URL tramite il provider configurato.',
       builtinWebOpsLabel: 'Set strumenti ricerca web',
       builtinWebOpsDesc: 'Ricerca web e scraping di pagine',
+      builtinJsEvalLabel: 'Esecuzione JavaScript',
+      builtinJsEvalDesc:
+        'Esegue JavaScript in un ambiente isolato per gestire compiti su cui gli LLM sono inaffidabili. Può comportare rischi',
       builtinDelegateExternalAgentLabel: 'Delega a agente esterno',
       builtinDelegateExternalAgentDesc:
         'Delega le attività complesse a un agente CLI installato localmente (Codex / Claude Code).',
@@ -513,6 +519,7 @@ export const it: TranslationKeys = {
       toolApproval: 'Approvazione',
       toolApprovalFullAccess: 'Accesso completo',
       toolApprovalRequire: 'Richiedi approvazione',
+      toolApprovalForced: 'Approvazione richiesta',
       toolDisclosureAlways: 'In contesto',
       toolDisclosureOnDemand: 'Su richiesta',
       editorEnabled: 'Abilitato',
@@ -1342,6 +1349,7 @@ export const it: TranslationKeys = {
     },
     sendMessage: 'Invia messaggio',
     newChat: 'Nuova chat',
+    untitledConversation: 'Nuova chat',
     continueResponse: 'Continua risposta',
     stopGeneration: 'Ferma generazione',
     queueMessage: {
@@ -1763,9 +1771,9 @@ export const it: TranslationKeys = {
     reviewTitle: 'Rivedi modifiche',
     changesResolved: 'modifiche risolte',
     acceptAllIncoming: 'Accetta tutte in arrivo',
-    keepAllChanges: 'Mantieni tutte le modifiche',
+    keepAllChanges: 'Mantieni tutto',
     rejectAll: 'Rifiuta tutte',
-    revertAllChanges: 'Ripristina tutte le modifiche',
+    revertAllChanges: 'Ripristina tutto',
     prevChange: 'Modifica precedente',
     nextChange: 'Modifica successiva',
     reset: 'Ripristina',

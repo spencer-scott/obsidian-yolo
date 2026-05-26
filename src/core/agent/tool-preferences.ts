@@ -5,6 +5,11 @@ import {
   AssistantToolPreference,
 } from '../../types/assistant.types'
 import {
+  type JsSandboxSettings,
+  hasAnyJsSandboxCapEnabled,
+} from '../mcp/jsSandboxSettings'
+import { JS_SANDBOX_TOOL_NAME } from '../mcp/jsSandboxTool'
+import {
   LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FILE_TOOL_SHORT_NAMES,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
@@ -29,12 +34,21 @@ export const ALWAYS_ALLOW_DISABLED_TOOL_NAMES: readonly string[] = [
 /**
  * Set of local tool names that require approval.
  * delegate_external_agent is a high-risk tool (executes external CLI) and must be in this list.
+ *
+ * JS sandbox execution defaults to full_access: with no extended capabilities
+ * enabled, it can only read injected snapshots ($content / $note, etc.) — no
+ * network, no $db, no external scripts — so the risk is on par with other
+ * read-only tools. Once allowFetch / allowVaultRead / allowDbQuery /
+ * allowExternalScripts is enabled in the agent config,
+ * `getAssistantToolApprovalMode` upgrades it to require_approval (see below).
  */
 const REQUIRE_APPROVAL_LOCAL_TOOLS: ReadonlySet<string> = new Set([
   'fs_file_ops',
   ...LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   'delegate_external_agent',
 ])
+
+const JS_SANDBOX_TOOL_FQN = `${getLocalFileToolServerName()}${McpManager.TOOL_NAME_DELIMITER}${JS_SANDBOX_TOOL_NAME}`
 
 const FULL_ACCESS_LOCAL_TOOLS: ReadonlySet<string> = new Set([
   LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
@@ -46,7 +60,11 @@ const FULL_ACCESS_LOCAL_TOOLS: ReadonlySet<string> = new Set([
  * and runtime read the same policy.
  */
 export const BUILTIN_DEFAULT_DISABLED_TOOL_SHORT_NAMES: ReadonlySet<string> =
-  new Set(['context_prune_tool_results', 'context_compact'])
+  new Set([
+    'context_prune_tool_results',
+    'context_compact',
+    JS_SANDBOX_TOOL_NAME,
+  ])
 
 /**
  * Full set of built-in tool FQNs that default to on. Derived from the local
@@ -259,7 +277,22 @@ export const getAssistantToolApprovalMode = (
     | null
     | undefined,
   toolName: string,
+  options?: { jsSandboxSettings?: JsSandboxSettings | null },
 ): AssistantToolApprovalMode => {
+  // Hard override: when JS isolated execution has any extension capability
+  // enabled in the global settings, force approval regardless of the agent's
+  // saved preference. The default-on capabilities (current note snapshot,
+  // $utils, time/locale/GPU info) keep the same risk surface as other
+  // read-only tools, but turning on fetch / vault read / $db / external
+  // scripts crosses into territory that requires explicit consent every run.
+  if (
+    toolName === JS_SANDBOX_TOOL_FQN &&
+    options?.jsSandboxSettings &&
+    hasAnyJsSandboxCapEnabled(options.jsSandboxSettings)
+  ) {
+    return 'require_approval'
+  }
+
   const toolPreferences = getAssistantToolPreferences(assistant)
   return (
     toolPreferences[toolName]?.approvalMode ??

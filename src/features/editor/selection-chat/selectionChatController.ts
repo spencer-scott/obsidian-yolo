@@ -413,12 +413,18 @@ export class SelectionChatController {
     rewriteBehavior?: SelectionActionRewriteBehavior,
     assistantId?: string,
   ) {
+    // undefined = "follow current selection" → use the sidebar's active assistant
+    const resolvedAssistantId =
+      assistantId !== undefined
+        ? assistantId
+        : this.getSettings().currentAssistantId
+
     if (mode === 'rewrite') {
       await this.rewriteSelection(
         editor,
         instruction,
         rewriteBehavior,
-        assistantId,
+        resolvedAssistantId,
       )
       return
     }
@@ -428,21 +434,21 @@ export class SelectionChatController {
         await this.addToSidebar(editor)
         return
       }
-      await this.addToChatInput(editor, instruction, assistantId)
+      await this.addToChatInput(editor, instruction, resolvedAssistantId)
       return
     }
 
     if (mode === 'chat-send') {
-      await this.addToChatAndSend(editor, instruction, assistantId)
+      await this.addToChatAndSend(editor, instruction, resolvedAssistantId)
       return
     }
 
     const prompt = instruction.trim()
     if (!prompt) {
-      await this.openCustomAsk(editor, assistantId)
+      await this.openCustomAsk(editor, resolvedAssistantId)
       return
     }
-    await this.explainSelection(editor, prompt, assistantId)
+    await this.explainSelection(editor, prompt, resolvedAssistantId)
   }
 
   private async openCustomAsk(editor: Editor, assistantId?: string) {
@@ -756,6 +762,12 @@ export class SelectionChatController {
     pdfPageContextPromise: Promise<PdfPageContextResult | null>,
     assistantId?: string,
   ): Promise<void> {
+    // undefined = "follow current selection" → use the sidebar's active assistant
+    const resolvedAssistantId =
+      assistantId !== undefined
+        ? assistantId
+        : this.getSettings().currentAssistantId
+
     // rewrite is filtered out at the menu level — this branch is unreachable
     if (mode === 'rewrite') {
       return
@@ -797,7 +809,7 @@ export class SelectionChatController {
       await this.openChatWithSelectionAndPrefill(
         pinned,
         instruction.trim(),
-        assistantId,
+        resolvedAssistantId,
       )
       return
     }
@@ -806,7 +818,7 @@ export class SelectionChatController {
       await this.openChatWithSelectionAndSend(
         buildPinnedBlock(),
         instruction.trim(),
-        assistantId,
+        resolvedAssistantId,
       )
       return
     }
@@ -836,7 +848,7 @@ export class SelectionChatController {
       file: pdfData.file,
       pageNumber: pdfData.pageNumber,
       contextText,
-      initialAssistantId: assistantId,
+      initialAssistantId: resolvedAssistantId,
       initialMentionables: [mentionable],
       initialPrompt: prompt || undefined,
       initialMode: 'chat',

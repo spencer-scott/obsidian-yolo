@@ -360,20 +360,6 @@
   color: var(--text-normal);
 }
 
-/* Assistant Dropdown */
-.yolo-quick-ask-assistant-dropdown {
-  min-width: 200px;
-  width: clamp(200px, 34vw, 300px);
-  background: color-mix(in srgb, var(--background-primary) 96%, transparent);
-  border: 1px solid
-    color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
-  border-radius: 8px;
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.24),
-    0 1px 0 color-mix(in srgb, white 2%, transparent);
-  animation: yolo-quick-ask-fade-in 0.12s ease forwards;
-}
-
 /* Assistant Menu */
 .yolo-quick-ask-assistant-menu {
   display: flex;
@@ -394,7 +380,6 @@
 }
 
 .yolo-quick-ask-assistant-list {
-  list-style: none;
   margin: 0;
   padding: 0;
   outline: none;

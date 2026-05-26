@@ -16,8 +16,10 @@ import {
   WEB_OPS_GROUP_TOOL_NAME,
   WEB_OPS_SPLIT_ACTION_TOOL_NAMES,
   getBuiltinToolCategory,
+  getBuiltinToolDisplayIndex,
   getBuiltinToolUiMeta,
 } from '../../../core/agent/builtinToolUiMeta'
+import { JS_SANDBOX_TOOL_NAME } from '../../../core/mcp/jsSandboxTool'
 import {
   LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
@@ -30,6 +32,7 @@ import { ReactModal } from '../../common/ReactModal'
 import { CollapsibleToolDescription } from '../common/CollapsibleToolDescription'
 import { McpSection } from '../sections/McpSection'
 
+import { JsSandboxConfigModal } from './JsSandboxConfigModal'
 import { WebSearchSettingsModal } from './WebSearchSettingsModal'
 
 type AgentToolsModalProps = {
@@ -106,7 +109,7 @@ function AgentToolsModalContent({
             ? t(meta.descKey ?? '', meta.descFallback)
             : tool.description,
           enabled: !(toolOptions[tool.name]?.disabled ?? false),
-          hasSettings: false,
+          hasSettings: tool.name === JS_SANDBOX_TOOL_NAME,
         }
       })
 
@@ -178,7 +181,12 @@ function AgentToolsModalContent({
         BUILTIN_TOOL_CATEGORY_I18N[category].key,
         BUILTIN_TOOL_CATEGORY_I18N[category].fallback,
       ),
-      tools: byCategory.get(category) ?? [],
+      tools: (byCategory.get(category) ?? []).slice().sort((a, b) => {
+        return (
+          getBuiltinToolDisplayIndex(category, a.id) -
+          getBuiltinToolDisplayIndex(category, b.id)
+        )
+      }),
     })).filter((group) => group.tools.length > 0)
   }, [settings.mcp.builtinToolOptions, settings.mcp.enableToolDisclosure, t])
 
@@ -252,13 +260,35 @@ function AgentToolsModalContent({
                       <button
                         type="button"
                         className="clickable-icon"
-                        aria-label={t(
-                          'settings.webSearch.openSettings',
-                          'Configure web search providers',
-                        )}
-                        onClick={() =>
-                          new WebSearchSettingsModal(app, plugin).open()
+                        aria-label={
+                          tool.id === JS_SANDBOX_TOOL_NAME
+                            ? t(
+                                'settings.jsSandbox.openSettings',
+                                'Configure JavaScript execution',
+                              )
+                            : t(
+                                'settings.webSearch.openSettings',
+                                'Configure web search providers',
+                              )
                         }
+                        onClick={() => {
+                          if (tool.id === JS_SANDBOX_TOOL_NAME) {
+                            new JsSandboxConfigModal(app, {
+                              title: t(
+                                'settings.jsSandbox.openSettings',
+                                'Configure JavaScript execution',
+                              ),
+                              value: settings.jsSandbox,
+                              onChange: (next) =>
+                                void setSettings({
+                                  ...settings,
+                                  jsSandbox: next,
+                                }),
+                            }).open()
+                            return
+                          }
+                          new WebSearchSettingsModal(app, plugin).open()
+                        }}
                       >
                         <Settings size={16} />
                       </button>

@@ -107,8 +107,16 @@ export function SettingsTabs({ app, plugin }: SettingsTabsProps) {
       `${activeButton.offsetLeft}px`,
     )
     nav.style.setProperty(
+      '--yolo-tab-glider-top',
+      `${activeButton.offsetTop}px`,
+    )
+    nav.style.setProperty(
       '--yolo-tab-glider-width',
       `${activeButton.offsetWidth}px`,
+    )
+    nav.style.setProperty(
+      '--yolo-tab-glider-height',
+      `${activeButton.offsetHeight}px`,
     )
   }
 

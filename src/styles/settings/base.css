@@ -755,6 +755,10 @@
         calc(var(--render-scale) * 1rem);
     }
 
+    :not(pre) > code {
+      word-break: break-all;
+    }
+
     hr {
       margin: calc(var(--render-scale) * 2rem) 0;
     }
