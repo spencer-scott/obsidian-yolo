@@ -12,7 +12,7 @@ set -euo pipefail
 # =============================================================================
 
 REPO_DIR="${REPO_DIR:-$HOME/Documents/obsidian/plugins/obsidian-yolo}"
-VAULT_DIR="${VAULT_DIR:-$HOME/Documents/obsidian}"
+VAULT_DIR="${VAULT_DIR:-$HOME/Documents/obsidian/vaults/vault}"
 PLUGIN_DIR="$VAULT_DIR/.obsidian/plugins/yolo"
 BRANCH="english-translation"
 
