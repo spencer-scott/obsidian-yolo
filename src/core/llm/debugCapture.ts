@@ -844,7 +844,8 @@ function unknownToDebugBody(value: unknown): string | undefined {
     return prepareBodyForStorage(value)
   }
   try {
-    return prepareBodyForStorage(JSON.stringify(value))
+    const compacted = JSON.stringify(omitBase64DebugData(redactJsonLike(value)))
+    return truncateDebugText(compacted ?? '')
   } catch {
     if (value === null) {
       return 'null'
@@ -866,6 +867,16 @@ function unknownToDebugBody(value: unknown): string | undefined {
     }
     return '[Unserializable debug value]'
   }
+}
+
+function wrapDebugCaptureError(action: string, error: unknown): Error {
+  const wrapped = new Error(
+    `LLM debug capture failed while ${action}.`,
+  ) as Error & {
+    cause?: unknown
+  }
+  wrapped.cause = error
+  return wrapped
 }
 
 async function readResponseBodyForDebug(response: Response): Promise<{
@@ -969,6 +980,13 @@ export async function captureLLMDebugOperation<T>({
   }
 
   const exchangeId = createExchangeId()
+  let requestBodyForDebug: string | undefined
+  try {
+    requestBodyForDebug = unknownToDebugBody(requestBody)
+  } catch (error) {
+    throw wrapDebugCaptureError('serializing request body', error)
+  }
+
   const exchange: LLMDebugHttpExchange = {
     id: exchangeId,
     traceId,
@@ -978,7 +996,7 @@ export async function captureLLMDebugOperation<T>({
       url: redactUrl(url),
       method,
       headers: headersToRecord(requestHeaders),
-      body: unknownToDebugBody(requestBody),
+      body: requestBodyForDebug,
     },
   }
   trace.exchanges.push(exchange)
@@ -987,6 +1005,14 @@ export async function captureLLMDebugOperation<T>({
   try {
     const result = await run()
     const responseHeaders = getResponseHeaders?.(result)
+    let responseBodyForDebug: string | undefined
+    try {
+      responseBodyForDebug = unknownToDebugBody(
+        getResponseBody ? getResponseBody(result) : result,
+      )
+    } catch (error) {
+      throw wrapDebugCaptureError('serializing response body', error)
+    }
     completeExchange(exchangeId, {
       completedAt: Date.now(),
       response: {
@@ -996,9 +1022,7 @@ export async function captureLLMDebugOperation<T>({
           ? headersToRecord(responseHeaders as HeadersInit)
           : {},
         contentType: responseContentType,
-        body: unknownToDebugBody(
-          getResponseBody ? getResponseBody(result) : result,
-        ),
+        body: responseBodyForDebug,
       },
     })
     return result
@@ -1021,7 +1045,11 @@ export function createLLMDebugFetch(
     })
     let debugRequest: LLMDebugHttpExchange['request'] | null = null
     if (llmDebugCaptureEnabled && !traceId) {
-      debugRequest = await buildDebugRequest(input, init)
+      try {
+        debugRequest = await buildDebugRequest(input, init)
+      } catch (error) {
+        throw wrapDebugCaptureError('reading request body', error)
+      }
       traceId = resolveLLMDebugTraceIdForRequest(debugRequest)
     }
 
@@ -1040,7 +1068,11 @@ export function createLLMDebugFetch(
       traceId,
       transportMode,
       startedAt: Date.now(),
-      request: debugRequest ?? (await buildDebugRequest(input, init)),
+      request:
+        debugRequest ??
+        (await buildDebugRequest(input, init).catch((error) => {
+          throw wrapDebugCaptureError('reading request body', error)
+        })),
     }
     trace.exchanges.push(exchange)
     enforceMemoryBudget()

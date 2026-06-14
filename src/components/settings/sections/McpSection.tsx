@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
+import { pruneOrphanedAssistantToolPreferences } from '../../../core/agent/tool-preferences'
+import { getLocalFileToolServerName } from '../../../core/mcp/localFileTools'
 import { McpManager } from '../../../core/mcp/mcpManager'
 import YoloPlugin from '../../../main'
 import {
@@ -151,12 +153,23 @@ function McpServerComponent({
     const message = `${t('settings.mcp.deleteServerConfirm')} "${server.name}"?`
     const deleteServer = async () => {
       try {
+        const nextServers = settings.mcp.servers.filter(
+          (s) => s.id !== server.name,
+        )
+        const knownServerNames = new Set<string>([
+          getLocalFileToolServerName(),
+          ...nextServers.map((s) => s.id),
+        ])
+        const nextAssistants = settings.assistants.map((assistant) =>
+          pruneOrphanedAssistantToolPreferences(assistant, knownServerNames),
+        )
         await setSettings({
           ...settings,
           mcp: {
             ...settings.mcp,
-            servers: settings.mcp.servers.filter((s) => s.id !== server.name),
+            servers: nextServers,
           },
+          assistants: nextAssistants,
         })
       } catch (error: unknown) {
         console.error('Failed to delete MCP server', error)

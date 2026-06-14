@@ -69,6 +69,7 @@ export type TranslationKeys = {
     chatList?: {
       searchPlaceholder?: string
       empty?: string
+      current?: string
       retryTitle?: string
       archived?: string
       hideArchived?: string
@@ -162,10 +163,6 @@ export type TranslationKeys = {
       title: string
       chatFontScale?: string
       chatFontScaleDesc?: string
-      historyArchiveEnabled?: string
-      historyArchiveEnabledDesc?: string
-      historyArchiveThreshold?: string
-      historyArchiveThresholdDesc?: string
     }
     assistants: {
       title: string
@@ -343,8 +340,10 @@ export type TranslationKeys = {
       builtinWebOpsDesc?: string
       builtinJsEvalLabel?: string
       builtinJsEvalDesc?: string
-      builtinDelegateExternalAgentLabel?: string
-      builtinDelegateExternalAgentDesc?: string
+      builtinTerminalCommandLabel?: string
+      builtinTerminalCommandDesc?: string
+      builtinDelegateSubagentLabel?: string
+      builtinDelegateSubagentDesc?: string
       builtinTodoWriteLabel?: string
       builtinTodoWriteDesc?: string
       builtinAskUserQuestionLabel?: string
@@ -377,6 +376,8 @@ export type TranslationKeys = {
       editorChooseIcon?: string
       editorSystemPrompt?: string
       editorSystemPromptDesc?: string
+      editorSystemPromptExpand?: string
+      editorSystemPromptCollapse?: string
       editorEnableProjectInstructions?: string
       editorEnableProjectInstructionsDesc?: string
       editorEnableTools?: string
@@ -421,6 +422,8 @@ export type TranslationKeys = {
       agentCapabilitiesBlockTitle?: string
       focusSyncTitle?: string
       focusSyncDesc?: string
+      timeContextTitle?: string
+      timeContextDesc?: string
       imageReadingBlockTitle?: string
       imageReadingEnabled?: string
       imageReadingEnabledDesc?: string
@@ -479,6 +482,31 @@ export type TranslationKeys = {
     jsSandbox?: {
       openSettings?: string
     }
+    terminalCommand?: {
+      openSettings?: string
+      blockedPrefixes?: string
+      blockedPrefixesDesc?: string
+      matchingRule?: string
+      addPrefixPlaceholder?: string
+      resetDefaults?: string
+    }
+    subagent?: {
+      openSettings?: string
+      modelPool?: string
+      modelPoolDesc?: string
+      preferredModelRule?: string
+      addModelsTitle?: string
+      addModelsDesc?: string
+      addModelPlaceholder?: string
+      addModel?: string
+      addSelectedModels?: string
+      searchModels?: string
+      setPreferredModel?: string
+      defaultModel?: string
+      setDefaultModel?: string
+      emptyModelPool?: string
+      poolCount?: string
+    }
     webSearch?: {
       modalTitle?: string
       openSettings?: string
@@ -521,6 +549,8 @@ export type TranslationKeys = {
       fieldDepth?: string
       fieldSearchUrl?: string
       fieldScrapeUrl?: string
+      fieldUseProviderScrapeApi?: string
+      fieldUseProviderScrapeApiDesc?: string
       fieldBaseUrl?: string
       fieldLanguage?: string
       fieldEngines?: string
@@ -643,9 +673,43 @@ export type TranslationKeys = {
       modelIdPlaceholder: string
       modelName: string
       modelNamePlaceholder: string
+      // model connectivity / health check
+      connectivityTest: {
+        button: string
+        title: string
+        testAll: string
+        retest: string
+        stop: string
+        test: string
+        passed: string
+        statusTesting: string
+        statusOk: string
+        statusFail: string
+        statusTimeout: string
+        statusIdle: string
+        normalCount: string
+        abnormalCount: string
+        notTested: string
+        noResponse: string
+        firstToken: string
+        dims: string
+        noModels: string
+        deleteModel: string
+        deleteChatModelBlocked: string
+        deleteEmbeddingModelBlocked: string
+        deleteEmbeddingModelInProgress: string
+      }
       // auto-fetched models helper labels
       availableModelsAuto?: string
       searchModels?: string
+      // batch add models
+      modeSingle?: string
+      modeBatch?: string
+      batchSelectAll?: string
+      batchSelected?: string
+      batchAlreadyAdded?: string
+      batchAdd?: string
+      batchHint?: string
       fetchModelsFailed?: string
       embeddingModelsFirst?: string
       // reasoning UI
@@ -718,6 +782,7 @@ export type TranslationKeys = {
       desc?: string
       enableRag: string
       enableRagDesc: string
+      partialFailureSummary?: string
       indexPdf?: string
       indexPdfDesc?: string
       embeddingModel: string
@@ -1013,6 +1078,9 @@ export type TranslationKeys = {
     }
     etc: {
       title: string
+      pluginAutoUpdate?: string
+      pluginAutoUpdateDesc?: string
+      pluginAutoUpdateDescUnavailable?: string
       exportConfig?: string
       exportConfigDesc?: string
       export?: string
@@ -1071,6 +1139,11 @@ export type TranslationKeys = {
       chatApplyModeDirectApply?: string
       persistSelectionHighlight?: string
       persistSelectionHighlightDesc?: string
+      chatExportSubsectionTitle?: string
+      chatExportIncludeThinking?: string
+      chatExportIncludeThinkingDesc?: string
+      chatExportIncludeToolCalls?: string
+      chatExportIncludeToolCallsDesc?: string
       notifications?: string
       notificationsDesc?: string
       notificationsEnabled?: string
@@ -1195,12 +1268,14 @@ export type TranslationKeys = {
     placeholderMention?: string
     placeholderSkill?: string
     contextUsage?: string
+    contextUsageUnknownMaxSuffix?: string
     contextBreakdown?: {
       title?: string
       /** "{{percent}} Full" — interpolated client-side */
       fullLabel?: string
       tokensSuffix?: string
       localEstimateCaption?: string
+      unknownMaxHint?: string
       error?: string
       bucket?: {
         system?: string
@@ -1209,6 +1284,7 @@ export type TranslationKeys = {
         skills?: string
         memory?: string
         conversation?: string
+        reasoning?: string
       }
     }
     inlineInfo?: {
@@ -1233,6 +1309,13 @@ export type TranslationKeys = {
     newChat: string
     untitledConversation?: string
     continueResponse?: string
+    loadEarlierMessages?: string
+    loadNewerMessages?: string
+    messageNavigator?: {
+      title?: string
+      itemAriaLabel?: string
+      emptyMessage?: string
+    }
     stopGeneration?: string
     queueMessage?: {
       tooltip?: string
@@ -1263,6 +1346,9 @@ export type TranslationKeys = {
     uploadImage: string
     uploadFile?: string
     imageUnsupportedByModel?: string
+    unsupportedFileType?: string
+    processImagesFailed?: string
+    readPdfFailed?: string
     addContext: string
     applyChanges: string
     copyMessage: string
@@ -1276,6 +1362,7 @@ export type TranslationKeys = {
     regenerate: string
     reasoning: string
     annotations: string
+    vaultSources?: string
     assistantQuote?: {
       add?: string
       badge?: string
@@ -1302,10 +1389,14 @@ export type TranslationKeys = {
       createSnippetsFile?: string
     }
     emptyState?: {
+      askTitle?: string
+      askDescription?: string
       chatTitle?: string
       chatDescription?: string
       agentTitle?: string
       agentDescription?: string
+      agentFullTitle?: string
+      agentFullDescription?: string
     }
     compaction?: {
       pendingTitle?: string
@@ -1424,11 +1515,14 @@ export type TranslationKeys = {
         open_skill?: string
       }
       writeAction?: {
+        write?: string
+        delete?: string
+        create_dir?: string
+        move?: string
+        // Legacy keys kept for rendering historical conversations.
         create_file?: string
         delete_file?: string
-        create_dir?: string
         delete_dir?: string
-        move?: string
       }
       readMode?: {
         full?: string
@@ -1459,28 +1553,35 @@ export type TranslationKeys = {
         created?: string
         progress?: string
       }
+      terminalCommand?: {
+        sessionPoll?: string
+        sessionKill?: string
+        sessionInput?: string
+      }
     }
-    // delegate_external_agent tool card
-    externalAgent?: {
+    // shared live task card
+    liveTask?: {
       statusRunning?: string
       statusDone?: string
       statusAborted?: string
       statusError?: string
       progress?: string
       output?: string
+      activity?: string
       abortedBeforeOutput?: string
+      noActivity?: string
       progressTruncated?: string
       truncated?: string
     }
-    // async external agent result card
-    externalAgentResult?: {
+    subagent?: {
+      openDetails?: string
+      planningNextMoves?: string
+      noActivity?: string
       statusCompleted?: string
+      statusAborted?: string
       statusFailed?: string
-      statusCancelled?: string
-      statusTimedOut?: string
-      statusKilledByShutdown?: string
-      showOutput?: string
-      jumpToDelegate?: string
+      toolUseCount?: string
+      tokenCount?: string
     }
     // conversation settings popover
     conversationSettings?: {
@@ -1509,6 +1610,8 @@ export type TranslationKeys = {
     rebuildingIndex: string
     rebuildComplete: string
     rebuildFailed: string
+    /** Manual index finished but some files could not be indexed. {{count}} interpolated client-side. */
+    indexedWithSkipped?: string
     continueComplete?: string
     continueFailed?: string
     openYoloNewChatFailed: string
@@ -1633,13 +1736,27 @@ export type TranslationKeys = {
 
   // Chat Mode Select
   chatMode?: {
+    ask?: string
+    askDesc?: string
     chat?: string
     chatDesc?: string
     rewrite?: string
     rewriteDesc?: string
     agent?: string
     agentDesc?: string
+    agentFull?: string
+    agentFullDesc?: string
     warning?: {
+      title?: string
+      description?: string
+      permission?: string
+      cost?: string
+      backup?: string
+      checkbox?: string
+      cancel?: string
+      confirm?: string
+    }
+    fullAccessWarning?: {
       title?: string
       description?: string
       permission?: string
@@ -1654,6 +1771,9 @@ export type TranslationKeys = {
   // Reasoning Select
   reasoning?: {
     selectReasoning?: string
+    effort?: string
+    faster?: string
+    smarter?: string
     off?: string
     on?: string
     auto?: string
@@ -1756,11 +1876,33 @@ export type TranslationKeys = {
   // Plugin update banner (GitHub release check)
   update: {
     newVersionAvailable: string
+    toastTitle: string
     currentVersion: string
     viewDetails: string
+    goUpdate: string
     dismiss: string
+    languageEnglish: string
+    languageChinese: string
+    muteThisVersion: string
+    viewHistory?: string
+    historyTitle?: string
+    historyLoading?: string
+    historyError?: string
+    historyEmpty?: string
+    historyPage?: string
+    historyPrev?: string
+    historyNext?: string
     installationIncompleteTitle: string
     installationIncompleteMeta: string
     installationIncompleteNotes: string
+    downloadUpdate: string
+    downloading: string
+    installAndReload: string
+    applying: string
+    downloadFailed: string
+    installFailed: string
+    viewOnGitHub: string
+    updateInCommunityPlugins: string
+    manualInstallOnGitHub: string
   }
 }

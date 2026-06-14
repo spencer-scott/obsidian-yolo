@@ -5,30 +5,24 @@ import type { UpdateCheckResult } from '../core/update/updateChecker'
 
 export function useUpdateCheck(): {
   result: UpdateCheckResult | null
-  dismissed: boolean
-  dismiss: () => void
+  dismissVersion: (version: string) => void
 } {
   const plugin = usePlugin()
   const [result, setResult] = useState<UpdateCheckResult | null>(
     () => plugin.updateCheckResult,
   )
-  const [dismissed, setDismissed] = useState(() =>
-    plugin.isUpdateBannerDismissed(),
-  )
 
   useEffect(() => {
     const remove = plugin.addUpdateCheckListener(() => {
       setResult(plugin.updateCheckResult)
-      setDismissed(plugin.isUpdateBannerDismissed())
     })
     return remove
   }, [plugin])
 
   return {
     result,
-    dismissed,
-    dismiss: () => {
-      plugin.dismissUpdateBanner()
+    dismissVersion: (version: string) => {
+      void plugin.dismissUpdateVersion(version)
     },
   }
 }

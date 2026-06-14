@@ -23,15 +23,17 @@ import { useMcp } from '../../contexts/mcp-context'
 import { usePlugin } from '../../contexts/plugin-context'
 import { useSettings } from '../../contexts/settings-context'
 import {
-  getLatestAssistantContextUsage,
-  resolveAutoContextCompactionChatOptions,
-  shouldTriggerAutoContextCompaction,
-} from '../../core/agent/compaction'
+  resolveAssistantIncludeCurrentFileContent,
+  resolveAssistantTimeContextEnabled,
+} from '../../core/agent/assistant-capabilities'
+import { getLatestAssistantContextUsage } from '../../core/agent/compaction'
 import { DEFAULT_ASSISTANT_ID } from '../../core/agent/default-assistant'
 import type { AgentConversationRunSummary } from '../../core/agent/service'
 import { materializeTextEditPlan } from '../../core/edits/textEditEngine'
 import { parseTextEditPlan } from '../../core/edits/textEditPlan'
 import { captureLLMDebugOperation } from '../../core/llm/debugCapture'
+import { getLocalFileToolServerName } from '../../core/mcp/localFileTools'
+import { parseToolName } from '../../core/mcp/tool-name-utils'
 import { readEditReviewSnapshot } from '../../database/json/chat/editReviewSnapshotStore'
 import type { ChatLeafPlacement } from '../../features/chat/chatLeafSessionManager'
 import { selectionHighlightController } from '../../features/editor/selection-highlight/selectionHighlightController'
@@ -47,6 +49,8 @@ import type {
   ChatAssistantMessage,
   ChatConversationCompactionState,
   ChatMessage,
+  ChatSubagentResultMessage,
+  ChatTerminalCommandResultMessage,
   ChatToolMessage,
   ChatUserMessage,
 } from '../../types/chat'
@@ -59,6 +63,7 @@ import type {
   MentionableBlock,
   MentionableBlockData,
   MentionableImage,
+  MentionableWebSelection,
 } from '../../types/mentionable'
 import {
   REASONING_LEVELS,
@@ -88,7 +93,9 @@ import { groupAssistantAndToolMessages } from '../../utils/chat/message-groups'
 import { RequestContextBuilder } from '../../utils/chat/requestContextBuilder'
 import { buildChatTimelineItems } from '../../utils/chat/timeline'
 import { formatTokenCount } from '../../utils/llm/formatTokenCount'
+import { resolveEffectiveMaxContextTokens } from '../../utils/llm/model-capability-registry'
 import { readTFileContent } from '../../utils/obsidian'
+import { stampUserMessageTimeContext } from '../../utils/prompt/timeContext'
 import DotLoader from '../common/DotLoader'
 import { AgentModeWarningModal } from '../modals/AgentModeWarningModal'
 
@@ -96,7 +103,11 @@ import { AgentModeWarningModal } from '../modals/AgentModeWarningModal'
 
 import { AssistantSelector } from './AssistantSelector'
 import AssistantToolMessageGroupItem from './AssistantToolMessageGroupItem'
-import type { ChatMode } from './chat-input/ChatModeSelect'
+import {
+  type ChatMode,
+  isAgentChatMode,
+  normalizeChatMode,
+} from './chat-input/ChatModeSelect'
 import ChatUserInput from './chat-input/ChatUserInput'
 import type { ChatUserInputRef } from './chat-input/ChatUserInput'
 import MentionableBadge from './chat-input/MentionableBadge'
@@ -112,15 +123,57 @@ import {
 import Composer from './Composer'
 import { useActiveViewState } from './hooks/useActiveViewState'
 import { syncRenderedLatexSelection } from './latex-copy'
+import MessageNavigator from './MessageNavigator'
+import type { MessageNavigatorAnchor } from './MessageNavigator'
 import QueryProgress from './QueryProgress'
 import type { QueryProgressState } from './QueryProgress'
 import { TodoListPanel } from './TodoListPanel'
 import { useAutoScroll } from './useAutoScroll'
+import { useChatHistoryWindow } from './useChatHistoryWindow'
 import { useChatStreamManager } from './useChatStreamManager'
 import UserMessageItem from './UserMessageItem'
 import ViewToggle from './ViewToggle'
 
 const WORKSPACE_WIDE_HEADER_MIN_WIDTH = 1200
+const MESSAGE_NAVIGATOR_MIN_ANCHORS = 7
+const MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH = 90
+
+const getPromptContentText = (
+  promptContent: ChatUserMessage['promptContent'],
+): string => {
+  if (!promptContent) {
+    return ''
+  }
+  if (typeof promptContent === 'string') {
+    return promptContent
+  }
+  return promptContent
+    .map((part) => (part.type === 'text' ? part.text : ''))
+    .join(' ')
+}
+
+const normalizeNavigatorLabel = (text: string, fallback: string): string => {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) {
+    return fallback
+  }
+  if (normalized.length <= MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH) {
+    return normalized
+  }
+  return `${normalized.slice(0, MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH - 1)}…`
+}
+
+const isDelegateSubagentToolName = (name: string): boolean => {
+  try {
+    const parsed = parseToolName(name)
+    return (
+      parsed.serverName === getLocalFileToolServerName() &&
+      parsed.toolName === 'delegate_subagent'
+    )
+  } catch {
+    return name === 'delegate_subagent'
+  }
+}
 
 const ensureDirectoryPathExists = async (
   app: ReturnType<typeof useApp>,
@@ -457,8 +510,71 @@ const isSyncSelectionSource = (source: MentionableBlock['source']): boolean => {
   return source === 'selection' || source === 'selection-sync'
 }
 
-const isSyncSelectionMentionable = (mentionable: MentionableBlock): boolean => {
-  return isSyncSelectionSource(mentionable.source)
+const isSyncSelectionMentionable = (mentionable: Mentionable): boolean => {
+  if (mentionable.type === 'block') {
+    return isSyncSelectionSource(mentionable.source)
+  }
+  return (
+    mentionable.type === 'web-selection' &&
+    mentionable.source === 'web-selection-sync'
+  )
+}
+
+const isSelectionBlockMentionable = (
+  mentionable: Mentionable,
+): mentionable is MentionableBlock => {
+  return (
+    mentionable.type === 'block' &&
+    (mentionable.source === 'selection' ||
+      mentionable.source === 'selection-sync' ||
+      mentionable.source === 'selection-pinned')
+  )
+}
+
+const collectSelectionHighlightIds = (
+  mentionables: Mentionable[],
+): string[] => {
+  const ids = new Set<string>()
+  for (const mentionable of mentionables) {
+    if (!isSelectionBlockMentionable(mentionable)) continue
+    if (mentionable.highlightId) ids.add(mentionable.highlightId)
+  }
+  return Array.from(ids)
+}
+
+const collectSelectionHighlightIdsFromMessages = (
+  messages: ChatMessage[],
+): string[] => {
+  const ids = new Set<string>()
+  for (const message of messages) {
+    if (message.role !== 'user') continue
+    for (const id of collectSelectionHighlightIds(message.mentionables)) {
+      ids.add(id)
+    }
+  }
+  return Array.from(ids)
+}
+
+const collectRemovedSelectionHighlightIds = (
+  previousMentionables: Mentionable[],
+  nextMentionables: Mentionable[],
+): string[] => {
+  const nextIds = new Set(collectSelectionHighlightIds(nextMentionables))
+  return collectSelectionHighlightIds(previousMentionables).filter(
+    (id) => !nextIds.has(id),
+  )
+}
+
+const collectSelectionHighlightIdsByMentionableKey = (
+  mentionables: Mentionable[],
+  mentionableKey: string,
+): string[] => {
+  return collectSelectionHighlightIds(
+    mentionables.filter(
+      (mentionable) =>
+        getMentionableKey(serializeMentionable(mentionable)) === mentionableKey,
+    ),
+  )
 }
 
 const REASONING_LEVEL_CANDIDATES: ReasoningLevel[] = [...REASONING_LEVELS]
@@ -478,6 +594,7 @@ export type ChatRef = {
   ) => void
   syncSelectionToChat: (selectedBlock: MentionableBlockData) => void
   syncSelectionToInput: (selectedBlock: MentionableBlockData) => void
+  syncWebSelectionToInput: (selection: MentionableWebSelection) => void
   clearSelectionFromChat: () => void
   addFileToChat: (file: TFile) => void
   addFolderToChat: (folder: TFolder) => void
@@ -494,12 +611,34 @@ export type ChatRef = {
   getCurrentConversationModelId: () => string | undefined
 }
 
+/**
+ * A snapshot of React state sufficient for Chat to seamlessly rebuild after the host DOM is replaced.
+ * Only includes fields that "users actually modify / affect current UI state" — don't stuff the whole
+ * Chat state in here (the message list is auto-restored from the DB, no snapshot needed).
+ */
+export type ChatRuntimeSnapshot = {
+  currentConversationId: string
+  inputMessage: ChatUserMessage
+  conversationModelId: string
+  conversationAssistantId: string
+  chatMode: ChatMode
+  reasoningLevel: ReasoningLevel
+  conversationOverrides: ConversationOverrideSettings | null
+}
+
 export type ChatProps = {
   selectedBlock?: MentionableBlockData
   activeView?: 'chat' | 'composer'
   onChangeView?: (view: 'chat' | 'composer') => void
   placement?: ChatLeafPlacement
   initialConversationId?: string
+  /**
+   * Used only when ChatView rebuilds the React tree after the host DOM is replaced — passes state through.
+   * Not passed when ChatView is first opened; only passed when a pop-out / dock back triggers a rebuild.
+   */
+  seededRuntimeSnapshot?: ChatRuntimeSnapshot
+  /** Reports the current snapshot whenever state affecting ChatRuntimeSnapshot changes. */
+  onRuntimeSnapshotChange?: (snapshot: ChatRuntimeSnapshot) => void
   onConversationContextChange?: (context: {
     currentConversationId?: string
     currentConversationTitle?: string
@@ -527,8 +666,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     chatList,
   } = useChatHistory()
   const chatManager = useChatManager()
+  const seededRuntimeSnapshot = props.seededRuntimeSnapshot
   const [conversationAssistantId, setConversationAssistantId] =
-    useState<string>(settings.currentAssistantId ?? DEFAULT_ASSISTANT_ID)
+    useState<string>(
+      seededRuntimeSnapshot?.conversationAssistantId ??
+        settings.currentAssistantId ??
+        DEFAULT_ASSISTANT_ID,
+    )
   const conversationAssistantIdRef = useRef<Map<string, string>>(new Map())
   const effectiveSettings = useMemo(
     () => ({
@@ -538,8 +682,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     [conversationAssistantId, settings],
   )
   const requestContextBuilder = useMemo(() => {
-    return new RequestContextBuilder(app, effectiveSettings)
-  }, [app, effectiveSettings])
+    return new RequestContextBuilder(app, effectiveSettings, {
+      systemPromptSnapshotStore: agentService.getSystemPromptSnapshotStore(),
+      getPromptSourceRevision: () =>
+        agentService.getPromptSourceWatcher().getRevision(),
+      promptSourcePathsCallback: (paths) =>
+        agentService.getPromptSourceWatcher().setWatchedPaths(paths),
+    })
+  }, [app, effectiveSettings, agentService])
 
   const normalizeReasoningLevel = useCallback(
     (value?: string): ReasoningLevel | null => {
@@ -571,6 +721,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const [workspaceWideHeaderHeight, setWorkspaceWideHeaderHeight] = useState(0)
 
   const [inputMessage, setInputMessage] = useState<ChatUserMessage>(() => {
+    if (seededRuntimeSnapshot) {
+      return seededRuntimeSnapshot.inputMessage
+    }
     const newMessage = getNewInputMessage(initialReasoningLevel)
     if (props.selectedBlock) {
       newMessage.mentionables = [
@@ -615,8 +768,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     setEnteringCompactionDividerAnchorMessageId,
   ] = useState<string | null>(null)
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null)
-  const [currentConversationId, setCurrentConversationId] =
-    useState<string>(uuidv4())
+  const suppressNextHistoricalUserMessageOutsidePointerRef = useRef<
+    string | null
+  >(null)
+  const [currentConversationId, setCurrentConversationId] = useState<string>(
+    () => seededRuntimeSnapshot?.currentConversationId ?? uuidv4(),
+  )
   const untitledFallback = t('chat.untitledConversation', 'New chat')
   const currentConversationTitle = useMemo(() => {
     const rawTitle = currentConversationId
@@ -627,7 +784,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return getConversationDisplayTitle(rawTitle, untitledFallback)
   }, [chatList, currentConversationId, untitledFallback])
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>(
-    initialReasoningLevel,
+    seededRuntimeSnapshot?.reasoningLevel ?? initialReasoningLevel,
   )
   const conversationReasoningLevelRef = useRef<Map<string, ReasoningLevel>>(
     new Map(),
@@ -830,8 +987,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     Map<string, ConversationOverrideSettings | null>
   >(new Map())
   const [conversationOverrides, setConversationOverrides] =
-    useState<ConversationOverrideSettings | null>(null)
+    useState<ConversationOverrideSettings | null>(
+      seededRuntimeSnapshot?.conversationOverrides ?? null,
+    )
   const [chatMode, setChatMode] = useState<ChatMode>(() => {
+    if (seededRuntimeSnapshot) {
+      return seededRuntimeSnapshot.chatMode
+    }
     const defaultMode = settings.chatOptions.chatMode ?? 'agent'
     return defaultMode
   })
@@ -847,6 +1009,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   // Per-conversation model id (do NOT write back to global settings)
   const conversationModelIdRef = useRef<Map<string, string>>(new Map())
   const [conversationModelId, setConversationModelId] = useState<string>(() => {
+    if (seededRuntimeSnapshot) {
+      return seededRuntimeSnapshot.conversationModelId
+    }
     const initialAssistantId =
       settings.currentAssistantId ?? DEFAULT_ASSISTANT_ID
     const initialAssistant = settings.assistants.find(
@@ -862,12 +1027,17 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     )
   }, [conversationModelId, settings.chatModels])
 
+  const effectiveMaxContextTokens = useMemo(
+    () => resolveEffectiveMaxContextTokens(currentConversationModel),
+    [currentConversationModel],
+  )
+
   const headerContextUsage = useMemo(() => {
     const contextUsage = getLatestAssistantContextUsage({
       messages: chatMessages,
-      maxContextTokens: currentConversationModel?.maxContextTokens,
+      maxContextTokens: effectiveMaxContextTokens,
     })
-    if (!contextUsage || contextUsage.maxContextTokens === null) {
+    if (!contextUsage) {
       return null
     }
 
@@ -875,7 +1045,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       promptTokens: contextUsage.promptTokens,
       maxContextTokens: contextUsage.maxContextTokens,
     }
-  }, [chatMessages, currentConversationModel?.maxContextTokens])
+  }, [chatMessages, effectiveMaxContextTokens])
 
   const getReasoningLevelForModelId = useCallback(
     (modelId?: string | null): ReasoningLevel => {
@@ -1048,6 +1218,42 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         assistantGroupBoundaryMessageIds,
       )
     }, [assistantGroupBoundaryMessageIds, chatMessages])
+  const {
+    windowedGroupedChatMessages,
+    hasEarlierMessages,
+    hasNewerMessages,
+    loadEarlier,
+    loadNewer,
+    resetToLatest,
+    jumpToUserMessage,
+    windowNavigationKey,
+    windowNavigationTargetMessageId,
+  } = useChatHistoryWindow({
+    conversationId: currentConversationId,
+    groupedChatMessages,
+  })
+  const messageNavigatorAnchors = useMemo<MessageNavigatorAnchor[]>(() => {
+    const emptyLabel = t('chat.messageNavigator.emptyMessage', 'Empty message')
+    let userMessageIndex = 0
+    return groupedChatMessages.flatMap((messageOrGroup) => {
+      if (Array.isArray(messageOrGroup)) {
+        return []
+      }
+
+      userMessageIndex += 1
+      const editorText = messageOrGroup.content
+        ? editorStateToPlainText(messageOrGroup.content)
+        : ''
+      const promptText = getPromptContentText(messageOrGroup.promptContent)
+      return [
+        {
+          id: messageOrGroup.id,
+          index: userMessageIndex,
+          label: normalizeNavigatorLabel(editorText || promptText, emptyLabel),
+        },
+      ]
+    })
+  }, [groupedChatMessages, t])
 
   const displayedChatMessages = useMemo(() => {
     return groupedChatMessages.flatMap((messageOrGroup): ChatMessage[] => {
@@ -1088,14 +1294,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     chatMessagesStateRef.current = chatMessages
   }, [chatMessages])
 
-  // Selection-highlight lifecycle.
-  //
-  // The hook owns the "sticky" cycle: highlights for selection-style mentions
-  // survive sending the user message and stay visible while the user keeps
-  // working in the chat panel.  They drop only when the user (a) interacts
-  // with any real editor leaf outside the chat container, or (b) switches /
-  // closes the conversation.  See useChatHighlightSession for the full
-  // contract.
+  // Selection-highlight lifecycle — see useChatHighlightSession for the full
+  // contract. In-input mentions reconcile immediately on delete; sent
+  // selection mentions commit to sticky on submit, then drop on the next
+  // editor interaction.
   const focusedHistoricalMentionables = useMemo<Mentionable[] | null>(() => {
     if (!focusedMessageId || focusedMessageId === inputMessage.id) return null
     const focused = chatMessages.find(
@@ -1104,12 +1306,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return focused?.role === 'user' ? focused.mentionables : null
   }, [chatMessages, focusedMessageId, inputMessage.id])
 
-  useChatHighlightSession({
-    conversationId: currentConversationId,
-    containerRef,
-    inputMentionables: inputMessage.mentionables,
-    focusedHistoricalMentionables,
-  })
+  const { commitSentSelectionHighlights, releaseHighlightIds } =
+    useChatHighlightSession({
+      conversationId: currentConversationId,
+      containerRef,
+      inputMentionables: inputMessage.mentionables,
+      focusedHistoricalMentionables,
+    })
 
   const compactionDividerAnchorMessageIds = useMemo(
     () => effectiveCompactionState.map((entry) => entry.anchorMessageId),
@@ -1194,7 +1397,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const displayMentionablesForInput = inputMessage.mentionables
 
-  const currentFileOverride = settings.chatOptions.includeCurrentFileContent
+  const currentFileOverride = resolveAssistantIncludeCurrentFileContent(
+    selectedAssistant,
+    settings,
+  )
     ? activeFile
     : null
 
@@ -1210,6 +1416,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     useState<HTMLDivElement | null>(null)
   const [inputOverlayHeight, setInputOverlayHeight] = useState(0)
   const [timelineIsVirtualized, setTimelineIsVirtualized] = useState(false)
+  const [activeNavigatorMessageId, setActiveNavigatorMessageId] = useState<
+    string | null
+  >(null)
   const latexSelectionSyncFrameRef = useRef<number | null>(null)
   const chatSurfacePreset = getChatSurfacePreset('chat')
   const hasStreamingMessages = useMemo(
@@ -1226,6 +1435,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     autoScrollToBottom,
     notifyContentFlushed,
     forceScrollToBottom,
+    stopAutoFollow,
     isAutoFollowEnabled,
     followOutput,
     onAtBottomStateChange,
@@ -1235,6 +1445,20 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     isStreaming: hasStreamingMessages,
     contentFollowMode: timelineIsVirtualized ? 'explicit' : 'observer',
   })
+  const handleForceScrollToBottom = useCallback(() => {
+    resetToLatest()
+    requestAnimationFrame(() => {
+      forceScrollToBottom()
+    })
+  }, [forceScrollToBottom, resetToLatest])
+  const handleNavigateToUserMessage = useCallback(
+    (messageId: string) => {
+      setActiveNavigatorMessageId(messageId)
+      stopAutoFollow()
+      jumpToUserMessage(messageId)
+    },
+    [jumpToUserMessage, stopAutoFollow],
+  )
 
   // Measure the overlay above the input box so the timeline can reserve
   // equivalent scrollable space at its bottom — keeps the last assistant
@@ -1334,9 +1558,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const [queuedUserMessages, setQueuedUserMessages] = useState<
     ChatUserMessage[]
   >(() => agentService.peekPendingUserMessages(currentConversationId))
-  const isCurrentConversationRunActive =
-    currentConversationRunSummary.isRunning ||
-    currentConversationRunSummary.isWaitingApproval
+  const isCurrentConversationRunActive = currentConversationRunSummary.isActive
   const shouldHidePendingAssistantPlaceholders = useMemo(() => {
     if (!isCurrentConversationRunActive) {
       return false
@@ -1380,7 +1602,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const chatTimelineItems: ChatTimelineItem[] = useMemo(
     () =>
       buildChatTimelineItems({
-        groupedChatMessages,
+        groupedChatMessages: windowedGroupedChatMessages,
         assistantGroupBoundaryMessageIds,
         compactionDividerAnchorMessageIds,
         latestCompaction: latestCompactionState,
@@ -1400,14 +1622,38 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       assistantGroupBoundaryMessageIds,
       compactionDividerAnchorMessageIds,
       focusedMessageId,
-      groupedChatMessages,
       inputMessage.id,
       latestCompactionState,
       pendingCompactionAnchorMessageId,
       queryProgress,
       showContinueResponseButton,
+      windowedGroupedChatMessages,
     ],
   )
+
+  const terminalCommandResultsByToolCallId = useMemo(() => {
+    const map = new Map<string, ChatTerminalCommandResultMessage>()
+    for (const message of chatMessages) {
+      if (
+        message.role !== 'terminal_command_result' ||
+        !message.delegateToolCallId
+      ) {
+        continue
+      }
+      map.set(message.delegateToolCallId, message)
+    }
+    return map
+  }, [chatMessages])
+  const subagentResultsByToolCallId = useMemo(() => {
+    const map = new Map<string, ChatSubagentResultMessage>()
+    for (const message of chatMessages) {
+      if (message.role !== 'subagent_result' || !message.delegateToolCallId) {
+        continue
+      }
+      map.set(message.delegateToolCallId, message)
+    }
+    return map
+  }, [chatMessages])
   useEffect(() => {
     const chatMessagesElement = chatMessagesRef.current
     if (!chatMessagesElement) {
@@ -1419,7 +1665,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     const syncLatexSelectionInView = () => {
       latexSelectionSyncFrameRef.current = null
 
-      const selection = window.getSelection()
+      const selection = (
+        chatMessagesElement.ownerDocument.defaultView ?? window
+      ).getSelection()
       const selectionRoot =
         selection?.rangeCount && !selection.isCollapsed
           ? selection.getRangeAt(0).commonAncestorContainer
@@ -1451,17 +1699,15 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
     }
 
-    document.addEventListener('selectionchange', scheduleLatexSelectionSync)
-    document.addEventListener('mouseup', scheduleLatexSelectionSync)
-    document.addEventListener('keyup', scheduleLatexSelectionSync)
+    const doc = chatMessagesElement.ownerDocument
+    doc.addEventListener('selectionchange', scheduleLatexSelectionSync)
+    doc.addEventListener('mouseup', scheduleLatexSelectionSync)
+    doc.addEventListener('keyup', scheduleLatexSelectionSync)
 
     return () => {
-      document.removeEventListener(
-        'selectionchange',
-        scheduleLatexSelectionSync,
-      )
-      document.removeEventListener('mouseup', scheduleLatexSelectionSync)
-      document.removeEventListener('keyup', scheduleLatexSelectionSync)
+      doc.removeEventListener('selectionchange', scheduleLatexSelectionSync)
+      doc.removeEventListener('mouseup', scheduleLatexSelectionSync)
+      doc.removeEventListener('keyup', scheduleLatexSelectionSync)
       if (latexSelectionSyncFrameRef.current !== null) {
         cancelAnimationFrame(latexSelectionSyncFrameRef.current)
         latexSelectionSyncFrameRef.current = null
@@ -1508,6 +1754,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         if (conversationId !== currentConversationId) return
         if (messages.length === 0) return
         const latest = messages[messages.length - 1]
+        releaseHighlightIds(
+          collectSelectionHighlightIdsFromMessages(messages.slice(0, -1)),
+        )
         setInputMessage((prev) => ({
           ...prev,
           content: latest.content,
@@ -1517,6 +1766,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           selectedSkills: latest.selectedSkills,
           selectedModelIds: latest.selectedModelIds,
           reasoningLevel: latest.reasoningLevel ?? prev.reasoningLevel,
+          // This message was never actually sent → clear the old timestamp from queueing; the next submit will re-stamp it.
+          timeContext: undefined,
         }))
         if (messages.length > 1) {
           new Notice(
@@ -1538,11 +1789,11 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return () => {
       unsubscribe()
     }
-  }, [agentService, currentConversationId, t])
+  }, [agentService, currentConversationId, releaseHighlightIds, t])
 
   // Auto-run when external agent results arrive for the current conversation
   useEffect(() => {
-    const unsubscribe = agentService.subscribeToPendingExternalAgentResults(
+    const unsubscribe = agentService.subscribeToPendingBackgroundTaskResults(
       (conversationId) => {
         if (conversationId !== currentConversationId) return
         if (agentService.isRunning(conversationId)) return
@@ -1777,6 +2028,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const removeHistoricalUserMessage = useCallback(
     (messageId: string) => {
       const sourceMessages = chatMessagesStateRef.current
+      const removedMessages = sourceMessages.filter(
+        (message) => message.role === 'user' && message.id === messageId,
+      )
+      releaseHighlightIds(
+        collectSelectionHighlightIdsFromMessages(removedMessages),
+      )
       const nextMessages = sourceMessages.filter(
         (message) => !(message.role === 'user' && message.id === messageId),
       )
@@ -1831,6 +2088,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       deleteConversation,
       inputMessage.id,
       persistConversation,
+      releaseHighlightIds,
     ],
   )
 
@@ -1884,18 +2142,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   )
 
   const handleManualContextCompaction = useCallback(async () => {
-    if (currentConversationRunSummary.isRunning) {
-      new Notice(
-        t('chat.compaction.runActive', 'Please wait for the current response to complete before compacting context.'),
-      )
-      return
-    }
-
     if (currentConversationRunSummary.isWaitingApproval) {
       new Notice(
         t(
           'chat.compaction.waitingApproval',
           'Please handle the pending tool call approvals before compacting context.',
+        ),
+      )
+      return
+    }
+
+    if (currentConversationRunSummary.isActive) {
+      new Notice(
+        t(
+          'chat.compaction.runActive',
+          'Please wait for the current response to complete before compacting context.',
         ),
       )
       return
@@ -1970,7 +2231,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationOverrides,
     createOrUpdateConversationImmediately,
     currentConversationId,
-    currentConversationRunSummary.isRunning,
+    currentConversationRunSummary.isActive,
     currentConversationRunSummary.isWaitingApproval,
     effectiveCompactionState,
     plugin,
@@ -1994,6 +2255,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   useEffect(() => {
     if (!focusedMessageId || focusedMessageId === inputMessage.id) {
+      suppressNextHistoricalUserMessageOutsidePointerRef.current = null
       return
     }
 
@@ -2014,13 +2276,22 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         return
       }
 
+      if (
+        suppressNextHistoricalUserMessageOutsidePointerRef.current ===
+        focusedMessageId
+      ) {
+        suppressNextHistoricalUserMessageOutsidePointerRef.current = null
+        return
+      }
+
       finalizeHistoricalUserMessageEdit(focusedMessageId)
       setFocusedMessageId(inputMessage.id)
     }
 
-    document.addEventListener('pointerdown', handlePointerDown, true)
+    const doc = chatMessagesRef.current?.ownerDocument ?? document
+    doc.addEventListener('pointerdown', handlePointerDown, true)
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true)
+      doc.removeEventListener('pointerdown', handlePointerDown, true)
     }
   }, [finalizeHistoricalUserMessageEdit, focusedMessageId, inputMessage.id])
 
@@ -2070,11 +2341,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           conversationId,
           loadedAssistantId,
         )
-        const loadedChatModeRaw = conversation.overrides?.chatMode
-        const loadedChatMode: ChatMode =
-          loadedChatModeRaw === 'agent' || loadedChatModeRaw === 'chat'
-            ? loadedChatModeRaw
-            : (settings.chatOptions.chatMode ?? 'agent')
+        const loadedChatMode = normalizeChatMode(
+          conversation.overrides?.chatMode,
+          settings.chatOptions.chatMode ?? 'agent',
+        )
         setChatMode(loadedChatMode)
         if (conversation.overrides) {
           conversationOverridesRef.current.set(
@@ -2192,6 +2462,32 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationOverrides,
     currentConversationId,
     props.onConversationContextChange,
+  ])
+
+  // Report the current rebuildable state to ChatView in real time, so the React tree can be
+  // seamlessly rebuilt when the host DOM is replaced (pop-out / dock back).
+  // Side effect only: reporting the snapshot; do not mutate state here.
+  const onRuntimeSnapshotChange = props.onRuntimeSnapshotChange
+  useEffect(() => {
+    if (!onRuntimeSnapshotChange) return
+    onRuntimeSnapshotChange({
+      currentConversationId,
+      inputMessage,
+      conversationModelId,
+      conversationAssistantId,
+      chatMode,
+      reasoningLevel,
+      conversationOverrides,
+    })
+  }, [
+    onRuntimeSnapshotChange,
+    currentConversationId,
+    inputMessage,
+    conversationModelId,
+    conversationAssistantId,
+    chatMode,
+    reasoningLevel,
+    conversationOverrides,
   ])
 
   const handleExportChatToVault = useCallback(
@@ -2335,6 +2631,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       const removedIds = new Set(
         sourceMessages.slice(startIdx, endIdx).map((m) => m.id),
       )
+      const removedMessages = sourceMessages.slice(startIdx, endIdx)
+      releaseHighlightIds(
+        collectSelectionHighlightIdsFromMessages(removedMessages),
+      )
       const nextMessages = sourceMessages.filter((m) => !removedIds.has(m.id))
       const nextAssistantGroupBoundaryMessageIds =
         normalizeAssistantGroupBoundaryMessageIds(
@@ -2386,6 +2686,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       isCurrentConversationRunActive,
       normalizeAssistantGroupBoundaryMessageIds,
       persistConversation,
+      releaseHighlightIds,
     ],
   )
 
@@ -2425,12 +2726,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         conversationOverridesRef.current.get(currentConversationId) ??
         conversationOverrides ??
         null
-      const rawNextChatMode = nextOverrides?.chatMode
-      const resolvedNextChatMode: ChatMode =
-        rawNextChatMode === 'agent' || rawNextChatMode === 'chat'
-          ? rawNextChatMode
-          : chatMode
-      const nextChatMode = resolvedNextChatMode
+      const nextChatMode = normalizeChatMode(nextOverrides?.chatMode, chatMode)
 
       const resolvedConversationModelId =
         conversationModelIdRef.current.get(currentConversationId) ??
@@ -2636,9 +2932,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
       applyMessages(runningMessages)
 
+      const foregroundToolAbortController = new AbortController()
+      let unregisterForegroundToolAborter: (() => void) | null = null
       try {
         const mcpManager = await getMcpManager()
         const args = getToolCallArgumentsObject(request.arguments)
+        unregisterForegroundToolAborter = plugin
+          .getAgentService()
+          .registerForegroundToolAborter({
+            conversationId,
+            toolCallId: request.id,
+            abort: () => {
+              foregroundToolAbortController.abort()
+              mcpManager.abortToolCall(request.id)
+            },
+          })
 
         if (allowForConversation) {
           mcpManager.allowToolForConversation(
@@ -2646,6 +2954,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             conversationId,
             args,
           )
+        }
+
+        if (foregroundToolAbortController.signal.aborted) {
+          return true
         }
 
         const result = await captureLLMDebugOperation({
@@ -2668,6 +2980,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
               name: request.name,
               args,
               id: request.id,
+              signal: foregroundToolAbortController.signal,
               conversationId,
               conversationMessages: runningMessages,
               roundId: toolMessageId,
@@ -2678,13 +2991,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
               // match the schema used when the call was emitted.
               chatModelId:
                 toolMessage.metadata?.branchModelId ?? conversationModelId,
-              workspaceScope:
-                chatMode === 'agent'
-                  ? selectedAssistant?.workspaceScope
-                  : undefined,
+              workspaceScope: isAgentChatMode(chatMode)
+                ? selectedAssistant?.workspaceScope
+                : undefined,
+              subagentParentContext: isDelegateSubagentToolName(request.name)
+                ? plugin
+                    .getAgentService()
+                    .getPendingApprovalSubagentParentContext(conversationId)
+                : undefined,
             }),
           getResponseBody: (response) => response,
         })
+
+        if (foregroundToolAbortController.signal.aborted) {
+          return true
+        }
 
         const resolvedMessages = updateToolCallResponseInMessages({
           messages: chatMessagesStateRef.current,
@@ -2718,6 +3039,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
         return true
       } catch (error) {
+        if (foregroundToolAbortController.signal.aborted) {
+          return true
+        }
+
         const errorMessage =
           error instanceof Error ? error.message : 'Tool call failed'
         const failedMessages = updateToolCallResponseInMessages({
@@ -2737,6 +3062,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           error,
         })
         return true
+      } finally {
+        unregisterForegroundToolAborter?.()
       }
     },
     [
@@ -2832,39 +3159,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         type: 'idle',
       })
 
-      const previousMessages = inputChatMessages.slice(0, -1)
-      const autoCompactionOptions = resolveAutoContextCompactionChatOptions(
-        settings.chatOptions,
-      )
-      let compactionForSubmit = effectiveCompactionState
-      if (
-        shouldTriggerAutoContextCompaction({
-          previousMessages,
-          chatOptions: autoCompactionOptions,
-          maxContextTokens: currentConversationModel?.maxContextTokens,
-          compactionState: effectiveCompactionState,
-          isConversationRunActive:
-            currentConversationRunSummary.isRunning ||
-            currentConversationRunSummary.isWaitingApproval,
-        })
-      ) {
-        setPendingCompactionAnchorMessageId(previousMessages.at(-1)?.id ?? null)
-        try {
-          const nextCompactionState =
-            await compactConversation(previousMessages)
-          setPendingCompactionAnchorMessageId(null)
-          if (nextCompactionState) {
-            compactionForSubmit = [
-              ...effectiveCompactionState,
-              nextCompactionState,
-            ]
-          }
-        } catch (error) {
-          setPendingCompactionAnchorMessageId(null)
-          new Notice(t('chat.compaction.autoFailed'))
-          console.error('Automatic context compaction failed', error)
-        }
-      }
+      const compactionForSubmit = effectiveCompactionState
 
       // Update the chat history to show the new user message
       setChatMessages(inputChatMessages)
@@ -3013,13 +3308,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       reasoningLevel,
       resolveReasoningLevelForMessages,
       serializeMessageModelMap,
-      settings.chatOptions,
-      compactConversation,
       plugin,
-      currentConversationModel?.maxContextTokens,
-      currentConversationRunSummary.isRunning,
-      currentConversationRunSummary.isWaitingApproval,
-      t,
     ],
   )
 
@@ -3612,11 +3901,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const removeSelectionMentionable = useCallback(
     (mentionables: ChatUserMessage['mentionables']) =>
       mentionables.filter(
-        (mentionable) =>
-          !(
-            mentionable.type === 'block' &&
-            isSyncSelectionMentionable(mentionable)
-          ),
+        (mentionable) => !isSyncSelectionMentionable(mentionable),
       ),
     [],
   )
@@ -3632,8 +3917,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
       if (focusedMessageId === inputMessage.id) {
         setInputMessage((prevInputMessage) => {
-          const existingSelection = prevInputMessage.mentionables.find(
-            (m) => m.type === 'block' && isSyncSelectionMentionable(m),
+          const existingSelection = prevInputMessage.mentionables.find((m) =>
+            isSyncSelectionMentionable(m),
           )
           if (existingSelection) {
             const existingKey = getMentionableKey(
@@ -3659,8 +3944,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       setChatMessages((prevChatHistory) =>
         prevChatHistory.map((message) => {
           if (message.id === focusedMessageId && message.role === 'user') {
-            const existingSelection = message.mentionables.find(
-              (m) => m.type === 'block' && isSyncSelectionMentionable(m),
+            const existingSelection = message.mentionables.find((m) =>
+              isSyncSelectionMentionable(m),
             )
             if (existingSelection) {
               const existingKey = getMentionableKey(
@@ -3700,8 +3985,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
       flushSync(() => {
         setInputMessage((prevInputMessage) => {
-          const existingSelection = prevInputMessage.mentionables.find(
-            (m) => m.type === 'block' && isSyncSelectionMentionable(m),
+          const existingSelection = prevInputMessage.mentionables.find((m) =>
+            isSyncSelectionMentionable(m),
           )
           if (existingSelection) {
             const existingKey = getMentionableKey(
@@ -3724,6 +4009,46 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
     },
     [buildSelectionMentionable, removeSelectionMentionable],
+  )
+
+  const syncWebSelectionMentionableToInput = useCallback(
+    (selection: MentionableWebSelection) => {
+      const mentionable: MentionableWebSelection = {
+        ...selection,
+        source: selection.source ?? 'web-selection-sync',
+        contentHash:
+          selection.contentHash ?? getBlockContentHash(selection.content),
+      }
+      const mentionableKey = getMentionableKey(
+        serializeMentionable(mentionable),
+      )
+
+      flushSync(() => {
+        setInputMessage((prevInputMessage) => {
+          const existingSelection = prevInputMessage.mentionables.find((m) =>
+            isSyncSelectionMentionable(m),
+          )
+          if (existingSelection) {
+            const existingKey = getMentionableKey(
+              serializeMentionable(existingSelection),
+            )
+            if (existingKey === mentionableKey) {
+              return prevInputMessage
+            }
+          }
+
+          return {
+            ...prevInputMessage,
+            mentionables: [
+              ...removeSelectionMentionable(prevInputMessage.mentionables),
+              mentionable,
+            ],
+            promptContent: null,
+          }
+        })
+      })
+    },
+    [removeSelectionMentionable],
   )
 
   const upsertSelectionMentionableInMainInput = useCallback(
@@ -3774,6 +4099,15 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     if (!focusedMessageId) return
 
     if (focusedMessageId === inputMessage.id) {
+      const nextMentionables = removeSelectionMentionable(
+        inputMessageRef.current.mentionables,
+      )
+      releaseHighlightIds(
+        collectRemovedSelectionHighlightIds(
+          inputMessageRef.current.mentionables,
+          nextMentionables,
+        ),
+      )
       setInputMessage((prevInputMessage) => {
         const nextMentionables = removeSelectionMentionable(
           prevInputMessage.mentionables,
@@ -3788,6 +4122,22 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         }
       })
       return
+    }
+
+    const focusedMessage = chatMessagesStateRef.current.find(
+      (message): message is ChatUserMessage =>
+        message.role === 'user' && message.id === focusedMessageId,
+    )
+    if (focusedMessage) {
+      const nextMentionables = removeSelectionMentionable(
+        focusedMessage.mentionables,
+      )
+      releaseHighlightIds(
+        collectRemovedSelectionHighlightIds(
+          focusedMessage.mentionables,
+          nextMentionables,
+        ),
+      )
     }
 
     updateHistoricalUserMessage(focusedMessageId, (message) => {
@@ -3806,6 +4156,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     focusedMessageId,
     inputMessage.id,
     removeSelectionMentionable,
+    releaseHighlightIds,
     updateHistoricalUserMessage,
   ])
 
@@ -3818,6 +4169,24 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
       // Delete from all historical messages
       const sourceMessages = chatMessagesStateRef.current
+      const idsToRelease = new Set<string>()
+      for (const message of sourceMessages) {
+        if (message.role !== 'user') continue
+        for (const id of collectSelectionHighlightIdsByMentionableKey(
+          message.mentionables,
+          mentionableKey,
+        )) {
+          idsToRelease.add(id)
+        }
+      }
+      for (const id of collectSelectionHighlightIdsByMentionableKey(
+        inputMessageRef.current.mentionables,
+        mentionableKey,
+      )) {
+        idsToRelease.add(id)
+      }
+      releaseHighlightIds(idsToRelease)
+
       let didChangeHistory = false
       const nextMessages = sourceMessages.flatMap((message): ChatMessage[] => {
         if (message.role !== 'user') {
@@ -3922,6 +4291,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       inputMessage.id,
       isUserMessageEffectivelyEmpty,
       persistConversation,
+      releaseHighlightIds,
     ],
   )
 
@@ -4088,6 +4458,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     },
     syncSelectionToInput: (selectedBlock: MentionableBlockData) => {
       syncSelectionMentionableToInput(selectedBlock)
+    },
+    syncWebSelectionToInput: (selection: MentionableWebSelection) => {
+      syncWebSelectionMentionableToInput(selection)
     },
     clearSelectionFromChat: () => {
       clearSelectionMentionable()
@@ -4268,6 +4641,66 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       const resolvedMode = nextMode
 
       if (
+        resolvedMode === 'agent-full' &&
+        !settings.chatOptions.fullAccessWarningConfirmed
+      ) {
+        new AgentModeWarningModal(app, {
+          title: t(
+            'chatMode.fullAccessWarning.title',
+            'Please confirm before enabling YOLO Mode',
+          ),
+          description: t(
+            'chatMode.fullAccessWarning.description',
+            'YOLO Mode auto-approves all tool calls, including file edits and terminal commands. Review the risks before continuing:',
+          ),
+          risks: [
+            t(
+              'chatMode.fullAccessWarning.permission',
+              'Tools run without per-call approval. Dangerous command prefixes are still blocked.',
+            ),
+            t(
+              'chatMode.fullAccessWarning.cost',
+              'Autonomous runs may consume significant model resources and incur higher costs.',
+            ),
+            t(
+              'chatMode.fullAccessWarning.backup',
+              'Back up important content in advance to avoid unintended changes.',
+            ),
+          ],
+          checkboxLabel: t(
+            'chatMode.fullAccessWarning.checkbox',
+            'I understand the risks above and accept responsibility for proceeding',
+          ),
+          cancelText: t('chatMode.fullAccessWarning.cancel', 'Cancel'),
+          confirmText: t(
+            'chatMode.fullAccessWarning.confirm',
+            'Continue with YOLO Mode',
+          ),
+          onConfirm: () => {
+            applyChatModeChange('agent-full')
+            void persistPreferredChatMode('agent-full')
+            void (async () => {
+              try {
+                await setSettings({
+                  ...settings,
+                  chatOptions: {
+                    ...settings.chatOptions,
+                    fullAccessWarningConfirmed: true,
+                  },
+                })
+              } catch (error: unknown) {
+                console.error(
+                  'Failed to persist full access warning confirmation',
+                  error,
+                )
+              }
+            })()
+          },
+        }).open()
+        return
+      }
+
+      if (
         resolvedMode === 'agent' &&
         !settings.chatOptions.agentModeWarningConfirmed
       ) {
@@ -4331,7 +4764,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       void persistPreferredChatMode(resolvedMode)
 
       if (
-        resolvedMode === 'agent' &&
+        isAgentChatMode(resolvedMode) &&
         selectedAssistant?.modelId &&
         conversationModelId === settings.chatModelId
       ) {
@@ -4362,8 +4795,6 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         <ViewToggle
           activeView={activeView}
           onChangeView={onChangeView}
-          chatMode={chatMode}
-          onChangeChatMode={handleChatModeChange}
           showComposer={isSidebarPlacement}
           disabled={false}
         />
@@ -4407,10 +4838,6 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                 'sidebar.chatList.exportConversation',
                 'Export conversation to vault',
               )}
-              title={t(
-                'sidebar.chatList.exportConversation',
-                'Export conversation to vault',
-              )}
             >
               <Download size={18} />
             </button>
@@ -4418,12 +4845,6 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
               chatList={chatList}
               currentConversationId={currentConversationId}
               runSummariesByConversationId={runSummariesByConversationId}
-              archiveEnabled={
-                settings.chatOptions.historyArchiveEnabled ?? true
-              }
-              archiveThreshold={
-                settings.chatOptions.historyArchiveThreshold ?? 50
-              }
               onSelect={(conversationId) => {
                 if (conversationId === currentConversationId) return
                 void handleLoadConversation(conversationId)
@@ -4501,7 +4922,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       if (current.kind !== 'assistant-group') continue
       if (next.kind !== 'assistant-group') continue
       const nextFirst = next.messages[0]
-      if (nextFirst && nextFirst.role === 'external_agent_result') {
+      if (
+        nextFirst &&
+        (nextFirst.role === 'external_agent_result' ||
+          nextFirst.role === 'subagent_result' ||
+          nextFirst.role === 'terminal_command_result')
+      ) {
         set.add(current.renderKey)
       }
     }
@@ -4595,6 +5021,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             activeApplyRequestKey={activeApplyRequestKey}
             onApply={handleApply}
             onToolMessageUpdate={handleToolMessageUpdate}
+            terminalCommandResultsByToolCallId={
+              terminalCommandResultsByToolCallId
+            }
+            subagentResultsByToolCallId={subagentResultsByToolCallId}
             onRecoverToolCall={handleRecoverPendingToolCall}
             onRecoverAnswerUserQuestion={handleRecoverAnswerUserQuestion}
             editingAssistantMessageId={editingAssistantMessageId}
@@ -4658,11 +5088,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             chatUserInputRef={(ref) =>
               registerChatUserInputRef(messageOrGroup.id, ref)
             }
-            onBlur={() => {
-              if (focusedMessageId === messageOrGroup.id) {
-                finalizeHistoricalUserMessageEdit(messageOrGroup.id)
-                setFocusedMessageId(inputMessage.id)
+            onControlPopoverOpenChange={(isOpen) => {
+              if (!isOpen) {
+                return
               }
+              suppressNextHistoricalUserMessageOutsidePointerRef.current =
+                messageOrGroup.id
             }}
             onInputChange={(content) => {
               updateHistoricalUserMessage(messageOrGroup.id, (message) => ({
@@ -4688,18 +5119,26 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                 messageReasoningLevel
               const nextMessageModelMap = new Map(messageModelMap)
               nextMessageModelMap.set(messageOrGroup.id, modelForThisMessage)
-              const editedUserMessage: ChatUserMessage = {
-                role: 'user',
-                content,
-                promptContent: null,
-                id: messageOrGroup.id,
-                reasoningLevel: reasoningForThisMessage,
-                mentionables: messageOrGroup.mentionables,
-                selectedSkills: messageOrGroup.selectedSkills ?? [],
-                selectedModelIds: extractSelectedModelIds(
-                  messageOrGroup.mentionables,
-                ),
-              }
+              // Resubmitting after a history edit is a new user turn → stamp with the new current time.
+              const editedUserMessage: ChatUserMessage =
+                stampUserMessageTimeContext(
+                  {
+                    role: 'user',
+                    content,
+                    promptContent: null,
+                    id: messageOrGroup.id,
+                    reasoningLevel: reasoningForThisMessage,
+                    mentionables: messageOrGroup.mentionables,
+                    selectedSkills: messageOrGroup.selectedSkills ?? [],
+                    selectedModelIds: extractSelectedModelIds(
+                      messageOrGroup.mentionables,
+                    ),
+                  },
+                  resolveAssistantTimeContextEnabled(
+                    selectedAssistant,
+                    settings,
+                  ),
+                )
               const inputChatMessages = [
                 ...groupedChatMessages
                   .slice(0, groupedMessageIndex)
@@ -4740,6 +5179,18 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
               setFocusedMessageId(messageOrGroup.id)
             }}
             onMentionablesChange={(mentionables) => {
+              const currentMessage = chatMessagesStateRef.current.find(
+                (message): message is ChatUserMessage =>
+                  message.role === 'user' && message.id === messageOrGroup.id,
+              )
+              if (currentMessage) {
+                releaseHighlightIds(
+                  collectRemovedSelectionHighlightIds(
+                    currentMessage.mentionables,
+                    mentionables,
+                  ),
+                )
+              }
               updateHistoricalUserMessage(messageOrGroup.id, (message) => {
                 const prevKeys = message.mentionables.map((m) =>
                   getMentionableKey(serializeMentionable(m)),
@@ -4902,6 +5353,26 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     ],
   )
 
+  const getMessageNavigatorItemLabel = useCallback(
+    (index: number, label: string) =>
+      t(
+        'chat.messageNavigator.itemAriaLabel',
+        'Jump to message {index}: {label}',
+      )
+        .replace('{index}', String(index))
+        .replace('{label}', label),
+    [t],
+  )
+  const messageNavigatorContent =
+    messageNavigatorAnchors.length >= MESSAGE_NAVIGATOR_MIN_ANCHORS ? (
+      <MessageNavigator
+        anchors={messageNavigatorAnchors}
+        activeMessageId={activeNavigatorMessageId}
+        itemLabel={getMessageNavigatorItemLabel}
+        onSelect={handleNavigateToUserMessage}
+      />
+    ) : undefined
+
   return (
     <div
       ref={containerRef}
@@ -4926,27 +5397,42 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           followOutput={followOutput}
           onAtBottomStateChange={onAtBottomStateChange}
           editingAssistantMessageId={editingAssistantMessageId}
-          onForceScrollToBottom={forceScrollToBottom}
+          hasEarlierMessages={hasEarlierMessages}
+          hasNewerMessages={hasNewerMessages}
+          onLoadEarlier={loadEarlier}
+          onLoadNewer={loadNewer}
+          loadEarlierLabel={t('chat.loadEarlierMessages', 'Loading earlier messages')}
+          loadNewerLabel={t('chat.loadNewerMessages', 'Loading newer messages')}
+          onForceScrollToBottom={handleForceScrollToBottom}
           hasStreamingMessages={hasStreamingMessages}
           scrollToBottomLabel={t('chat.scrollToBottom', 'Scroll to bottom')}
           scrollToBottomWhileStreamingLabel={t(
             'chat.scrollToBottomWhileStreaming',
             'Scroll to bottom and follow',
           )}
-          emptyStateChatTitle={t(
-            'chat.emptyState.chatTitle',
-            'Think first, then write',
-          )}
+          emptyStateAskTitle={t('chat.emptyState.askTitle', 'Think first, then write')}
           emptyStateAgentTitle={t('chat.emptyState.agentTitle', 'Let AI take action')}
-          emptyStateChatDescription={t(
-            'chat.emptyState.chatDescription',
+          emptyStateAgentFullTitle={t(
+            'chat.emptyState.agentFullTitle',
+            'Let AI run autonomously · YOLO mode',
+          )}
+          emptyStateAskDescription={t(
+            'chat.emptyState.askDescription',
             'Ideal for questions, polishing, and rewriting - focused on expression',
           )}
           emptyStateAgentDescription={t(
             'chat.emptyState.agentDescription',
             'Enable tool chain for search, read/write, and multi-step tasks',
           )}
+          emptyStateAgentFullDescription={t(
+            'chat.emptyState.agentFullDescription',
+            'Auto-approve tool calls for search, read/write, and multi-step tasks',
+          )}
           onTimelineVirtualizationChange={setTimelineIsVirtualized}
+          onActiveUserMessageChange={setActiveNavigatorMessageId}
+          windowNavigationKey={windowNavigationKey || undefined}
+          windowNavigationTargetMessageId={windowNavigationTargetMessageId}
+          messageNavigatorContent={messageNavigatorContent}
           bottomSpacerHeight={inputOverlayHeight}
           footerContent={
             <>
@@ -5024,7 +5510,16 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                     ) {
                       return
                     }
-                    const messageForSubmit = buildInputMessageForSubmit(content)
+                    // New user turn entering the conversation: pin the current time here. Also
+                    // covers the two downstream paths — enqueue (running branch) and normal submit —
+                    // so both use the time of enqueue/submit, not the drain moment.
+                    const messageForSubmit = stampUserMessageTimeContext(
+                      buildInputMessageForSubmit(content),
+                      resolveAssistantTimeContextEnabled(
+                        selectedAssistant,
+                        settings,
+                      ),
+                    )
 
                     // ask_user_question parks the agent in a paused state that
                     // may outlive the run itself (run can finalize while the
@@ -5041,13 +5536,20 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       return
                     }
 
-                    // While a run is active on the default branch, route the
-                    // message through enqueue so the service decides whether
-                    // to queue (mid-run injection), reject (pending approval),
-                    // or fall through (fast-path / idle). Without this, a
-                    // submit during a pending-approval state would abort the
-                    // current run.
-                    if (currentConversationRunSummary.status === 'running') {
+                    if (currentConversationRunSummary.isWaitingApproval) {
+                      new Notice(
+                        t(
+                          'chat.queueMessage.blockedApproval',
+                          'Please approve or reject the pending tool call before sending a new message.',
+                        ),
+                      )
+                      return
+                    }
+
+                    // While the live loop is queueable, route the message
+                    // through AgentService so it can be injected at the next
+                    // safe LLM boundary instead of aborting the current run.
+                    if (currentConversationRunSummary.isQueueable) {
                       const enqueueResult = agentService.enqueueUserMessage(
                         currentConversationId,
                         messageForSubmit,
@@ -5058,6 +5560,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                           next.set(inputMessage.id, reasoningLevel)
                           return next
                         })
+                        commitSentSelectionHighlights(
+                          messageForSubmit.mentionables,
+                        )
                         setInputMessage(getNewInputMessage(reasoningLevel))
                         return
                       }
@@ -5071,6 +5576,16 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                         return
                       }
                       // 'idle' → fall through to the normal submit path below.
+                    }
+
+                    if (currentConversationRunSummary.isActive) {
+                      new Notice(
+                        t(
+                          'chat.queueMessage.blockedActiveTool',
+                          'Please wait for the current tool call to finish before sending a new message.',
+                        ),
+                      )
+                      return
                     }
 
                     const nextMessageModelMap = new Map(messageModelMap)
@@ -5092,6 +5607,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       next.set(inputMessage.id, reasoningLevel)
                       return next
                     })
+                    commitSentSelectionHighlights(messageForSubmit.mentionables)
                     setInputMessage(getNewInputMessage(reasoningLevel))
                   }}
                   onFocus={() => {
@@ -5099,6 +5615,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                   }}
                   mentionables={inputMessage.mentionables}
                   setMentionables={(mentionables) => {
+                    releaseHighlightIds(
+                      collectRemovedSelectionHighlightIds(
+                        inputMessageRef.current.mentionables,
+                        mentionables,
+                      ),
+                    )
                     setInputMessage((prevInputMessage) => {
                       return {
                         ...prevInputMessage,
@@ -5160,6 +5682,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                   }
                   currentChatMode={chatMode}
                   onSelectChatModeForConversation={handleChatModeChange}
+                  chatMode={chatMode}
+                  onChatModeChange={handleChatModeChange}
                   allowAgentModeOption={true}
                   enableResize
                   onRunSlashCommand={(command) => {
@@ -5167,7 +5691,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       void handleManualContextCompaction()
                     }
                   }}
-                  isGenerating={currentConversationRunSummary.isRunning}
+                  isGenerating={currentConversationRunSummary.isAbortable}
+                  canQueueWhileGenerating={
+                    currentConversationRunSummary.isQueueable
+                  }
                   onAbort={() => abortConversationRun(currentConversationId)}
                   submitDisabled={isInputEmpty}
                   contextUsage={

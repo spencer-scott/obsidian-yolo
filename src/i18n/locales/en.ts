@@ -66,6 +66,7 @@ export const en: TranslationKeys = {
     chatList: {
       searchPlaceholder: 'Search conversations',
       empty: 'No conversations',
+      current: 'Current',
       retryTitle: 'Retry title',
       archived: 'Archived',
       hideArchived: 'Hide archived',
@@ -158,9 +159,9 @@ export const en: TranslationKeys = {
       defaultChatModel: 'Default chat model',
       defaultChatModelDesc:
         'Choose the model you want to use for sidebar chat.',
-      chatTitleModel: 'Conversation title and summary model',
+      chatTitleModel: 'Conversation title model',
       chatTitleModelDesc:
-        'Choose the model used for automatic conversation naming and compact summaries.',
+        'Choose the model used for automatic conversation naming.',
       streamFallbackRecovery: 'Enable automatic recovery',
       streamFallbackRecoveryDesc:
         'When the streaming primary request times out or fails, retry once with a non-streaming fallback.',
@@ -169,7 +170,7 @@ export const en: TranslationKeys = {
         'How long to wait before the streaming primary request is treated as timed out. This timeout always applies; if automatic recovery is enabled, a non-streaming fallback is attempted afterward. Default: 60 seconds.',
       globalSystemPrompt: 'Global system prompt',
       globalSystemPromptDesc:
-        'This prompt is added to the beginning of every chat conversation. Supported variables: date {{current_date}}, date + current hour {{current_hour}}, date + current hour and minute {{current_minute}}, weekday {{current_weekday}}.',
+        'This prompt is added to the beginning of every chat conversation.',
       continuationSystemPrompt: 'Default continuation system prompt',
       continuationSystemPromptDesc:
         'Used as the system message when generating continuation text; leave empty to fall back to the built-in default.',
@@ -274,12 +275,6 @@ export const en: TranslationKeys = {
       chatFontScale: 'Chat UI scale',
       chatFontScaleDesc:
         'Adjust the overall scale of the chat interface (default 100%).',
-      historyArchiveEnabled: 'Enable history archive grouping',
-      historyArchiveEnabledDesc:
-        'Keep older non-pinned conversations collapsed under an archive section.',
-      historyArchiveThreshold: 'Recent conversation limit',
-      historyArchiveThresholdDesc:
-        'Number of latest non-pinned conversations shown before archiving the rest (20-500).',
     },
     assistants: {
       title: 'Assistants',
@@ -293,7 +288,7 @@ export const en: TranslationKeys = {
       description: 'Description',
       systemPrompt: 'System prompt',
       systemPromptDesc:
-        'This prompt will be added to the beginning of every chat. Supports {{current_date}}, {{current_hour}}, {{current_minute}}, and {{current_weekday}}.',
+        'This prompt will be added to the beginning of every chat.',
       systemPromptPlaceholder:
         "Enter system prompt to define assistant's behavior and capabilities",
       namePlaceholder: 'Enter assistant name',
@@ -312,7 +307,7 @@ export const en: TranslationKeys = {
     },
     agent: {
       title: 'Agent',
-      desc: 'Manage global capabilities and configure your agents.',
+      desc: 'Manage global tool availability. Enabled tools become selectable by agents; actual use must still be enabled in each agent.',
       globalCapabilities: 'Global capabilities',
       mcpServerCount: '{count} custom tool servers (MCP) connected',
       tools: 'Tools',
@@ -436,10 +431,11 @@ export const en: TranslationKeys = {
       builtinFsSearchLabel: 'Search Vault',
       builtinFsSearchDesc: 'Search vault files and content',
       builtinFsReadLabel: 'Read',
-      builtinFsReadDesc: 'Read vault files',
+      builtinFsReadDesc:
+        'Read vault files, skills, or open web pages (browser://)',
       builtinContextPruneToolResultsLabel: 'Prune Tool Results',
       builtinContextPruneToolResultsDesc:
-        'Exclude past tool results from future context',
+        'Exclude past tool results from future context. Note: this tool may break the prompt cache and increase request cost.',
       builtinContextCompactLabel: 'Compact Context',
       builtinContextCompactDesc: 'Compress earlier conversation into a summary',
       builtinToolSearchLabel: 'Load Tool',
@@ -453,7 +449,7 @@ export const en: TranslationKeys = {
       fsEditReviewToggleDesc:
         'When enabled, agent fs_edit changes open inline/apply review before writing the file.',
       builtinFsFileOpsLabel: 'File Operation Toolset',
-      builtinFsFileOpsDesc: 'Create, delete, and move files and folders',
+      builtinFsFileOpsDesc: 'Write, delete, and move files and folders',
       builtinMemoryOpsLabel: 'Memory Toolset',
       builtinMemoryOpsDesc: 'Add, update, and delete memory',
       builtinMemoryAddLabel: 'Add Memory',
@@ -475,9 +471,12 @@ export const en: TranslationKeys = {
       builtinWebOpsDesc: 'Web search and page scraping',
       builtinJsEvalLabel: 'JavaScript Execution',
       builtinJsEvalDesc: 'Run JavaScript in an isolated environment.',
-      builtinDelegateExternalAgentLabel: 'Delegate to External Agent',
-      builtinDelegateExternalAgentDesc:
-        'Delegate complex tasks to a CLI agent installed locally (Codex / Claude Code).',
+      builtinTerminalCommandLabel: 'Terminal Commands',
+      builtinTerminalCommandDesc:
+        'Run commands in the local terminal. Desktop-only.',
+      builtinDelegateSubagentLabel: 'Delegate Subagent',
+      builtinDelegateSubagentDesc:
+        'Dispatch an isolated temporary subagent to complete a self-contained task asynchronously.',
       builtinTodoWriteLabel: 'Task List',
       builtinTodoWriteDesc:
         'Let the agent plan and track multi-step task progress autonomously. Agent mode only.',
@@ -513,8 +512,9 @@ export const en: TranslationKeys = {
       editorIconDesc: 'Pick an icon for this agent',
       editorChooseIcon: 'Choose icon',
       editorSystemPrompt: 'System prompt',
-      editorSystemPromptDesc:
-        'Primary behavior instruction for this agent. Supported variables: date {{current_date}}, date + current hour {{current_hour}}, date + current hour and minute {{current_minute}}, weekday {{current_weekday}}.',
+      editorSystemPromptDesc: 'Primary behavior instruction for this agent.',
+      editorSystemPromptExpand: 'Expand editor',
+      editorSystemPromptCollapse: 'Close expanded editor',
       editorEnableProjectInstructions: 'Load project instruction files',
       editorEnableProjectInstructionsDesc:
         'Auto-load AGENTS.md and CLAUDE.md from the vault root for this agent. Compatible with Codex / Claude Code / Cursor and similar tools.',
@@ -562,7 +562,10 @@ export const en: TranslationKeys = {
       agentCapabilitiesBlockTitle: 'Agent capabilities',
       focusSyncTitle: 'Focus sync',
       focusSyncDesc:
-        'When enabled, the AI can sense which file you are reading and where you are in it.',
+        'When enabled, the AI can sense where you are in the note, PDF, or web page you are viewing. Full web page content is read via fs_read with a browser:// path.',
+      timeContextTitle: 'Current time awareness',
+      timeContextDesc:
+        'Lets the model know the current time when each message is sent.',
       imageReadingBlockTitle: 'Image reading',
       imageReadingEnabled: 'Image reading',
       imageReadingEnabledDesc:
@@ -579,7 +582,7 @@ export const en: TranslationKeys = {
       autoContextCompactionBlockTitle: 'Context compaction',
       autoContextCompaction: 'Automatic context compaction',
       autoContextCompactionDesc:
-        "When the last assistant reply's prompt token usage crosses the threshold, compact older history before your next message is sent (not during the reply).",
+        'When the context reaches the threshold, remind the Agent to run the context compaction command.',
       autoContextCompactionThresholdMode: 'Compaction threshold mode',
       autoContextCompactionModeTokens: 'Absolute prompt tokens',
       autoContextCompactionModeRatio: 'Fraction of context window',
@@ -592,7 +595,7 @@ export const en: TranslationKeys = {
       jsSandboxExtTitle: 'Extension capabilities',
       jsSandboxAllowFetch: 'Allow Network Fetch',
       jsSandboxAllowFetchDesc:
-        'Allow browser network requests, plus a separate $fetch helper for requests that need YOLO to bypass cross-origin limits.',
+        'Allow browser network requests, plus a separate $fetch helper for requests that need YOLO to bypass cross-origin limits. Also enabled automatically when external scripts are enabled.',
       jsSandboxAllowFetchRisk:
         'Risk: scripts can reach any URL the browser can — public APIs, your local network, internal services, and the LLM provider itself. Data in the script (including vault contents you pass in) can be exfiltrated. Only enable for agents you fully trust.',
       jsSandboxAllowFetchConfirm:
@@ -631,6 +634,36 @@ export const en: TranslationKeys = {
     },
     jsSandbox: {
       openSettings: 'Configure JavaScript execution',
+    },
+    terminalCommand: {
+      openSettings: 'Configure terminal command',
+      blockedPrefixes: 'Blocked command prefixes',
+      blockedPrefixesDesc:
+        'Commands matching these prefixes will be rejected before execution.',
+      matchingRule:
+        'Prefix matching uses the first command token: rm blocks rm -rf /, but not npm run build.',
+      addPrefixPlaceholder: 'Command prefix, e.g. rm',
+      resetDefaults: 'Reset to defaults',
+    },
+    subagent: {
+      openSettings: 'Configure subagent models',
+      modelPool: 'Subagent model pool',
+      modelPoolDesc:
+        'The parent agent can dispatch subagents only with models in this pool.',
+      preferredModelRule:
+        'If the parent agent does not pass modelId explicitly, the preferred model is used.',
+      addModelsTitle: 'Add subagent models',
+      addModelsDesc:
+        'Select registered chat models to add to the subagent model pool.',
+      addModelPlaceholder: 'Select a model',
+      addModel: 'Add model',
+      addSelectedModels: 'Add selected models',
+      searchModels: 'Search models...',
+      setPreferredModel: 'Set as preferred model',
+      defaultModel: 'Default',
+      setDefaultModel: 'Set default',
+      emptyModelPool: 'No subagent models selected.',
+      poolCount: '{count} models',
     },
     webSearch: {
       modalTitle: 'Web search settings',
@@ -679,6 +712,9 @@ export const en: TranslationKeys = {
       fieldDepth: 'Depth',
       fieldSearchUrl: 'Search URL',
       fieldScrapeUrl: 'Scrape URL',
+      fieldUseProviderScrapeApi: 'Use provider scrape API',
+      fieldUseProviderScrapeApiDesc:
+        'When enabled, web_scrape uses this provider\u2019s extract API. When disabled, web_scrape uses the built-in generic scraper (static HTML, no extra API usage).',
       fieldBaseUrl: 'Base URL',
       fieldLanguage: 'Language',
       fieldEngines: 'Engines (comma-separated)',
@@ -765,13 +801,13 @@ export const en: TranslationKeys = {
       useObsidianRequestUrl: 'Use Obsidian requestUrl',
       useObsidianRequestUrlDesc:
         'Use Obsidian requestUrl to bypass cross-origin restrictions. Streaming responses are buffered.',
-      requestTransportMode: 'Request transport mode',
+      requestTransportMode: 'Network request method',
       requestTransportModeDesc:
-        'Auto tries browser fetch first, then desktop Node fetch, and finally falls back to Obsidian requestUrl on CORS/network errors. Obsidian mode buffers streaming responses, while Node mode uses desktop Node fetch for real streaming.',
+        'Choose how this provider sends network requests on this device. Desktop direct connection is recommended on desktop. On mobile, switch to Obsidian built-in request if browser requests have streaming or network issues.',
       requestTransportModeAuto: 'Auto (recommended)',
-      requestTransportModeBrowser: 'Browser fetch only',
-      requestTransportModeObsidian: 'Obsidian requestUrl only',
-      requestTransportModeNode: 'Desktop Node fetch only',
+      requestTransportModeBrowser: 'Browser request',
+      requestTransportModeObsidian: 'Obsidian built-in request',
+      requestTransportModeNode: 'Desktop direct connection (recommended)',
       promptCaching: 'Prompt caching',
       promptCachingDesc:
         'Enable Anthropic ephemeral prompt caching. Reuses system prompt, tools, and conversation history across turns to cut input tokens. Cache writes carry a 25% premium; reads cost ~10% of normal input. Available whenever the provider API type is Anthropic; upstream must actually honor the cache_control field.',
@@ -837,8 +873,43 @@ export const en: TranslationKeys = {
       modelIdPlaceholder: 'Example: gpt-4o-mini',
       modelName: 'Display name',
       modelNamePlaceholder: 'Enter a display name',
+      connectivityTest: {
+        button: 'Connectivity Test',
+        title: 'Connectivity Test',
+        testAll: 'Test All',
+        retest: 'Retest',
+        stop: 'Stop',
+        test: 'Test',
+        passed: 'Passed',
+        statusTesting: 'Testing',
+        statusOk: 'OK',
+        statusFail: 'Failed',
+        statusTimeout: 'Timeout',
+        statusIdle: 'Pending',
+        normalCount: 'OK',
+        abnormalCount: 'failing',
+        notTested: 'Not tested yet',
+        noResponse: 'No response',
+        firstToken: 'First token',
+        dims: 'dims',
+        noModels: 'No models configured under this provider',
+        deleteModel: 'Delete model',
+        deleteChatModelBlocked:
+          'Cannot delete the model currently selected as chat or title model',
+        deleteEmbeddingModelBlocked:
+          'Cannot delete the currently selected embedding model',
+        deleteEmbeddingModelInProgress: 'Deleting embedding model…',
+      },
       availableModelsAuto: 'Available models (auto-fetched)',
       searchModels: 'Search models...',
+      modeSingle: 'Single',
+      modeBatch: 'Batch',
+      batchSelectAll: 'Select all',
+      batchSelected: 'Selected',
+      batchAlreadyAdded: 'Added',
+      batchAdd: 'Add selected',
+      batchHint:
+        'Batch-added models use default settings; fine-tune each one afterwards.',
       fetchModelsFailed: 'Failed to fetch models',
       embeddingModelsFirst: 'Embedding models are listed first',
       reasoningType: 'Model type',
@@ -922,6 +993,7 @@ export const en: TranslationKeys = {
       desc: 'Manage knowledge base indexing. RAG is invoked automatically when the Agent uses the Search tool in Hybrid or RAG mode.',
       enableRag: 'Enable knowledge base indexing',
       enableRagDesc: 'Build indexes for documents within the selected scope.',
+      partialFailureSummary: 'Done · {{count}} file(s) could not be indexed',
       embeddingModel: 'Embedding model',
       embeddingModelDesc: 'Choose the model you want to use for embeddings',
       chunkSize: 'Chunk size',
@@ -1298,6 +1370,11 @@ export const en: TranslationKeys = {
     },
     etc: {
       title: 'Other',
+      pluginAutoUpdate: 'Auto-download updates',
+      pluginAutoUpdateDesc:
+        'When enabled, new versions are downloaded automatically in the background when detected.',
+      pluginAutoUpdateDescUnavailable:
+        'One-click install is only available on desktop with a writable plugin folder. On this device, update via Community plugins or GitHub.',
       exportConfig: 'Export settings',
       exportConfigDesc:
         'Export current plugin settings to a JSON file for use in other vaults.',
@@ -1375,6 +1452,13 @@ export const en: TranslationKeys = {
       persistSelectionHighlight: 'Keep selection block highlight',
       persistSelectionHighlightDesc:
         'Keep showing the block highlight for selected editor content while interacting with sidebar Chat or Quick Ask.',
+      chatExportSubsectionTitle: 'Chat export',
+      chatExportIncludeThinking: 'Export thinking process',
+      chatExportIncludeThinkingDesc:
+        'Include assistant reasoning blocks in exported chat markdown.',
+      chatExportIncludeToolCalls: 'Export tool calls',
+      chatExportIncludeToolCallsDesc:
+        'Include tool call arguments and results in exported chat markdown.',
       notifications: 'Notifications',
       notificationsDesc:
         'Configure alerts for Agent runs. System notifications automatically degrade when the environment does not support them.',
@@ -1410,12 +1494,15 @@ export const en: TranslationKeys = {
     placeholderMention: 'add references or models',
     placeholderSkill: 'choose a skill or command',
     contextUsage: 'Context window usage',
+    contextUsageUnknownMaxSuffix: ' (context window limit not set)',
     contextBreakdown: {
       title: 'Context',
       fullLabel: '{{percent}} Full',
       tokensSuffix: 'Tokens',
       localEstimateCaption:
         'Local estimate — may differ from server-side billing.',
+      unknownMaxHint:
+        'Set context window tokens in model settings to show usage percentage.',
       error: 'Estimation failed',
       bucket: {
         system: 'System prompt',
@@ -1424,6 +1511,7 @@ export const en: TranslationKeys = {
         skills: 'Skills',
         memory: 'Memory',
         conversation: 'Conversation',
+        reasoning: 'Reasoning',
       },
     },
     inlineInfo: {
@@ -1449,6 +1537,13 @@ export const en: TranslationKeys = {
     newChat: 'New chat',
     untitledConversation: 'New chat',
     continueResponse: 'Continue response',
+    loadEarlierMessages: 'Loading earlier messages',
+    loadNewerMessages: 'Loading newer messages',
+    messageNavigator: {
+      title: 'Message navigator',
+      itemAriaLabel: 'Jump to message {index}: {label}',
+      emptyMessage: 'Empty message',
+    },
     stopGeneration: 'Stop generation',
     queueMessage: {
       tooltip: 'Queue this message — it will be sent after the current step',
@@ -1484,6 +1579,9 @@ export const en: TranslationKeys = {
     uploadFile: 'Add file',
     imageUnsupportedByModel:
       'This model has not declared image support. Enable the "Vision" input modality in the model settings to attach images.',
+    unsupportedFileType: 'Unsupported file type: {names}',
+    processImagesFailed: 'Failed to process uploaded images',
+    readPdfFailed: 'Failed to read PDF "{name}": {error}',
     addContext: 'Add context',
     applyChanges: 'Apply changes',
     copyMessage: 'Copy message',
@@ -1497,6 +1595,7 @@ export const en: TranslationKeys = {
     regenerate: 'Regenerate',
     reasoning: 'Reasoning',
     annotations: 'Annotations',
+    vaultSources: 'Vault sources ({count})',
     pdfReferenceNoPreview: '(PDF: click the title to open the page)',
     assistantQuote: {
       add: 'Quote',
@@ -1525,12 +1624,18 @@ export const en: TranslationKeys = {
       createSnippetsFile: 'Click to create snippets.md',
     },
     emptyState: {
+      askTitle: 'Think first, then write',
+      askDescription:
+        'Great for questions, polishing, and rewriting with focus on expression.',
       chatTitle: 'Think first, then write',
       chatDescription:
         'Great for questions, polishing, and rewriting with focus on expression.',
       agentTitle: 'Let AI execute',
       agentDescription:
         'Enable tools to handle search, read/write operations, and multi-step tasks.',
+      agentFullTitle: 'Let AI execute · YOLO Mode',
+      agentFullDescription:
+        'Auto-approve tool calls for search, read/write operations, and multi-step tasks.',
     },
     compaction: {
       pendingTitle: 'Compacting context',
@@ -1688,11 +1793,14 @@ export const en: TranslationKeys = {
         open_skill: 'Open skill',
       },
       writeAction: {
+        write: 'Write file',
+        delete: 'Delete',
+        create_dir: 'Create folder',
+        move: 'Move path',
+        // Legacy keys kept for rendering historical conversations.
         create_file: 'Create file',
         delete_file: 'Delete file',
-        create_dir: 'Create folder',
         delete_dir: 'Delete folder',
-        move: 'Move path',
       },
       readMode: {
         full: 'Full',
@@ -1723,24 +1831,34 @@ export const en: TranslationKeys = {
         created: 'Planned {count} tasks',
         progress: 'Progress {done}/{total}',
       },
+      terminalCommand: {
+        sessionPoll: 'Session {id} · Poll',
+        sessionKill: 'Session {id} · Kill',
+        sessionInput: 'Session {id} · Input: {preview}',
+      },
     },
-    externalAgent: {
+    liveTask: {
       statusRunning: 'Running',
       statusDone: 'Done',
       statusAborted: 'Aborted',
       statusError: 'Error',
       progress: 'Progress',
       output: 'Output',
+      activity: 'Activity',
       abortedBeforeOutput: 'Aborted before any output was collected.',
+      noActivity: 'No activity yet.',
+      progressTruncated: 'Progress truncated.',
+      truncated: 'Output truncated.',
     },
-    externalAgentResult: {
+    subagent: {
+      openDetails: 'View subagent details',
+      planningNextMoves: 'Planning next moves',
+      noActivity: 'No activity yet.',
       statusCompleted: 'Completed',
+      statusAborted: 'Aborted',
       statusFailed: 'Failed',
-      statusCancelled: 'Cancelled',
-      statusTimedOut: 'Timed out',
-      statusKilledByShutdown: 'Stopped',
-      showOutput: 'Show output',
-      jumpToDelegate: 'Jump to original delegate message',
+      toolUseCount: '{count} tools',
+      tokenCount: '{count} tokens',
     },
     conversationSettings: {
       openAria: 'Conversation settings',
@@ -1770,6 +1888,8 @@ export const en: TranslationKeys = {
     rebuildingIndex: 'Rebuilding vault index…',
     rebuildComplete: 'Rebuilding vault index complete.',
     rebuildFailed: 'Rebuilding vault index failed.',
+    indexedWithSkipped:
+      'Index complete · {{count}} file(s) could not be indexed.',
     continueComplete: 'Resumed index completed.',
     continueFailed: 'Resumed index failed.',
     openYoloNewChatFailed:
@@ -1902,12 +2022,16 @@ export const en: TranslationKeys = {
   },
 
   chatMode: {
+    ask: 'Ask',
+    askDesc: 'Ask, refine, create',
     chat: 'Chat',
     chatDesc: 'Ask, refine, create',
     rewrite: 'Rewrite',
     rewriteDesc: 'Only modify the current selection',
     agent: 'Agent',
     agentDesc: 'Tools for complex tasks',
+    agentFull: 'Agent (YOLO)',
+    agentFullDesc: 'Auto-approve tool calls for complex tasks',
     warning: {
       title: 'Please confirm before enabling Agent mode',
       description:
@@ -1922,10 +2046,27 @@ export const en: TranslationKeys = {
       cancel: 'Cancel',
       confirm: 'Continue and Enable Agent',
     },
+    fullAccessWarning: {
+      title: 'Please confirm before enabling YOLO Mode',
+      description:
+        'YOLO Mode auto-approves all tool calls, including file edits and terminal commands. Review the risks before continuing:',
+      permission:
+        'Tools run without per-call approval. Dangerous command prefixes are still blocked.',
+      cost: 'Autonomous runs may consume significant model resources and incur higher costs.',
+      backup:
+        'Back up important content in advance to avoid unintended changes.',
+      checkbox:
+        'I understand the risks above and accept responsibility for proceeding',
+      cancel: 'Cancel',
+      confirm: 'Continue with YOLO Mode',
+    },
   },
 
   reasoning: {
     selectReasoning: 'Select reasoning',
+    effort: 'Effort',
+    faster: 'Faster',
+    smarter: 'Smarter',
     off: 'Off',
     on: 'On',
     auto: 'Auto',
@@ -2046,13 +2187,35 @@ export const en: TranslationKeys = {
 
   update: {
     newVersionAvailable: 'New version {version} is available',
+    toastTitle: 'YOLO · New version',
     currentVersion: 'Current',
     viewDetails: 'Check for updates',
+    goUpdate: 'Update',
     dismiss: 'Dismiss',
+    languageEnglish: 'EN',
+    languageChinese: '中文',
+    muteThisVersion: "Don't notify for this version",
+    viewHistory: 'View update history',
+    historyTitle: 'Release history',
+    historyLoading: 'Loading release history...',
+    historyError: 'Failed to load release history. Please try again later.',
+    historyEmpty: 'No release history found.',
+    historyPage: 'Page {{current}}',
+    historyPrev: 'Previous',
+    historyNext: 'Next',
     installationIncompleteTitle: 'Plugin installation incomplete',
     installationIncompleteMeta:
       'main.js {bakedVersion} · manifest {manifestVersion}',
     installationIncompleteNotes:
       'This usually means main.js did not finish downloading during an update. Back up data.json, remove the plugin, and reinstall.',
+    downloadUpdate: 'Download update',
+    downloading: 'Downloading {{progress}}%',
+    installAndReload: 'Install and reload',
+    applying: 'Installing…',
+    downloadFailed: 'Download failed',
+    installFailed: 'Install failed',
+    viewOnGitHub: 'View on GitHub',
+    updateInCommunityPlugins: 'Update in community plugins',
+    manualInstallOnGitHub: "Can't update? Install manually from GitHub",
   },
 }

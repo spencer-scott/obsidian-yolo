@@ -10,7 +10,10 @@ import { App } from 'obsidian'
 import { type ReactNode, useState } from 'react'
 
 import { useLanguage } from '../../../contexts/language-context'
-import type { JsSandboxSettings } from '../../../core/mcp/jsSandboxSettings'
+import {
+  type JsSandboxSettings,
+  normalizeJsSandboxConfig,
+} from '../../../core/mcp/jsSandboxSettings'
 import {
   JS_SANDBOX_DEFAULT_OUTPUT_MAX_BYTES,
   JS_SANDBOX_DEFAULT_TIMEOUT_MS,
@@ -68,11 +71,14 @@ function JsSandboxConfigModalContent({
   onChange,
 }: JsSandboxConfigModalProps & { onClose: () => void }) {
   const { t } = useLanguage()
-  const [config, setConfig] = useState<JsSandboxSettings>(value ?? {})
+  const [config, setConfig] = useState<JsSandboxSettings>(() =>
+    normalizeJsSandboxConfig(value ?? {}),
+  )
 
   const update = (next: JsSandboxSettings) => {
-    setConfig(next)
-    onChange(next)
+    const normalized = normalizeJsSandboxConfig(next)
+    setConfig(normalized)
+    onChange(normalized)
   }
 
   const handleCapToggle = (
@@ -81,6 +87,10 @@ function JsSandboxConfigModalContent({
     confirmMessage: string,
   ) => {
     if (!requested) {
+      if (cap === 'allowFetch' && config.allowExternalScripts) {
+        update({ ...config, allowFetch: true })
+        return
+      }
       update({ ...config, [cap]: false })
       return
     }
@@ -94,7 +104,10 @@ function JsSandboxConfigModalContent({
       ctaText: t('common.confirm', 'Confirm'),
       cancelText: t('common.cancel', 'Cancel'),
       onConfirm: () => update({ ...snapshot, [cap]: true }),
-      onCancel: () => setConfig((current) => ({ ...current, [cap]: false })),
+      onCancel: () =>
+        setConfig((current) =>
+          normalizeJsSandboxConfig({ ...current, [cap]: false }),
+        ),
     }).open()
   }
 
@@ -238,13 +251,14 @@ function JsSandboxConfigModalContent({
             )}
             description={t(
               'settings.agent.jsSandboxAllowFetchDesc',
-              'Allow browser network requests, plus a separate $fetch helper for requests that need YOLO to bypass cross-origin limits.',
+              'Allow browser network requests, plus a separate $fetch helper for requests that need YOLO to bypass cross-origin limits. Also enabled automatically when external scripts are enabled.',
             )}
             riskWarning={t(
               'settings.agent.jsSandboxAllowFetchRisk',
               'Risk: scripts can reach any URL the browser can — public APIs, your local network, internal services, and the LLM provider itself. Data in the script (including vault contents you pass in) can be exfiltrated. Only enable for agents you fully trust.',
             )}
-            enabled={Boolean(config.allowFetch)}
+            enabled={Boolean(config.allowFetch || config.allowExternalScripts)}
+            disabled={Boolean(config.allowExternalScripts)}
             onToggle={(v) =>
               handleCapToggle(
                 'allowFetch',
@@ -387,6 +401,7 @@ function CapabilityCard({
   riskWarning,
   enabled,
   onToggle,
+  disabled,
   children,
 }: {
   icon: ReactNode
@@ -395,6 +410,7 @@ function CapabilityCard({
   riskWarning?: string
   enabled: boolean
   onToggle: (value: boolean) => void
+  disabled?: boolean
   children?: ReactNode
 }) {
   return (
@@ -408,7 +424,11 @@ function CapabilityCard({
           name={title}
           desc={description}
         >
-          <ObsidianToggle value={enabled} onChange={onToggle} />
+          <ObsidianToggle
+            value={enabled}
+            onChange={onToggle}
+            disabled={disabled}
+          />
         </ObsidianSetting>
         {riskWarning ? (
           <div className="yolo-js-exec-cap-risk" role="note">

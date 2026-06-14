@@ -71,6 +71,57 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
     })()
   }
 
+  const handlePersistSelectionHighlightChange = (value: boolean) => {
+    void (async () => {
+      try {
+        await setSettings({
+          ...settings,
+          continuationOptions: {
+            ...settings.continuationOptions,
+            persistSelectionHighlight: value,
+          },
+        })
+        if (!value) {
+          selectionHighlightController.clearAll()
+        }
+      } catch (error: unknown) {
+        console.error('Failed to update selection highlight setting', error)
+      }
+    })()
+  }
+
+  const handleChatExportIncludeThinkingChange = (value: boolean) => {
+    void (async () => {
+      try {
+        await setSettings({
+          ...settings,
+          chatOptions: {
+            ...settings.chatOptions,
+            chatExportIncludeThinking: value,
+          },
+        })
+      } catch (error: unknown) {
+        console.error('Failed to update chat export thinking setting', error)
+      }
+    })()
+  }
+
+  const handleChatExportIncludeToolCallsChange = (value: boolean) => {
+    void (async () => {
+      try {
+        await setSettings({
+          ...settings,
+          chatOptions: {
+            ...settings.chatOptions,
+            chatExportIncludeToolCalls: value,
+          },
+        })
+      } catch (error: unknown) {
+        console.error('Failed to update chat export tool calls setting', error)
+      }
+    })()
+  }
+
   const handleRibbonClickActionChange = (value: string) => {
     if (
       value !== 'sidebar' &&
@@ -93,25 +144,6 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
         })
       } catch (error: unknown) {
         console.error('Failed to update ribbon click action', error)
-      }
-    })()
-  }
-
-  const handlePersistSelectionHighlightChange = (value: boolean) => {
-    void (async () => {
-      try {
-        await setSettings({
-          ...settings,
-          continuationOptions: {
-            ...settings.continuationOptions,
-            persistSelectionHighlight: value,
-          },
-        })
-        if (!value) {
-          selectionHighlightController.clearAll()
-        }
-      } catch (error: unknown) {
-        console.error('Failed to update selection highlight setting', error)
       }
     })()
   }
@@ -259,6 +291,53 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
             </ObsidianSetting>
 
             <ChatPreferencesSection embedded />
+          </div>
+        </section>
+      </div>
+
+      <div className="yolo-settings-section yolo-settings-section--tight">
+        <section className="yolo-settings-block">
+          <div className="yolo-settings-block-head">
+            <div className="yolo-settings-block-head-title-row">
+              <div className="yolo-settings-sub-header yolo-settings-block-title">
+                {t('settings.etc.chatExportSubsectionTitle', 'Chat export')}
+              </div>
+            </div>
+          </div>
+
+          <div className="yolo-settings-block-content">
+            <ObsidianSetting
+              name={t(
+                'settings.etc.chatExportIncludeThinking',
+                'Export thinking process',
+              )}
+              desc={t(
+                'settings.etc.chatExportIncludeThinkingDesc',
+                'Include assistant reasoning blocks in exported chat markdown.',
+              )}
+              className="yolo-settings-card"
+            >
+              <ObsidianToggle
+                value={settings.chatOptions.chatExportIncludeThinking ?? false}
+                onChange={handleChatExportIncludeThinkingChange}
+              />
+            </ObsidianSetting>
+            <ObsidianSetting
+              name={t(
+                'settings.etc.chatExportIncludeToolCalls',
+                'Export tool calls',
+              )}
+              desc={t(
+                'settings.etc.chatExportIncludeToolCallsDesc',
+                'Include tool call arguments and results in exported chat markdown.',
+              )}
+              className="yolo-settings-card"
+            >
+              <ObsidianToggle
+                value={settings.chatOptions.chatExportIncludeToolCalls ?? false}
+                onChange={handleChatExportIncludeToolCallsChange}
+              />
+            </ObsidianSetting>
           </div>
         </section>
       </div>

@@ -1,4 +1,4 @@
-import { BookOpen, FolderOpen, User, Wrench } from 'lucide-react'
+import { BookOpen, FolderOpen, Maximize2, User, Wrench, X } from 'lucide-react'
 import { App, TFile } from 'obsidian'
 import {
   useCallback,
@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useLanguage } from '../../../contexts/language-context'
 import { usePlugin } from '../../../contexts/plugin-context'
@@ -25,6 +26,7 @@ import {
   getBuiltinToolUiMeta,
 } from '../../../core/agent/builtinToolUiMeta'
 import {
+  buildDefaultBuiltinToolPreferences,
   getAssistantToolApprovalMode,
   getAssistantToolDisclosureMode,
   getAssistantToolPreferences,
@@ -33,17 +35,13 @@ import {
   getExplicitlyEnabledAssistantToolNames,
   isAssistantToolEnabled,
 } from '../../../core/agent/tool-preferences'
-import {
-  applyDynamicToolDescriptions,
-  isLoadToolSchemasToolName,
-} from '../../../core/agent/tool-selection'
+import { applyDynamicToolDescriptions } from '../../../core/agent/tool-selection'
 import {
   getJsSandboxSettings,
   hasAnyJsSandboxCapEnabled,
 } from '../../../core/mcp/jsSandboxSettings'
 import { JS_SANDBOX_TOOL_NAME } from '../../../core/mcp/jsSandboxTool'
 import {
-  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileToolServerName,
@@ -53,12 +51,13 @@ import { getYoloSkillsDir } from '../../../core/paths/yoloPaths'
 import {
   LiteSkillEntry,
   getLiteSkillDocument,
-  listLiteSkillEntries,
+  humanizeSkillName,
 } from '../../../core/skills/liteSkills'
 import {
-  getDisabledSkillIdSet,
+  getDisabledSkillNameSet,
   resolveAssistantSkillPolicy,
 } from '../../../core/skills/skillPolicy'
+import { useLiteSkillEntries } from '../../../hooks/useLiteSkillEntries'
 import { YoloSettings } from '../../../settings/schema/setting.types'
 import {
   AgentPersona,
@@ -70,6 +69,7 @@ import {
   AssistantWorkspaceScope,
 } from '../../../types/assistant.types'
 import { McpTool } from '../../../types/mcp.types'
+import { stableStringify } from '../../../utils/json/stableStringify'
 import {
   estimateJsonTokens,
   estimateTextTokens,
@@ -147,26 +147,6 @@ function fnv1aHash(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-// Stable JSON serialization with sorted object keys, so cache keys stay
-// consistent across re-renders that recreate equivalent objects.
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'null'
-  }
-  if (Array.isArray(value)) {
-    return '[' + value.map(stableStringify).join(',') + ']'
-  }
-  const record = value as Record<string, unknown>
-  const keys = Object.keys(record).sort()
-  return (
-    '{' +
-    keys
-      .map((key) => JSON.stringify(key) + ':' + stableStringify(record[key]))
-      .join(',') +
-    '}'
-  )
-}
-
 function buildToolTokenPayload(tool: McpTool): Record<string, unknown> {
   return {
     name: tool.name,
@@ -211,7 +191,7 @@ function estimateToolDefaultContextTokens(tool: McpTool): Promise<number> {
 }
 
 function buildSkillMetadataPrompt(skill: LiteSkillEntry): string {
-  return `- id: ${skill.id} | name: ${skill.name} | description: ${skill.description}`
+  return `- name: ${skill.name} | description: ${skill.description}`
 }
 
 function buildAlwaysOnSkillPrompt({
@@ -221,7 +201,7 @@ function buildAlwaysOnSkillPrompt({
   entry: LiteSkillEntry
   content: string
 }): string {
-  return `<skill id="${entry.id}" name="${entry.name}" path="${entry.path}">
+  return `<skill name="${entry.name}" path="${entry.path}">
 ${content}
 </skill>`
 }
@@ -251,7 +231,7 @@ async function estimateSkillDefaultContextTokens({
 
   const document = await getLiteSkillDocument({
     app,
-    id: skill.id,
+    name: skill.name,
     settings,
   })
   if (!document) {
@@ -279,9 +259,11 @@ function createNewAgent(defaultModelId: string): Assistant {
     enableTools: true,
     includeBuiltinTools: true,
     enabledToolNames: [],
-    toolPreferences: {},
+    toolPreferences: buildDefaultBuiltinToolPreferences(),
     enabledSkills: [],
     skillPreferences: {},
+    includeCurrentFileContent: true,
+    timeContextEnabled: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
@@ -301,6 +283,8 @@ function toDraftAgent(
     skillPreferences: assistant.skillPreferences ?? {},
     enableTools: assistant.enableTools ?? true,
     includeBuiltinTools: assistant.includeBuiltinTools ?? true,
+    includeCurrentFileContent: assistant.includeCurrentFileContent ?? true,
+    timeContextEnabled: assistant.timeContextEnabled ?? true,
   }
 }
 
@@ -359,6 +343,22 @@ export function AgentsSectionContent({
     return toDraftAgent(initialAssistant, settings.chatModelId)
   })
   const [activeTab, setActiveTab] = useState<AgentEditorTab>('profile')
+  const [isSystemPromptExpanded, setIsSystemPromptExpanded] = useState(false)
+  const expandedPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const systemPromptWrapperRef = useRef<HTMLDivElement | null>(null)
+  const [systemPromptOverlayTarget, setSystemPromptOverlayTarget] =
+    useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!isSystemPromptExpanded) {
+      setSystemPromptOverlayTarget(null)
+      return
+    }
+    const target =
+      systemPromptWrapperRef.current?.closest<HTMLElement>('.modal') ??
+      document.body
+    setSystemPromptOverlayTarget(target)
+  }, [isSystemPromptExpanded])
   const [availableTools, setAvailableTools] = useState<McpTool[]>([])
   const activeTabIndex = AGENT_EDITOR_TABS.findIndex((tab) => tab === activeTab)
   const activeTabIndexRef = useRef(activeTabIndex)
@@ -610,7 +610,7 @@ export function AgentsSectionContent({
     })
   }
 
-  const setSkillEnabled = (skillId: string, enabled: boolean) => {
+  const setSkillEnabled = (skillName: string, enabled: boolean) => {
     if (!draftAgent) {
       return
     }
@@ -620,13 +620,13 @@ export function AgentsSectionContent({
     }
 
     if (enabled) {
-      current.add(skillId)
+      current.add(skillName)
     } else {
-      current.delete(skillId)
+      current.delete(skillName)
     }
 
-    nextPreferences[skillId] = {
-      ...(nextPreferences[skillId] ?? {}),
+    nextPreferences[skillName] = {
+      ...(nextPreferences[skillName] ?? {}),
       enabled,
     }
 
@@ -638,7 +638,7 @@ export function AgentsSectionContent({
   }
 
   const setSkillLoadMode = (
-    skillId: string,
+    skillName: string,
     loadMode: AssistantSkillLoadMode,
   ) => {
     if (!draftAgent) {
@@ -647,11 +647,11 @@ export function AgentsSectionContent({
 
     const nextPreferences = {
       ...(draftAgent.skillPreferences ?? {}),
-      [skillId]: {
-        ...(draftAgent.skillPreferences?.[skillId] ?? {}),
+      [skillName]: {
+        ...(draftAgent.skillPreferences?.[skillName] ?? {}),
         enabled:
-          draftAgent.skillPreferences?.[skillId]?.enabled ??
-          draftAgent.enabledSkills?.includes(skillId) ??
+          draftAgent.skillPreferences?.[skillName]?.enabled ??
+          draftAgent.enabledSkills?.includes(skillName) ??
           true,
         loadMode,
       },
@@ -686,13 +686,6 @@ export function AgentsSectionContent({
       }
 
       const isBuiltin = serverName === localFsServerName
-      if (
-        isBuiltin &&
-        !enableToolDisclosure &&
-        toolName === LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME
-      ) {
-        return
-      }
       if (isBuiltin && draftAgent?.includeBuiltinTools === false) {
         return
       }
@@ -826,13 +819,7 @@ export function AgentsSectionContent({
           : value.tools
         return { key, ...value, tools }
       })
-  }, [
-    availableTools,
-    draftAgent?.includeBuiltinTools,
-    enableToolDisclosure,
-    localFsServerName,
-    t,
-  ])
+  }, [availableTools, draftAgent?.includeBuiltinTools, localFsServerName, t])
 
   const visibleToolsCount = useMemo(
     () => visibleToolGroups.reduce((sum, group) => sum + group.tools.length, 0),
@@ -901,9 +888,6 @@ export function AgentsSectionContent({
       ) {
         return false
       }
-      if (!enableToolDisclosure && isLoadToolSchemasToolName(tool.name)) {
-        return false
-      }
       return isAssistantToolEnabled(draftAgent, tool.name)
     })
 
@@ -930,6 +914,7 @@ export function AgentsSectionContent({
     // tool list carries. Same bridge selectAllowedTools uses at request time.
     const resolvedTools = applyDynamicToolDescriptions(eligibleTools, {
       jsSandboxSettings: getJsSandboxSettings(settings),
+      settings,
     })
 
     void Promise.all(
@@ -989,27 +974,24 @@ export function AgentsSectionContent({
     return result
   }, [draftAgent, estimatedToolContextTokens.perTool, visibleToolGroups])
 
-  const skillEntries = useMemo<LiteSkillEntry[]>(
-    () => listLiteSkillEntries(app, { settings }),
-    [app, settings],
-  )
+  const skillEntries = useLiteSkillEntries(app, { settings })
 
   const disabledSkillIds = useMemo(
     () => settings.skills?.disabledSkillIds ?? [],
     [settings.skills?.disabledSkillIds],
   )
   const skillsDir = getYoloSkillsDir(settings)
-  const disabledSkillIdSet = useMemo(
-    () => getDisabledSkillIdSet(disabledSkillIds),
+  const disabledSkillNameSet = useMemo(
+    () => getDisabledSkillNameSet(disabledSkillIds),
     [disabledSkillIds],
   )
 
   const skillRows = useMemo(() => {
     return skillEntries.map((skill) => {
-      const globallyDisabled = disabledSkillIdSet.has(skill.id)
+      const globallyDisabled = disabledSkillNameSet.has(skill.name)
       const policy = resolveAssistantSkillPolicy({
         assistant: draftAgent,
-        skillId: skill.id,
+        skillName: skill.name,
         defaultLoadMode: skill.mode,
       })
       const enabled = policy.enabled && !globallyDisabled
@@ -1020,7 +1002,7 @@ export function AgentsSectionContent({
         loadMode: policy.loadMode,
       }
     })
-  }, [disabledSkillIdSet, draftAgent, skillEntries])
+  }, [disabledSkillNameSet, draftAgent, skillEntries])
 
   // Same agent-scoped pattern as estimatedToolContextTokens above.
   const [estimatedSkillContextTokens, setEstimatedSkillContextTokens] =
@@ -1076,7 +1058,7 @@ export function AgentsSectionContent({
             app,
             settings,
             skill,
-          }).then((count) => [skill.id, count] as const),
+          }).then((count) => [skill.name, count] as const),
         ),
       )
 
@@ -1284,15 +1266,120 @@ export function AgentsSectionContent({
                 )}
                 className="yolo-settings-textarea-header yolo-settings-desc-copyable"
               />
-              <ObsidianSetting className="yolo-settings-textarea">
-                <ObsidianTextArea
-                  value={draftAgent.systemPrompt}
-                  onChange={(value) =>
-                    setDraftAgent({ ...draftAgent, systemPrompt: value })
-                  }
-                  autoResize
-                  maxAutoResizeHeight={360}
-                  inputClassName="yolo-agent-system-prompt-textarea"
+              <div
+                className="yolo-agent-system-prompt-wrapper"
+                ref={systemPromptWrapperRef}
+              >
+                <ObsidianSetting className="yolo-settings-textarea">
+                  <ObsidianTextArea
+                    value={draftAgent.systemPrompt}
+                    onChange={(value) =>
+                      setDraftAgent({ ...draftAgent, systemPrompt: value })
+                    }
+                    autoResize
+                    maxAutoResizeHeight={360}
+                    inputClassName="yolo-agent-system-prompt-textarea"
+                  />
+                </ObsidianSetting>
+                <button
+                  type="button"
+                  className="clickable-icon yolo-agent-system-prompt-expand-btn"
+                  aria-label={t(
+                    'settings.agent.editorSystemPromptExpand',
+                    'Expand editor',
+                  )}
+                  onClick={() => setIsSystemPromptExpanded(true)}
+                >
+                  <Maximize2 size={14} />
+                </button>
+              </div>
+              {isSystemPromptExpanded &&
+                systemPromptOverlayTarget &&
+                createPortal(
+                  <div
+                    className="yolo-agent-system-prompt-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) {
+                        setIsSystemPromptExpanded(false)
+                      }
+                    }}
+                  >
+                    <div className="yolo-agent-system-prompt-overlay-panel">
+                      <div className="yolo-agent-system-prompt-overlay-header">
+                        <div className="yolo-agent-system-prompt-overlay-title">
+                          {t(
+                            'settings.agent.editorSystemPrompt',
+                            'System prompt',
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="clickable-icon yolo-agent-system-prompt-overlay-close"
+                          aria-label={t(
+                            'settings.agent.editorSystemPromptCollapse',
+                            'Close editor',
+                          )}
+                          onClick={() => setIsSystemPromptExpanded(false)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="yolo-agent-system-prompt-overlay-desc">
+                        {t(
+                          'settings.agent.editorSystemPromptDesc',
+                          'Primary behavior instruction for this agent',
+                        )}
+                      </div>
+                      <textarea
+                        ref={expandedPromptTextareaRef}
+                        className="yolo-agent-system-prompt-overlay-textarea"
+                        value={draftAgent.systemPrompt}
+                        onChange={(e) =>
+                          setDraftAgent({
+                            ...draftAgent,
+                            systemPrompt: e.target.value,
+                          })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            setIsSystemPromptExpanded(false)
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  </div>,
+                  systemPromptOverlayTarget,
+                )}
+              <ObsidianSetting
+                name={t('settings.agent.focusSyncTitle')}
+                desc={t('settings.agent.focusSyncDesc')}
+              >
+                <ObsidianToggle
+                  value={draftAgent.includeCurrentFileContent !== false}
+                  onChange={(value) => {
+                    setDraftAgent({
+                      ...draftAgent,
+                      includeCurrentFileContent: value,
+                    })
+                  }}
+                />
+              </ObsidianSetting>
+              <ObsidianSetting
+                name={t('settings.agent.timeContextTitle')}
+                desc={t('settings.agent.timeContextDesc')}
+              >
+                <ObsidianToggle
+                  value={draftAgent.timeContextEnabled !== false}
+                  onChange={(value) => {
+                    setDraftAgent({
+                      ...draftAgent,
+                      timeContextEnabled: value,
+                    })
+                  }}
                 />
               </ObsidianSetting>
               <ObsidianSetting
@@ -1644,13 +1731,13 @@ export function AgentsSectionContent({
                     {skillRows.map((skill) => {
                       const disabledByGlobal = skill.globallyDisabled
                       return (
-                        <div key={skill.id} className="yolo-agent-tool-row">
+                        <div key={skill.name} className="yolo-agent-tool-row">
                           <div className="yolo-agent-tool-main">
                             <div className="yolo-agent-tool-name">
-                              <span>{skill.name}</span>
+                              <span>{humanizeSkillName(skill.name)}</span>
                               {skill.enabled &&
                                 estimatedSkillContextTokens.perSkill.has(
-                                  skill.id,
+                                  skill.name,
                                 ) && (
                                   <span className="yolo-agent-skill-tokens">
                                     {t(
@@ -1660,7 +1747,7 @@ export function AgentsSectionContent({
                                       '{count}',
                                       formatTokenCount(
                                         estimatedSkillContextTokens.perSkill.get(
-                                          skill.id,
+                                          skill.name,
                                         ) ?? 0,
                                       ),
                                     )}
@@ -1672,7 +1759,7 @@ export function AgentsSectionContent({
                             </div>
                             <div className="yolo-agent-skill-meta">
                               <span className="yolo-agent-chip">
-                                id: {skill.id}
+                                name: {skill.name}
                               </span>
                               <span className="yolo-agent-chip">
                                 {skill.path}
@@ -1694,7 +1781,7 @@ export function AgentsSectionContent({
                                 if (disabledByGlobal) {
                                   return
                                 }
-                                setSkillEnabled(skill.id, value)
+                                setSkillEnabled(skill.name, value)
                               }}
                             />
                             <select
@@ -1702,7 +1789,7 @@ export function AgentsSectionContent({
                               disabled={!skill.enabled || disabledByGlobal}
                               onChange={(event) =>
                                 setSkillLoadMode(
-                                  skill.id,
+                                  skill.name,
                                   event.target.value as AssistantSkillLoadMode,
                                 )
                               }

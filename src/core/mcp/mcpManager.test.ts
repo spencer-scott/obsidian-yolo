@@ -71,6 +71,25 @@ describe('McpManager mobile built-in tool behavior', () => {
     ).resolves.toEqual([])
   })
 
+  it('lists web_scrape without a configured web search provider', async () => {
+    const manager = createManager()
+
+    const tools = await manager.listAvailableTools({
+      includeBuiltinTools: true,
+    })
+
+    expect(tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'yolo_local__web_scrape' }),
+      ]),
+    )
+    expect(tools).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'yolo_local__web_search' }),
+      ]),
+    )
+  })
+
   it('executes built-in tools on mobile', async () => {
     const manager = createManager()
 
@@ -100,11 +119,8 @@ describe('McpManager mobile built-in tool behavior', () => {
       id: 'tool-call-1',
       args: {
         path: 'note.md',
-        operation: {
-          type: 'replace',
-          oldText: 'hello world',
-          newText: 'updated',
-        },
+        oldText: 'hello world',
+        newText: 'updated',
       },
       requireReview: true,
     })

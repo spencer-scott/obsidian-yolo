@@ -30,6 +30,8 @@ const KNOWN_MODEL_CAPABILITIES: Record<string, KnownChatModelCapability> = {
   },
   'gemini-2.0-flash': { context: 1048576, modalities: ['text', 'vision'] },
   'gemini-2.0-flash-lite': { context: 1048576, modalities: ['text', 'vision'] },
+  'deepseek-v4-flash': { context: 1048576, modalities: ['text'] },
+  'deepseek-v4-pro': { context: 1048576, modalities: ['text'] },
   'deepseek-reasoner': { context: 65536, modalities: ['text'] },
 }
 
@@ -76,6 +78,33 @@ export function resolveKnownMaxContextTokens(
   modelId: string | undefined,
 ): number | undefined {
   return resolveKnownCapability(modelId)?.context
+}
+
+/** User-configured max, then registry lookup. Undefined when neither is known. */
+export function resolveEffectiveMaxContextTokens(
+  model:
+    | Pick<ChatModel, 'maxContextTokens' | 'model' | 'id'>
+    | null
+    | undefined,
+): number | undefined {
+  if (!model) {
+    return undefined
+  }
+
+  if (
+    typeof model.maxContextTokens === 'number' &&
+    model.maxContextTokens > 0 &&
+    Number.isFinite(model.maxContextTokens)
+  ) {
+    return model.maxContextTokens
+  }
+
+  const known = resolveKnownMaxContextTokens(model.model ?? model.id)
+  if (typeof known === 'number' && known > 0 && Number.isFinite(known)) {
+    return known
+  }
+
+  return undefined
 }
 
 export function resolveKnownChatModelModalities(

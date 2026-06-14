@@ -3,7 +3,10 @@
   Assistente AI native per Obsidian — chat, scrittura, knowledge base e orchestrazione, tutto in un unico posto.
 </p>
 
-<p align="center"><a href="https://github.com/Lapis0x0/obsidian-yolo/stargazers">
+<p align="center"><a href="https://github.com/Lapis0x0/obsidian-yolo/commits/main">
+    <img src="https://img.shields.io/github/last-commit/Lapis0x0/obsidian-yolo/main?style=flat-square&color=6c5ce7" alt="Last Commit">
+  </a>
+  <a href="https://github.com/Lapis0x0/obsidian-yolo/stargazers">
     <img src="https://img.shields.io/github/stars/Lapis0x0/obsidian-yolo?style=flat-square&color=6c5ce7" alt="GitHub Stars">
   </a>
   <a href="https://github.com/Lapis0x0/obsidian-yolo/releases/latest">
@@ -23,13 +26,7 @@
 
 ## Novita recenti
 
-- `1.5.7`: YOLO ora percepisce cosa stai leggendo—la sincronizzazione del focus mantiene l'AI aggiornata sul file e sulla posizione corrente, con supporto avanzato per PDF: lettura visiva, sincronizzazione della selezione e screenshot di regioni.
-- `1.5.6`: La ricerca web integrata è disponibile—gli Agent possono ora navigare su internet direttamente, con più provider di ricerca e scraping web unificato.
-- `1.5.5`: Motore della knowledge base rinnovato, ricerca ibrida e indicizzazione completamente aggiornate, con risultati di ricerca piu intelligenti.
-- `1.5.4`: Per sessioni lunghe e compiti complessi—introduzione di potatura e compressione del contesto, conversazioni multi-modello, timeline virtualizzata per chat lunghe e compressione automatica.
-- `1.5.3`: Chat multi-finestra nativa e Agent in background per un'automazione piu scorrevole.
-- `1.5.2`: Il nuovo sistema di memoria e ora disponibile e permette a YOLO di ricordare in modo piu naturale le tue preferenze, abitudini e il contesto a lungo termine tra conversazioni diverse.
-- `1.5.1`: YOLO introduce una nuovissima modalita Agent: l'AI non si limita piu a rispondere, ma puo usare strumenti, organizzare passaggi e partecipare davvero al lavoro da svolgere.
+- **`1.5`**: Introduce un nuovo runtime Agent che trasforma l'AI da semplice Q&A in collaborazione attiva—con tool calling completo, MCP, Skills, Bash desktop, subagent e ricerca web—oltre a contesto e memoria per sessioni lunghe, RAG ibrido rinnovato, sincronizzazione del focus e consapevolezza PDF, e chat multi-finestra con Agent in background.
 
 ## Highlights
 

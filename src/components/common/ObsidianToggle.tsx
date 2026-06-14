@@ -6,9 +6,14 @@ import { useObsidianSetting } from './ObsidianSetting'
 type ObsidianToggleProps = {
   value: boolean
   onChange: (value: boolean) => void
+  disabled?: boolean
 }
 
-export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
+export function ObsidianToggle({
+  value,
+  onChange,
+  disabled,
+}: ObsidianToggleProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const { setting } = useObsidianSetting()
   const [toggleComponent, setToggleComponent] =
@@ -68,6 +73,15 @@ export function ObsidianToggle({ value, onChange }: ObsidianToggleProps) {
       isSyncingRef.current = false
     })
   })
+
+  useEffect(() => {
+    if (!toggleComponent) return
+    toggleComponent.setDisabled(!!disabled)
+    // setDisabled only sets the flag; visually nothing changes unless the
+    // theme has a rule. Toggle .is-disabled so styles/chat/input.css
+    // (.yolo-checkbox-container.is-disabled) can dim and block clicks.
+    toggleComponent.toggleEl.toggleClass('is-disabled', !!disabled)
+  }, [toggleComponent, disabled])
 
   return <div ref={containerRef} className="yolo-display-contents" />
 }

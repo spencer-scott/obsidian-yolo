@@ -8,10 +8,13 @@ type SubmitButtonProps = {
    * True while a conversation run is in flight. The button takes one of two
    * forms depending on whether the input has content:
    * - empty input → stop button (clicking aborts the run)
-   * - non-empty input → send button (clicking enqueues the message for
-   *   injection at the next safe boundary)
+   * - non-empty input + queueable → send button (clicking enqueues the message
+   *   for injection at the next safe boundary)
+   * - non-empty input + not queueable → send button remains visible, but the
+   *   submit handler blocks with contextual guidance
    */
   isGenerating?: boolean
+  canQueue?: boolean
   onAbort?: () => void
   /**
    * True when the input is empty. While idle this disables the send button;
@@ -24,6 +27,7 @@ type SubmitButtonProps = {
 export function SubmitButton({
   onClick,
   isGenerating = false,
+  canQueue = true,
   onAbort,
   disabled = false,
 }: SubmitButtonProps) {
@@ -32,6 +36,10 @@ export function SubmitButton({
   const queueLabel = t(
     'chat.queueMessage.tooltip',
     'Queue message, will continue after the current turn completes',
+  )
+  const blockedLabel = t(
+    'chat.queueMessage.blockedActiveTooltip',
+    'Can send again after the current tool call completes',
   )
   const stopLabel = t('chat.stopGeneration', 'Stop generation')
 
@@ -42,19 +50,22 @@ export function SubmitButton({
         className="yolo-chat-user-input-submit-button-circle is-stop"
         onClick={() => onAbort?.()}
         aria-label={stopLabel}
-        title={stopLabel}
       >
         <Square size={12} fill="currentColor" strokeWidth={0} />
       </button>
     )
   }
 
-  const label = isGenerating ? queueLabel : sendLabel
+  const label = isGenerating
+    ? canQueue
+      ? queueLabel
+      : blockedLabel
+    : sendLabel
   return (
     <button
       type="button"
       className={`yolo-chat-user-input-submit-button-circle${
-        isGenerating ? ' is-queueing' : ''
+        isGenerating && canQueue ? ' is-queueing' : ''
       }`}
       disabled={!isGenerating && disabled}
       onClick={() => {
@@ -62,7 +73,6 @@ export function SubmitButton({
         onClick()
       }}
       aria-label={label}
-      title={label}
     >
       <ArrowUp size={16} strokeWidth={2.5} />
     </button>

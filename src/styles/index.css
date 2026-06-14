@@ -7,6 +7,8 @@
 @import './settings/tabs.css';
 @import './settings/agent.css';
 @import './settings/web-search.css';
+@import './settings/connectivity-test.css';
+@import './settings/batch-add-models.css';
 
 @import './popover/index.css';
 
@@ -14,6 +16,7 @@
 @import './chat/message.css';
 @import './chat/popover.css';
 @import './chat/external-agent-card.css';
+@import './chat/subagent-card.css';
 @import './chat/todo-list-panel.css';
 @import './chat/ask-user-question-panel.css';
 

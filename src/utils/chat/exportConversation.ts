@@ -24,6 +24,10 @@ type YoloSettingsLike = {
   yolo?: {
     baseDir?: string
   }
+  chatOptions?: {
+    chatExportIncludeThinking?: boolean
+    chatExportIncludeToolCalls?: boolean
+  }
 }
 
 type SerializedAssistantToolMessageGroup = Array<
@@ -35,6 +39,10 @@ export type ConversationToMarkdownOptions = {
   exportedAtIso: string
   /** When true (default), only include the active branch per user turn. */
   filterBranches?: boolean
+  /** When true, include assistant reasoning/thinking blocks. Default false. */
+  includeThinking?: boolean
+  /** When true, include tool call blocks. Default false. */
+  includeToolCalls?: boolean
 }
 
 const WINDOWS_FORBIDDEN_FILENAME_CHARS = /[<>:"/\\|?*]/g
@@ -122,6 +130,9 @@ function mentionablesToMarkdownLines(
       case 'url':
         lines.push(`<${m.url}>`)
         break
+      case 'web-selection':
+        lines.push(`Web selection: [${m.title || m.url}](${m.url})`)
+        break
       case 'assistant-quote':
         lines.push('Assistant quote')
         break
@@ -151,8 +162,12 @@ function groupSerializedAssistantAndToolMessages(
     ) => {
       if (message.role === 'user') {
         acc.push(message)
-      } else if (message.role === 'external_agent_result') {
-        // external_agent_result messages are not exported to markdown
+      } else if (
+        message.role === 'external_agent_result' ||
+        message.role === 'subagent_result' ||
+        message.role === 'terminal_command_result'
+      ) {
+        // These side-channel messages are exported through their owning assistant turn.
       } else {
         const lastItem = acc[acc.length - 1]
         if (
@@ -287,9 +302,10 @@ function toolResponseToMarkdownSnippet(response: ToolCallResponse): string {
 function appendAssistantMessageToLines(
   message: SerializedChatAssistantMessage,
   lines: string[],
+  includeThinking: boolean,
 ): void {
   lines.push('## Assistant', '')
-  if (message.reasoning?.trim()) {
+  if (includeThinking && message.reasoning?.trim()) {
     lines.push(
       '> [!note]- Thinking',
       ...message.reasoning.split('\n').map((line) => `> ${line}`),
@@ -427,7 +443,13 @@ export function conversationToMarkdown(
   conversation: ChatConversation,
   options: ConversationToMarkdownOptions,
 ): string {
-  const { snapshotEntries, exportedAtIso, filterBranches = true } = options
+  const {
+    snapshotEntries,
+    exportedAtIso,
+    filterBranches = true,
+    includeThinking = false,
+    includeToolCalls = false,
+  } = options
 
   const lines: string[] = []
   const title = conversation.title?.trim() || 'Chat'
@@ -509,7 +531,7 @@ export function conversationToMarkdown(
     }
 
     if (message.role === 'assistant') {
-      appendAssistantMessageToLines(message, lines)
+      appendAssistantMessageToLines(message, lines, includeThinking)
       appendAnchoredCompactionSummariesToLines(
         message.id,
         compactionByAnchorMessageId,
@@ -519,7 +541,9 @@ export function conversationToMarkdown(
     }
 
     if (message.role === 'tool') {
-      appendToolMessageToLines(message, lines)
+      if (includeToolCalls) {
+        appendToolMessageToLines(message, lines)
+      }
     }
     appendAnchoredCompactionSummariesToLines(
       message.id,
@@ -608,6 +632,9 @@ export async function exportChatConversationToVault(
   const markdown = conversationToMarkdown(conversation, {
     snapshotEntries,
     exportedAtIso: new Date().toISOString(),
+    includeThinking: settings?.chatOptions?.chatExportIncludeThinking ?? false,
+    includeToolCalls:
+      settings?.chatOptions?.chatExportIncludeToolCalls ?? false,
   })
 
   await ensureDirectoryPathExists(app, folderPath)

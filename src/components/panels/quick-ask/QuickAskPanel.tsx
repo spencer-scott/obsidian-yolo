@@ -9,7 +9,6 @@ import {
 import {
   ChevronDown,
   ChevronUp,
-  PencilLine,
   RotateCcw,
   Send,
   Square,
@@ -30,6 +29,7 @@ import { useApp } from '../../../contexts/app-context'
 import { useLanguage } from '../../../contexts/language-context'
 import { useMcp } from '../../../contexts/mcp-context'
 import { useSettings } from '../../../contexts/settings-context'
+import { resolveAssistantTimeContextEnabled } from '../../../core/agent/assistant-capabilities'
 import { getEnabledAssistantToolNames } from '../../../core/agent/tool-preferences'
 import { materializeTextEditPlan } from '../../../core/edits/textEditEngine'
 import { parseTextEditPlan } from '../../../core/edits/textEditPlan'
@@ -42,6 +42,7 @@ import type {
   QuickAskSelectionScope,
 } from '../../../features/editor/quick-ask/quickAsk.types'
 import { QUICK_ASK_CURSOR_MARKER } from '../../../features/editor/quick-ask/quickAskController'
+import { selectionHighlightController } from '../../../features/editor/selection-highlight/selectionHighlightController'
 import { useChatHistory } from '../../../hooks/useChatHistory'
 import YoloPlugin from '../../../main'
 import type { ApplyViewState } from '../../../types/apply-view.types'
@@ -71,6 +72,7 @@ import { groupAssistantAndToolMessages } from '../../../utils/chat/message-group
 import { RequestContextBuilder } from '../../../utils/chat/requestContextBuilder'
 import { buildMessageTimelineItems } from '../../../utils/chat/timeline'
 import { readTFileContent } from '../../../utils/obsidian'
+import { stampUserMessageTimeContext } from '../../../utils/prompt/timeContext'
 import AssistantToolMessageGroupItem from '../../chat-view/AssistantToolMessageGroupItem'
 import type { ChatUserInputRef } from '../../chat-view/chat-input/ChatUserInput'
 import LexicalContentEditable from '../../chat-view/chat-input/LexicalContentEditable'
@@ -94,7 +96,7 @@ type QuickAskExecutionMode = QuickAskMode | 'edit' | 'edit-direct'
 function normalizeQuickAskVisibleMode(
   mode?: QuickAskLaunchMode | null,
 ): QuickAskMode {
-  return mode === 'agent' ? 'agent' : 'chat'
+  return mode === 'agent' ? 'agent' : 'ask'
 }
 
 function normalizeQuickAskExecutionMode(
@@ -104,7 +106,7 @@ function normalizeQuickAskExecutionMode(
     return mode
   }
 
-  return 'chat'
+  return 'ask'
 }
 
 function getSelectionMentionable(
@@ -249,6 +251,19 @@ export function QuickAskPanel({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  // While the LLM is streaming, flip the QuickAsk-owned selection highlight
+  // into a "pending" shimmer so users get visible feedback that AI is working
+  // on the selected text. The highlight itself is created/cleared by
+  // QuickAskController; we only flip its visual state here.
+  useEffect(() => {
+    selectionHighlightController.updateVisualByOwner(
+      'quickask',
+      isStreaming ? 'pending' : 'selection',
+    )
+    return () => {
+      selectionHighlightController.updateVisualByOwner('quickask', 'selection')
+    }
+  }, [isStreaming])
   const [runStatus, setRunStatus] = useState<QuickAskRunStatus>(null)
   const [isAssistantMenuOpen, setIsAssistantMenuOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
@@ -287,12 +302,12 @@ export function QuickAskPanel({
       const resolved = normalizeQuickAskExecutionMode(
         initialMode ?? settings.continuationOptions?.quickAskMode,
       )
-      // PDF path: edit modes are unavailable; fall back to 'chat'
+      // PDF path: edit modes are unavailable; fall back to 'ask'
       if (
         !capabilities.edit &&
         (resolved === 'edit' || resolved === 'edit-direct')
       ) {
-        return 'chat'
+        return 'ask'
       }
       return resolved
     },
@@ -317,17 +332,20 @@ export function QuickAskPanel({
   const [focusedUserMessageId, setFocusedUserMessageId] = useState<
     string | null
   >(null)
+  const suppressNextFocusedUserMessageOutsidePointerRef = useRef<string | null>(
+    null,
+  )
 
   useEffect(() => {
     if (initialMode) {
       setMode(normalizeQuickAskVisibleMode(initialMode))
       const resolved = normalizeQuickAskExecutionMode(initialMode)
-      // PDF path: edit modes are unavailable; fall back to 'chat'
+      // PDF path: edit modes are unavailable; fall back to 'ask'
       if (
         !capabilities.edit &&
         (resolved === 'edit' || resolved === 'edit-direct')
       ) {
-        setExecutionMode('chat')
+        setExecutionMode('ask')
       } else {
         setExecutionMode(resolved)
       }
@@ -385,9 +403,6 @@ export function QuickAskPanel({
   const modeTriggerLabel = isTemporaryRewriteMode
     ? t('chatMode.rewrite', 'Rewrite')
     : undefined
-  const modeTriggerIcon = isTemporaryRewriteMode ? (
-    <PencilLine size={14} />
-  ) : undefined
   const buildEditInstruction = useCallback(
     (instruction: string) => {
       const context = selectionEditContextText.trim()
@@ -492,7 +507,7 @@ export function QuickAskPanel({
   const shouldShowInlineRunStatus =
     isStreaming &&
     !!runStatusLabel &&
-    ((executionMode !== 'agent' && executionMode !== 'chat') ||
+    ((executionMode !== 'agent' && executionMode !== 'ask') ||
       (!hasStreamingAssistantPlaceholder && !hasVisibleAssistantOrToolMessages))
 
   const noop = useCallback(() => {}, [])
@@ -613,10 +628,20 @@ export function QuickAskPanel({
         systemPrompt: combinedSystemPrompt,
       },
       {
-        includeSkills: executionMode === 'agent' || executionMode === 'chat',
+        includeSkills: executionMode === 'agent' || executionMode === 'ask',
+        systemPromptSnapshotStore: plugin
+          .getAgentService()
+          .getSystemPromptSnapshotStore(),
+        getPromptSourceRevision: () =>
+          plugin.getAgentService().getPromptSourceWatcher().getRevision(),
+        promptSourcePathsCallback: (paths) =>
+          plugin
+            .getAgentService()
+            .getPromptSourceWatcher()
+            .setWatchedPaths(paths),
       },
     )
-  }, [app, executionMode, selectedAssistant, settings])
+  }, [app, executionMode, selectedAssistant, settings, plugin])
 
   const editorSnapshotInjection =
     useMemo<EditorSnapshotInjection | null>(() => {
@@ -985,13 +1010,17 @@ export function QuickAskPanel({
         }
       })
 
-      const userMessage: ChatUserMessage = {
-        role: 'user',
-        content: editorState,
-        promptContent: null,
-        id: options?.userMessageId ?? uuidv4(),
-        mentionables: mentionablesOverride ?? mentionables,
-      }
+      // New user turn entering the conversation: pin the current time here (same mechanism as the sidebar Chat).
+      const userMessage: ChatUserMessage = stampUserMessageTimeContext(
+        {
+          role: 'user',
+          content: editorState,
+          promptContent: null,
+          id: options?.userMessageId ?? uuidv4(),
+          mentionables: mentionablesOverride ?? mentionables,
+        },
+        resolveAssistantTimeContextEnabled(selectedAssistant, settings),
+      )
 
       // Clear mentionables after creating the message
       setMentionables([])
@@ -1065,24 +1094,23 @@ export function QuickAskPanel({
 
         const isAgentMode = executionMode === 'agent'
         const chatModeRuntime = resolveChatModeRuntime({
-          mode: isAgentMode ? 'agent' : 'chat',
+          mode: isAgentMode ? 'agent' : 'ask',
           assistant: selectedAssistant,
           assistantEnabledToolNames:
             getEnabledAssistantToolNames(selectedAssistant),
         })
         const effectiveModel = model
-        const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
+        const disabledSkillNames = settings.skills?.disabledSkillIds ?? []
         const enabledSkillEntries = selectedAssistant
-          ? listLiteSkillEntries(app, { settings }).filter((skill) =>
+          ? (await listLiteSkillEntries(app, { settings })).filter((skill) =>
               isSkillEnabledForAssistant({
                 assistant: selectedAssistant,
-                skillId: skill.id,
-                disabledSkillIds,
+                skillName: skill.name,
+                disabledSkillNames,
               }),
             )
           : []
-        const allowedSkillIds = enabledSkillEntries.map((skill) => skill.id)
-        const allowedSkillNames = enabledSkillEntries.map((skill) => skill.name)
+        const allowedSkillPaths = enabledSkillEntries.map((skill) => skill.path)
 
         const agentService = plugin.getAgentService()
         unsubscribeRunner = agentService.subscribe(
@@ -1108,8 +1136,8 @@ export function QuickAskPanel({
             allowedToolNames: chatModeRuntime.allowedToolNames,
             enableToolDisclosure: settings.mcp.enableToolDisclosure,
             toolPreferences: chatModeRuntime.toolPreferences,
-            allowedSkillIds,
-            allowedSkillNames,
+            allowedSkillPaths,
+            runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
             contextualInjections: editorSnapshotInjection
               ? [editorSnapshotInjection]
               : [],
@@ -1198,6 +1226,7 @@ export function QuickAskPanel({
 
   useEffect(() => {
     if (!focusedUserMessageId) {
+      suppressNextFocusedUserMessageOutsidePointerRef.current = null
       return
     }
 
@@ -1215,6 +1244,14 @@ export function QuickAskPanel({
         `[data-user-message-id="${focusedUserMessageId}"]`,
       )
       if (activeMessageElement?.contains(target)) {
+        return
+      }
+
+      if (
+        suppressNextFocusedUserMessageOutsidePointerRef.current ===
+        focusedUserMessageId
+      ) {
+        suppressNextFocusedUserMessageOutsidePointerRef.current = null
         return
       }
 
@@ -1460,7 +1497,14 @@ export function QuickAskPanel({
           console.warn('Some planned edits failed:', errors)
         }
 
-        // Close Quick Ask before opening review to avoid layout jump
+        // Close Quick Ask before opening review to avoid layout jump.
+        // Tear down the QuickAsk-owned selection highlight *synchronously*
+        // here, instead of relying on the controller's local close (which
+        // runs ~200ms later, after the close animation). Otherwise the
+        // pending shimmer keeps painting over the selection through the
+        // review and stays visible after the user rejects the diff, because
+        // ApplyView never touches owner='quickask' entries.
+        selectionHighlightController.clearByOwner('quickask')
         setIsStreaming(false)
         setRunStatus(null)
         closedForReview = true
@@ -1723,7 +1767,14 @@ export function QuickAskPanel({
 
   // Clear conversation
   const clearConversation = useCallback(() => {
+    // Abort any in-flight run first: clearing starts a new topic under the same
+    // conversationId, and a still-running loop would otherwise re-create the
+    // snapshot we are about to evict on its next iteration.
+    abortStream()
     setChatMessages([])
+    // New topic under the same conversationId, so drop the frozen system prompt
+    // to re-snapshot against the current memory / config on the next message.
+    plugin.getAgentService().evictSystemPromptSnapshot(conversationId)
     new Notice(t('quickAsk.cleared', 'Conversation cleared'))
     // Re-enable follow mode after clearing.
     forceScrollToBottom()
@@ -1731,7 +1782,7 @@ export function QuickAskPanel({
     setTimeout(() => {
       contentEditableRef.current?.focus()
     }, 0)
-  }, [forceScrollToBottom, t])
+  }, [abortStream, conversationId, plugin, forceScrollToBottom, t])
 
   // Open in sidebar
   const hasMessages = chatMessages.length > 0
@@ -2069,8 +2120,12 @@ export function QuickAskPanel({
               chatUserInputRef={(ref) =>
                 registerChatUserInputRef(messageOrGroup.id, ref)
               }
-              onBlur={() => {
-                setFocusedUserMessageId(null)
+              onControlPopoverOpenChange={(isOpen) => {
+                if (!isOpen) {
+                  return
+                }
+                suppressNextFocusedUserMessageOutsidePointerRef.current =
+                  messageOrGroup.id
               }}
               onInputChange={(content) => {
                 setChatMessages((prev) =>
@@ -2444,7 +2499,6 @@ export function QuickAskPanel({
               mode={mode}
               onChange={handleModeChange}
               triggerLabel={modeTriggerLabel}
-              triggerIcon={modeTriggerIcon}
               onMenuOpenChange={(open) => setIsModeMenuOpen(open)}
               side="bottom"
               align="start"
@@ -2487,7 +2541,6 @@ export function QuickAskPanel({
               className="yolo-quick-ask-toolbar-button"
               onClick={clearConversation}
               aria-label={t('quickAsk.clear', 'Clear conversation')}
-              title={t('quickAsk.clear', 'Clear conversation')}
             >
               <RotateCcw size={14} />
             </button>

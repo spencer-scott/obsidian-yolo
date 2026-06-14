@@ -11,6 +11,7 @@ import {
 } from '../constants'
 import { useApp } from '../contexts/app-context'
 import { useLanguage } from '../contexts/language-context'
+import { usePlugin } from '../contexts/plugin-context'
 import { useSettings } from '../contexts/settings-context'
 import { executeSingleTurn } from '../core/ai/single-turn'
 import {
@@ -20,6 +21,7 @@ import {
   updateLLMDebugTrace,
 } from '../core/llm/debugCapture'
 import { getChatModelClient } from '../core/llm/manager'
+import type { AutoPromotedTransportMode } from '../core/llm/requestTransport'
 import { promoteProviderTransportModeToObsidian } from '../core/llm/transportModePromotion'
 import { batchLookupImageCache } from '../database/json/chat/imageCacheStore'
 import { compactConversationMessagesForStorage } from '../database/json/chat/promptSnapshotStore'
@@ -141,6 +143,7 @@ type UseChatHistory = {
 
 export function useChatHistory(): UseChatHistory {
   const app = useApp()
+  const plugin = usePlugin()
   const { settings, setSettings } = useSettings()
   const { language } = useLanguage()
   const chatManager = useChatManager()
@@ -154,7 +157,7 @@ export function useChatHistory(): UseChatHistory {
   }, [settings])
 
   const handleAutoPromoteTransportMode = useCallback(
-    (providerId: string, mode: 'node' | 'obsidian') => {
+    (providerId: string, mode: AutoPromotedTransportMode) => {
       void promoteProviderTransportModeToObsidian({
         getSettings: () => settingsRef.current,
         setSettings,
@@ -382,10 +385,11 @@ export function useChatHistory(): UseChatHistory {
   const deleteConversation = useCallback(
     async (id: string): Promise<void> => {
       await chatManager.deleteChat(id)
+      plugin.getAgentService().evictSystemPromptSnapshot(id)
       emitChatHistoryUpdated()
       await fetchChatList()
     },
-    [chatManager, emitChatHistoryUpdated, fetchChatList],
+    [chatManager, plugin, emitChatHistoryUpdated, fetchChatList],
   )
 
   const getChatMessagesById = useCallback(
@@ -645,9 +649,10 @@ export function useChatHistory(): UseChatHistory {
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: titleInput },
                   ],
+                  reasoningLevel: 'off',
                 },
                 stream: false,
-                purpose: 'auxiliary',
+                purpose: 'lightweight',
                 signal: controller.signal,
                 debugTraceId: debugTrace?.id,
               })
@@ -771,6 +776,7 @@ const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
         selectedSkills: message.selectedSkills ?? [],
         selectedModelIds: message.selectedModelIds ?? [],
         reasoningLevel: message.reasoningLevel,
+        timeContext: message.timeContext,
       }
     case 'assistant':
       return {
@@ -790,6 +796,8 @@ const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
         metadata: message.metadata,
       }
     case 'external_agent_result':
+    case 'subagent_result':
+    case 'terminal_command_result':
       return message
   }
 }
@@ -812,6 +820,7 @@ const deserializeChatMessage = (
         selectedSkills: message.selectedSkills ?? [],
         selectedModelIds: message.selectedModelIds ?? [],
         reasoningLevel: message.reasoningLevel,
+        timeContext: message.timeContext,
       }
     }
     case 'assistant':
@@ -832,6 +841,8 @@ const deserializeChatMessage = (
         metadata: message.metadata,
       }
     case 'external_agent_result':
+    case 'subagent_result':
+    case 'terminal_command_result':
       return message
   }
 }

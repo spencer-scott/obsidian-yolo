@@ -1,4 +1,4 @@
-import { App, Notice, TFile, TFolder } from 'obsidian'
+import { App, Notice, TFile, TFolder, normalizePath } from 'obsidian'
 import { useCallback, useMemo, useState } from 'react'
 
 import { useLanguage } from '../../../contexts/language-context'
@@ -7,7 +7,8 @@ import {
   useSettings,
 } from '../../../contexts/settings-context'
 import { getYoloSkillsDir } from '../../../core/paths/yoloPaths'
-import { listLiteSkillEntries } from '../../../core/skills/liteSkills'
+import { humanizeSkillName } from '../../../core/skills/liteSkills'
+import { useLiteSkillEntries } from '../../../hooks/useLiteSkillEntries'
 import YoloPlugin from '../../../main'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianToggle } from '../../common/ObsidianToggle'
@@ -68,28 +69,25 @@ function AgentSkillsModalContent({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const skillsDir = getYoloSkillsDir(settings)
 
-  const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
-  const disabledSkillIdSet = useMemo(
-    () => new Set(disabledSkillIds),
-    [disabledSkillIds],
+  const disabledSkillNames = settings.skills?.disabledSkillIds ?? []
+  const disabledSkillNameSet = useMemo(
+    () => new Set(disabledSkillNames),
+    [disabledSkillNames],
   )
 
-  const skills = useMemo(() => {
-    void refreshTick
-    return listLiteSkillEntries(app, { settings })
-  }, [app, refreshTick, settings])
+  const skills = useLiteSkillEntries(app, { settings, refreshTick })
 
   const deletableSkills = useMemo(
     () => skills.filter((s) => !s.path.startsWith('builtin://')),
     [skills],
   )
 
-  const handleToggleSkill = (skillId: string, enabled: boolean) => {
+  const handleToggleSkill = (skillName: string, enabled: boolean) => {
     const current = new Set(settings.skills?.disabledSkillIds ?? [])
     if (enabled) {
-      current.delete(skillId)
+      current.delete(skillName)
     } else {
-      current.add(skillId)
+      current.add(skillName)
     }
 
     void setSettings({
@@ -122,26 +120,64 @@ function AgentSkillsModalContent({
     setSelectedIds(new Set())
   }
 
-  const handleToggleSelect = useCallback((skillId: string) => {
+  const handleToggleSelect = useCallback((skillName: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(skillId)) {
-        next.delete(skillId)
+      if (next.has(skillName)) {
+        next.delete(skillName)
       } else {
-        next.add(skillId)
+        next.add(skillName)
       }
       return next
     })
   }, [])
 
   const handleSelectAll = useCallback(() => {
-    setSelectedIds(new Set(deletableSkills.map((s) => s.id)))
+    setSelectedIds(new Set(deletableSkills.map((s) => s.name)))
   }, [deletableSkills])
+
+  const deleteSkillPath = async (path: string) => {
+    const normalizedPath = normalizePath(path)
+    const file = app.vault.getAbstractFileByPath(normalizedPath)
+    if (file) {
+      if (file instanceof TFile) {
+        const parent = file.parent
+        if (
+          parent &&
+          parent.path !== skillsDir &&
+          parent instanceof TFolder &&
+          file.name === 'SKILL.md'
+        ) {
+          await app.fileManager.trashFile(parent)
+        } else {
+          await app.fileManager.trashFile(file)
+        }
+      } else if (file instanceof TFolder) {
+        await app.fileManager.trashFile(file)
+      }
+      return
+    }
+
+    if (!(await app.vault.adapter.exists(normalizedPath))) {
+      throw new Error('Skill file not found')
+    }
+
+    if (normalizedPath.endsWith('/SKILL.md')) {
+      const parentPath = normalizedPath.slice(
+        0,
+        normalizedPath.lastIndexOf('/'),
+      )
+      await app.vault.adapter.rmdir(parentPath, true)
+      return
+    }
+
+    await app.vault.adapter.remove(normalizedPath)
+  }
 
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return
 
-    const selectedSkills = skills.filter((s) => selectedIds.has(s.id))
+    const selectedSkills = skills.filter((s) => selectedIds.has(s.name))
     const names = selectedSkills.map((s) => s.name)
 
     const modal = new ConfirmModal(app, {
@@ -155,24 +191,7 @@ function AgentSkillsModalContent({
         let successCount = 0
         for (const skill of selectedSkills) {
           try {
-            const file = app.vault.getAbstractFileByPath(skill.path)
-            if (file) {
-              if (file instanceof TFile) {
-                const parent = file.parent
-                if (
-                  parent &&
-                  parent.path !== skillsDir &&
-                  parent instanceof TFolder &&
-                  file.name === 'SKILL.md'
-                ) {
-                  await app.fileManager.trashFile(parent)
-                } else {
-                  await app.fileManager.trashFile(file)
-                }
-              } else if (file instanceof TFolder) {
-                await app.fileManager.trashFile(file)
-              }
-            }
+            await deleteSkillPath(skill.path)
             successCount++
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error'
@@ -273,8 +292,9 @@ function AgentSkillsModalContent({
               .replace(
                 '{enabled}',
                 String(
-                  skills.filter((skill) => !disabledSkillIdSet.has(skill.id))
-                    .length,
+                  skills.filter(
+                    (skill) => !disabledSkillNameSet.has(skill.name),
+                  ).length,
                 ),
               )}
           </div>
@@ -287,12 +307,12 @@ function AgentSkillsModalContent({
                 isSelectMode ? !skill.path.startsWith('builtin://') : true,
               )
               .map((skill) => {
-                const enabled = !disabledSkillIdSet.has(skill.id)
-                const isSelected = selectedIds.has(skill.id)
+                const enabled = !disabledSkillNameSet.has(skill.name)
+                const isSelected = selectedIds.has(skill.name)
 
                 return (
                   <div
-                    key={skill.id}
+                    key={skill.name}
                     className={`yolo-agent-tool-row ${isSelectMode && isSelected ? 'is-selected' : ''}`}
                   >
                     {isSelectMode && (
@@ -300,16 +320,20 @@ function AgentSkillsModalContent({
                         type="checkbox"
                         className="yolo-agent-skill-checkbox"
                         checked={isSelected}
-                        onChange={() => handleToggleSelect(skill.id)}
+                        onChange={() => handleToggleSelect(skill.name)}
                       />
                     )}
                     <div className="yolo-agent-tool-main">
-                      <div className="yolo-agent-tool-name">{skill.name}</div>
+                      <div className="yolo-agent-tool-name">
+                        {humanizeSkillName(skill.name)}
+                      </div>
                       <div className="yolo-agent-tool-source yolo-agent-tool-source--preview">
                         {skill.description}
                       </div>
                       <div className="yolo-agent-skill-meta">
-                        <span className="yolo-agent-chip">id: {skill.id}</span>
+                        <span className="yolo-agent-chip">
+                          name: {skill.name}
+                        </span>
                         <span className="yolo-agent-chip">{skill.path}</span>
                       </div>
                     </div>
@@ -318,7 +342,7 @@ function AgentSkillsModalContent({
                         <ObsidianToggle
                           value={enabled}
                           onChange={(value) =>
-                            handleToggleSkill(skill.id, value)
+                            handleToggleSkill(skill.name, value)
                           }
                         />
                       </div>

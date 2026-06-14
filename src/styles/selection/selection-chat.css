@@ -23,13 +23,55 @@
   z-index: 2;
 }
 
-/* Layer-based highlight (replaces Decoration.mark to avoid DOM mutation) */
+/* Suppress native CM + browser selection when our persisted layer paints it.
+   Obsidian sets both .cm-selectionLayer and ::selection on .markdown-source-view.
+   Scope to .cm-selectionLayer only — our markers also use cm-selectionBackground
+   inside .yolo-selection-highlight-layer and must stay visible. */
+.markdown-source-view.mod-cm6 .cm-editor.yolo-hide-native-selection ::selection,
+.markdown-source-view.mod-cm6
+  .cm-editor.yolo-hide-native-selection
+  *::selection,
+.cm-editor.yolo-hide-native-selection ::selection,
+.cm-editor.yolo-hide-native-selection *::selection {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.markdown-source-view.mod-cm6
+  .cm-editor.yolo-hide-native-selection
+  .cm-selectionLayer,
+.cm-editor.yolo-hide-native-selection .cm-selectionLayer {
+  display: none !important;
+}
+
+.markdown-source-view.mod-cm6
+  .cm-editor.yolo-hide-native-selection
+  .cm-selectionLayer
+  .cm-selectionBackground,
+.markdown-source-view.mod-cm6
+  .cm-editor.yolo-hide-native-selection
+  .cm-line
+  .cm-selection,
+.markdown-source-view.mod-cm6
+  .cm-editor.yolo-hide-native-selection
+  .cm-line
+  .cm-inline-code
+  .cm-selection,
+.cm-editor.yolo-hide-native-selection
+  .cm-selectionLayer
+  .cm-selectionBackground,
+.cm-editor.yolo-hide-native-selection .cm-line .cm-selection,
+.cm-editor.yolo-hide-native-selection .cm-line .cm-inline-code .cm-selection {
+  background-color: transparent !important;
+}
+
+/* Layer-based highlight (replaces Decoration.mark to avoid DOM mutation).
+   Markers also carry cm-selectionBackground so Obsidian / theme styles apply. */
 .yolo-selection-persisted-layer {
   background: var(
     --text-selection,
     color-mix(in srgb, var(--interactive-accent) 18%, transparent)
   );
-  border-radius: 2px;
   pointer-events: none;
 }
 
@@ -47,6 +89,71 @@
       --text-selection,
       color-mix(in srgb, var(--interactive-accent) 18%, transparent)
     );
+  }
+}
+
+/* Pending shimmer — overlays a moving sheen on the selected text while the
+   LLM is streaming a response. Keeps the static accent background as the
+   anchor so users still see "this is the selected text"; the sheen conveys
+   "AI is working on it" without altering the text glyphs.
+
+   `mix-blend-mode: plus-lighter` keeps the highlight band readable on both
+   light and dark themes (no grey wash, no muddy overlap with text color). */
+.yolo-selection-persisted-layer.yolo-selection-persisted-layer-pending {
+  position: absolute;
+  overflow: hidden;
+  /* Match the base selection background — visual hierarchy between
+     "selected" and "AI is processing" is conveyed entirely by the moving
+     sheen, not by a deeper static fill. */
+  background: var(
+    --text-selection,
+    color-mix(in srgb, var(--interactive-accent) 18%, transparent)
+  );
+}
+
+.yolo-selection-persisted-layer.yolo-selection-persisted-layer-pending::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 40%,
+    color-mix(in srgb, var(--interactive-accent) 24%, transparent) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation:
+    yolo-selection-shimmer-fade-in 200ms ease-out forwards,
+    yolo-selection-shimmer 1.6s linear 200ms infinite;
+  pointer-events: none;
+}
+
+@keyframes yolo-selection-shimmer {
+  from {
+    background-position: 220% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes yolo-selection-shimmer-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yolo-selection-persisted-layer.yolo-selection-persisted-layer-pending::after {
+    animation: none;
+    background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+    background-size: auto;
   }
 }
 

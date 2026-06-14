@@ -24,11 +24,33 @@ export type { JsSandboxSettings } from '../../settings/schema/setting.types'
  * consumer (LLM-facing description, capability gate, proxy handler, approval
  * mode resolver) reads through this helper so the model's view of `js_eval`
  * cannot drift from what the host actually executes.
+ *
+ * Always returns a normalized view (see normalizeJsSandboxConfig) so any
+ * legacy persisted state — e.g. `allowExternalScripts=true` saved before
+ * fetch was implicit — is reconciled before downstream code reads it.
  */
 export function getJsSandboxSettings(
   settings: Pick<YoloSettings, 'jsSandbox'> | null | undefined,
 ): JsSandboxSettings {
-  return settings?.jsSandbox ?? {}
+  return normalizeJsSandboxConfig(settings?.jsSandbox ?? {})
+}
+
+/**
+ * Reconcile cross-capability invariants so every read path sees the same
+ * shape: enabling external scripts implicitly enables network fetch, since
+ * any remote script can call `fetch` itself the moment it is loaded.
+ * Keeping the two flags coupled at the data layer avoids UI/runtime drift.
+ */
+export function normalizeJsSandboxConfig(
+  config: JsSandboxSettings,
+): JsSandboxSettings {
+  if (!config.allowExternalScripts) {
+    return config
+  }
+  if (config.allowFetch) {
+    return config
+  }
+  return { ...config, allowFetch: true }
 }
 
 /**
@@ -81,7 +103,10 @@ export function buildJsSandboxToolDescription(s: JsSandboxSettings): string {
           )
         : JS_SANDBOX_FETCH_DEFAULT_MAX_CONCURRENT
     enabled.push(
-      `Network: fetch/XMLHttpRequest/WebSocket are browser-native and still obey CORS/CSP. For cross-origin reads use await $fetch(url,{method?,headers?,body?,contentType?}) -> Response; it uses Obsidian host networking, buffers the response, is capped at ${fetchCapKb} KB, and allows at most ${fetchMaxConcurrent} concurrent $fetch calls per execution (excess calls throw)`,
+      `Network: fetch/XMLHttpRequest/WebSocket are browser-native (CORS/CSP apply). For cross-origin reads: \`const data = await (await $fetch(url, {method?,headers?,body?,contentType?})).text()\`. Host-routed, ${fetchCapKb} KB cap, max ${fetchMaxConcurrent} concurrent calls per execution (excess throw)`,
+    )
+    enabled.push(
+      'HTML parsing: await $utils.html.extract(html,{baseUrl?,maxTextChars?,maxItems?})->{title,lang,text,meta,headings:[{level,text}],links:[{text,href}],images:[{alt,src}]} (baseUrl resolves relative href/src); await $utils.html.select(html,cssSelector,{baseUrl?,limit?,includeHtml?})->[{tag,text,attrs,html?}]',
     )
   }
 
@@ -101,8 +126,19 @@ export function buildJsSandboxToolDescription(s: JsSandboxSettings): string {
   }
 
   if (s.allowExternalScripts) {
+    // importScripts and nested Worker remain reachable at the JS API level
+    // when this capability is on — this is not a lockdown, it is guidance.
+    // We deliberately omit them from the model-facing description because
+    // their failures (network / CSP / parse / eval) all surface as a
+    // single opaque "Script error", which routinely misleads external
+    // models into reporting a network problem when the real cause is a
+    // CSP block or a syntax error in the fetched bundle. For remote
+    // source loading we point the model at `$fetch(url).text()` instead,
+    // which preserves status codes, response headers, and parse errors
+    // separately — the model can then decide whether to `eval` / `new
+    // Function` the source itself with useful diagnostics on failure.
     enabled.push(
-      'External scripts: `importScripts(url, ...)` loads AND executes remote classic scripts into the worker — synchronous (no await), registers globals (e.g. `Tesseract`, `tf`). `$loadScript(url)` only FETCHES source text; use it for inspection or patching, NOT to load libraries. Worker/SharedWorker unblocked. Network implicitly enabled',
+      'External scripts: classic Worker globals — `document`/`location` absent (shim on globalThis; canvas → OffscreenCanvas). Network implicitly enabled. Load remote source via indirect eval (so UMD/IIFE bundles attach to globalThis): `(0, eval)(await (await $fetch(url)).text())`',
     )
   }
 

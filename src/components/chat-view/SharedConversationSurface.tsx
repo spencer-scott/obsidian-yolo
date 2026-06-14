@@ -25,11 +25,20 @@ type SharedConversationSurfaceProps<TItem extends ChatTimelineItem> = {
   overscanPx?: number
   atBottomThreshold?: number
   onVirtualizationChange?: (isVirtualized: boolean) => void
+  onActiveUserMessageChange?: (messageId: string | null) => void
+  windowNavigationKey?: number
+  windowNavigationTargetMessageId?: string | null
   onRenderStateChange?: (state: {
     visibleStartIndex: number
     visibleEndIndex: number
     heightByItemId: Record<string, number>
   }) => void
+  hasEarlierMessages?: boolean
+  hasNewerMessages?: boolean
+  onLoadEarlier?: () => void
+  onLoadNewer?: () => void
+  loadEarlierLabel?: string
+  loadNewerLabel?: string
   scrollContainerClassName?: string
   scrollContainerStyle?: CSSProperties
   containerClassName?: string
@@ -53,7 +62,16 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
   overscanPx,
   atBottomThreshold,
   onVirtualizationChange,
+  onActiveUserMessageChange,
+  windowNavigationKey,
+  windowNavigationTargetMessageId,
   onRenderStateChange,
+  hasEarlierMessages,
+  hasNewerMessages,
+  onLoadEarlier,
+  onLoadNewer,
+  loadEarlierLabel,
+  loadNewerLabel,
   scrollContainerClassName,
   scrollContainerStyle,
   containerClassName,
@@ -77,7 +95,16 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
       overscanPx={overscanPx}
       atBottomThreshold={atBottomThreshold}
       onVirtualizationChange={onVirtualizationChange}
+      onActiveUserMessageChange={onActiveUserMessageChange}
+      windowNavigationKey={windowNavigationKey}
+      windowNavigationTargetMessageId={windowNavigationTargetMessageId}
       onRenderStateChange={onRenderStateChange}
+      hasEarlierMessages={hasEarlierMessages}
+      hasNewerMessages={hasNewerMessages}
+      onLoadEarlier={onLoadEarlier}
+      onLoadNewer={onLoadNewer}
+      loadEarlierLabel={loadEarlierLabel}
+      loadNewerLabel={loadNewerLabel}
       scrollContainerClassName={scrollContainerClassName}
       scrollContainerStyle={scrollContainerStyle}
       bottomSpacerHeight={bottomSpacerHeight}

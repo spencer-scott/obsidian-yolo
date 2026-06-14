@@ -3,9 +3,11 @@ import {
   FileIcon,
   FileText,
   FolderClosedIcon,
+  Globe,
   ImageIcon,
   LinkIcon,
   Quote,
+  TextSelect,
 } from 'lucide-react'
 
 import { Mentionable } from '../../../../types/mentionable'
@@ -17,11 +19,13 @@ export const getMentionableIcon = (mentionable: Mentionable) => {
     case 'folder':
       return FolderClosedIcon
     case 'block':
-      return FileIcon
+      return TextSelect
     case 'assistant-quote':
       return Quote
     case 'url':
       return LinkIcon
+    case 'web-selection':
+      return Globe
     case 'image':
       return ImageIcon
     case 'pdf':

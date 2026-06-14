@@ -41,6 +41,34 @@ jest.mock('../../utils/pdf/slicePdfPages', () => ({
   slicePdfPages: jest.fn(),
 }))
 
+jest.mock('../agent/subagent/runner', () => ({
+  runSubagent: jest.fn().mockResolvedValue({
+    accepted: true,
+    taskId: 'sub_test',
+    title: 'Test',
+    status: 'running',
+    note: 'accepted',
+    modelName: 'mock',
+  }),
+}))
+
+jest.mock('../browser/activeWebviewProbe', () => ({
+  BROWSER_PAGE_ID_PATTERN: /^page_[a-z0-9]{8}_[a-z0-9]{8}$/,
+  findWebviewHandleByPageId: jest.fn(),
+}))
+
+jest.mock('../browser/activeWebviewReader', () => ({
+  BrowserReadFailure: class BrowserReadFailure extends Error {
+    code: string
+    constructor(code: string, message: string) {
+      super(message)
+      this.code = code
+      this.name = 'BrowserReadFailure'
+    }
+  },
+  readActiveWebviewPage: jest.fn(),
+}))
+
 import { App, TFile, TFolder } from 'obsidian'
 import { PDFDocument } from 'pdf-lib'
 
@@ -54,6 +82,9 @@ import { extractMarkdownImages } from '../../utils/llm/extract-markdown-images'
 import { extractPdfText } from '../../utils/pdf/extractPdfText'
 import { renderPdfPagesToImages } from '../../utils/pdf/renderPdfPagesToImages'
 import { PdfSliceError, slicePdfPages } from '../../utils/pdf/slicePdfPages'
+import { runSubagent } from '../agent/subagent/runner'
+import { findWebviewHandleByPageId } from '../browser/activeWebviewProbe'
+import { readActiveWebviewPage } from '../browser/activeWebviewReader'
 import type { RAGEngine } from '../rag/ragEngine'
 
 import {
@@ -66,6 +97,7 @@ import {
 
 afterEach(() => {
   editUndoSnapshotStore.clear()
+  ;(runSubagent as jest.Mock).mockClear()
 })
 
 describe('recoverLikelyEscapedBackslashSequences', () => {
@@ -89,16 +121,16 @@ describe('local fs tool action helpers', () => {
   it('parses split file-op tools to fs actions', () => {
     expect(
       parseLocalFsActionFromToolArgs({
-        toolName: 'fs_create_file',
+        toolName: 'fs_write',
         args: { path: 'a.md', content: 'x' },
       }),
-    ).toBe('create_file')
+    ).toBe('write')
     expect(
       parseLocalFsActionFromToolArgs({
-        toolName: 'fs_delete_dir',
+        toolName: 'fs_delete',
         args: { path: 'tmp', recursive: true },
       }),
-    ).toBe('delete_dir')
+    ).toBe('delete')
   })
 
   it('recognizes write tool names with local prefixes', () => {
@@ -132,11 +164,8 @@ describe('local fs tool action helpers', () => {
       toolName: 'fs_edit',
       args: {
         path: 'note.md',
-        operation: {
-          type: 'replace',
-          oldText: 'world',
-          newText: 'changed',
-        },
+        oldText: 'world',
+        newText: 'changed',
       },
       requireReview: true,
     })
@@ -183,11 +212,8 @@ describe('local fs tool action helpers', () => {
       toolName: 'fs_edit',
       args: {
         path: 'note.md',
-        operation: {
-          type: 'replace',
-          oldText: 'world',
-          newText: 'changed',
-        },
+        oldText: 'world',
+        newText: 'changed',
       },
       requireReview: true,
     })
@@ -197,7 +223,7 @@ describe('local fs tool action helpers', () => {
     expect(result.status).toBe('aborted')
   })
 
-  it('supports fs_edit operations[] array as an atomic batch', async () => {
+  it('supports fs_edit operations[] array of flat args as an atomic batch', async () => {
     const file = Object.assign(new TFile(), {
       path: 'note.md',
       stat: { size: 20 },
@@ -218,7 +244,6 @@ describe('local fs tool action helpers', () => {
         path: 'note.md',
         operations: [
           {
-            type: 'replace',
             oldText: 'world',
             newText: 'changed',
           },
@@ -256,8 +281,8 @@ describe('local fs tool action helpers', () => {
         // Intentionally provided in ASC startLine order to exercise the
         // engine's automatic descending reordering for replace_lines.
         operations: [
-          { type: 'replace_lines', startLine: 1, endLine: 1, newText: 'A' },
-          { type: 'replace_lines', startLine: 3, endLine: 3, newText: 'C' },
+          { startLine: 1, endLine: 1, newText: 'A' },
+          { startLine: 3, endLine: 3, newText: 'C' },
         ],
       },
     })
@@ -289,8 +314,8 @@ describe('local fs tool action helpers', () => {
       args: {
         path: 'note.md',
         operations: [
-          { type: 'replace_lines', startLine: 1, endLine: 2, newText: 'X' },
-          { type: 'replace_lines', startLine: 2, endLine: 3, newText: 'Y' },
+          { startLine: 1, endLine: 2, newText: 'X' },
+          { startLine: 2, endLine: 3, newText: 'Y' },
         ],
       },
     })
@@ -321,12 +346,9 @@ describe('local fs tool action helpers', () => {
       toolName: 'fs_edit',
       args: {
         path: 'note.md',
-        operation: {
-          type: 'replace_lines',
-          startLine: 2,
-          endLine: 3,
-          newText: ['dos', 'tres'].join('\n'),
-        },
+        startLine: 2,
+        endLine: 3,
+        newText: ['dos', 'tres'].join('\n'),
       },
     })
 
@@ -342,7 +364,213 @@ describe('local fs tool action helpers', () => {
     })
   })
 
-  it('returns edit summary metadata for fs_create_file', async () => {
+  it('returns a friendly hint when fs_edit replace matches the first line but not the full block', async () => {
+    const file = Object.assign(new TFile(), {
+      path: 'note.md',
+      stat: { size: 100 },
+    })
+    const modify = jest.fn()
+    const read = jest
+      .fn()
+      .mockResolvedValue(['alpha', '\tbeta', 'gamma'].join('\n'))
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolName: 'fs_edit',
+      args: {
+        path: 'note.md',
+        oldText: ['alpha', '  beta'].join('\n'),
+        newText: 'replaced',
+      },
+    })
+
+    expect(modify).not.toHaveBeenCalled()
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toContain('first line exists at line 1')
+      expect(result.error).toContain('fs_read')
+      expect(result.error).not.toContain('lineEndingNormalized')
+    }
+  })
+
+  it('returns a friendly hint when fs_edit replace text is not found at all', async () => {
+    const file = Object.assign(new TFile(), {
+      path: 'note.md',
+      stat: { size: 100 },
+    })
+    const modify = jest.fn()
+    const read = jest.fn().mockResolvedValue(['alpha', 'beta'].join('\n'))
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolName: 'fs_edit',
+      args: {
+        path: 'note.md',
+        oldText: 'totally absent text',
+        newText: 'replaced',
+      },
+    })
+
+    expect(modify).not.toHaveBeenCalled()
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toContain('Could not find the text to replace')
+      expect(result.error).toContain('fs_read')
+    }
+  })
+
+  it('rejects fs_edit when no locator is provided', async () => {
+    const file = Object.assign(new TFile(), {
+      path: 'note.md',
+      stat: { size: 20 },
+    })
+    const modify = jest.fn()
+    const read = jest.fn().mockResolvedValue('hello world')
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolName: 'fs_edit',
+      args: {
+        path: 'note.md',
+        newText: 'x',
+      },
+    })
+
+    expect(modify).not.toHaveBeenCalled()
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toContain('startLine+endLine')
+    }
+  })
+
+  it('edits an oversized existing file without undo/review snapshot metadata', async () => {
+    const over2mb = 2 * 1024 * 1024 + 1
+    const largeContent = `${'x'.repeat(over2mb - 1)}z`
+    const file = Object.assign(new TFile(), {
+      path: 'large.md',
+      stat: { size: over2mb },
+    })
+    const modify = jest.fn()
+    const read = jest.fn().mockResolvedValue(largeContent)
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolCallId: 'tool-call-large-fs-edit',
+      toolName: 'fs_edit',
+      args: {
+        path: 'large.md',
+        oldText: 'z',
+        newText: 'y',
+      },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    expect(modify).toHaveBeenCalledWith(file, `${'x'.repeat(over2mb - 1)}y`)
+    if (result.status !== ToolCallResponseStatus.Success) {
+      throw new Error('expected success')
+    }
+    expect(result.metadata).toBeUndefined()
+    expect(
+      editUndoSnapshotStore.get('tool-call-large-fs-edit', 'large.md'),
+    ).toBeUndefined()
+  })
+
+  it('skips undo/review snapshot when fs_edit inflates content above snapshot threshold', async () => {
+    const over2mb = 2 * 1024 * 1024 + 1
+    const file = Object.assign(new TFile(), {
+      path: 'small.md',
+      stat: { size: 6 },
+    })
+    const modify = jest.fn()
+    const read = jest.fn().mockResolvedValue('small\n')
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolCallId: 'tool-call-inflate-fs-edit',
+      toolName: 'fs_edit',
+      args: {
+        path: 'small.md',
+        startLine: 1,
+        endLine: 1,
+        newText: 'x'.repeat(over2mb),
+      },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    expect(modify).toHaveBeenCalledWith(file, `${'x'.repeat(over2mb)}\n`)
+    if (result.status !== ToolCallResponseStatus.Success) {
+      throw new Error('expected success')
+    }
+    expect(result.metadata).toBeUndefined()
+    expect(
+      editUndoSnapshotStore.get('tool-call-inflate-fs-edit', 'small.md'),
+    ).toBeUndefined()
+  })
+
+  it('rejects fs_edit when both oldText and a line range are provided', async () => {
+    const file = Object.assign(new TFile(), {
+      path: 'note.md',
+      stat: { size: 20 },
+    })
+    const modify = jest.fn()
+    const read = jest.fn().mockResolvedValue('hello world')
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(file),
+          read,
+          modify,
+        },
+      } as unknown as App,
+      toolName: 'fs_edit',
+      args: {
+        path: 'note.md',
+        oldText: 'hello',
+        startLine: 1,
+        endLine: 1,
+        newText: 'x',
+      },
+    })
+
+    expect(modify).not.toHaveBeenCalled()
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toContain('not both')
+    }
+  })
+
+  it('returns edit summary metadata for fs_write (create)', async () => {
     const create = jest.fn()
 
     const result = await callLocalFileTool({
@@ -354,7 +582,7 @@ describe('local fs tool action helpers', () => {
         },
       } as unknown as App,
       toolCallId: 'tool-call-create-1',
-      toolName: 'fs_create_file',
+      toolName: 'fs_write',
       args: {
         path: 'note.md',
         content: ['one', 'two'].join('\n'),
@@ -380,7 +608,7 @@ describe('local fs tool action helpers', () => {
     })
   })
 
-  it('returns edit summary metadata for fs_delete_file', async () => {
+  it('returns edit summary metadata for fs_delete (file)', async () => {
     const file = Object.assign(new TFile(), {
       path: 'note.md',
       stat: { size: 20 },
@@ -399,7 +627,7 @@ describe('local fs tool action helpers', () => {
         },
       } as unknown as App,
       toolCallId: 'tool-call-delete-1',
-      toolName: 'fs_delete_file',
+      toolName: 'fs_delete',
       args: {
         path: 'note.md',
       },
@@ -474,6 +702,258 @@ describe('local fs tool action helpers', () => {
       totalLines: 3,
     })
     expect(payload.results[0].returnedRange).toBeUndefined()
+  })
+
+  describe('fs_read browser:// paths', () => {
+    const pagePath = 'browser://page_ab12cd34_ef56gh78'
+    const mockHandle = {
+      pageId: 'page_ab12cd34_ef56gh78',
+      webview: {},
+    }
+
+    beforeEach(() => {
+      jest.mocked(findWebviewHandleByPageId).mockReset()
+      jest.mocked(readActiveWebviewPage).mockReset()
+    })
+
+    it('reads an open web page with readable format and line pagination', async () => {
+      jest
+        .mocked(findWebviewHandleByPageId)
+        .mockReturnValue(mockHandle as never)
+      jest.mocked(readActiveWebviewPage).mockResolvedValue({
+        source: 'core_webviewer',
+        sourceViewType: 'webviewer',
+        url: 'https://example.com/article',
+        title: 'Article',
+        format: 'readable',
+        loading: false,
+        capturedAt: Date.now(),
+        text: ['Intro', 'Body line', 'Tail'].join('\n'),
+        redactions: [],
+      })
+
+      const result = await callLocalFileTool({
+        app: {
+          vault: { getFileByPath: jest.fn().mockReturnValue(null) },
+        } as unknown as App,
+        toolName: 'fs_read',
+        args: {
+          paths: [pagePath],
+          operation: {
+            type: 'lines',
+            startLine: 2,
+            maxLines: 1,
+            format: 'readable',
+          },
+        },
+      })
+
+      expect(result.status).toBe(ToolCallResponseStatus.Success)
+      if (result.status !== ToolCallResponseStatus.Success) {
+        throw new Error('expected success')
+      }
+      const payload = JSON.parse(result.text) as {
+        results: Array<{
+          ok: boolean
+          path: string
+          content: string
+          url?: string
+          title?: string
+          returnedRange?: { startLine: number; endLine: number }
+          hasMoreBelow: boolean
+          nextStartLine: number | null
+        }>
+      }
+      expect(readActiveWebviewPage).toHaveBeenCalledWith(
+        mockHandle,
+        expect.objectContaining({ format: 'readable' }),
+      )
+      expect(payload.results[0]).toMatchObject({
+        ok: true,
+        path: pagePath,
+        content: '2|Body line',
+        url: 'https://example.com/article',
+        title: 'Article',
+        returnedRange: { startLine: 2, endLine: 2 },
+        hasMoreBelow: true,
+        nextStartLine: 3,
+      })
+    })
+
+    it('defaults browser reads to key_visible_info format', async () => {
+      jest
+        .mocked(findWebviewHandleByPageId)
+        .mockReturnValue(mockHandle as never)
+      jest.mocked(readActiveWebviewPage).mockResolvedValue({
+        source: 'core_webviewer',
+        sourceViewType: 'webviewer',
+        url: 'https://example.com',
+        title: 'X',
+        format: 'key_visible_info',
+        loading: false,
+        capturedAt: Date.now(),
+        text: 'Visible summary',
+        redactions: [],
+      })
+
+      const result = await callLocalFileTool({
+        app: {
+          vault: { getFileByPath: jest.fn().mockReturnValue(null) },
+        } as unknown as App,
+        toolName: 'fs_read',
+        args: {
+          paths: [pagePath],
+          operation: {
+            type: 'full',
+          },
+        },
+      })
+
+      expect(result.status).toBe(ToolCallResponseStatus.Success)
+      expect(readActiveWebviewPage).toHaveBeenCalledWith(
+        mockHandle,
+        expect.objectContaining({ format: 'key_visible_info' }),
+      )
+    })
+
+    it('supports key_visible_info format for browser paths', async () => {
+      jest
+        .mocked(findWebviewHandleByPageId)
+        .mockReturnValue(mockHandle as never)
+      jest.mocked(readActiveWebviewPage).mockResolvedValue({
+        source: 'core_webviewer',
+        sourceViewType: 'webviewer',
+        url: 'https://example.com',
+        title: 'X',
+        format: 'key_visible_info',
+        loading: false,
+        capturedAt: Date.now(),
+        text: 'Formula: E = mc^2',
+        redactions: [],
+      })
+
+      const result = await callLocalFileTool({
+        app: {
+          vault: { getFileByPath: jest.fn().mockReturnValue(null) },
+        } as unknown as App,
+        toolName: 'fs_read',
+        args: {
+          paths: [pagePath],
+          operation: {
+            type: 'full',
+            format: 'key_visible_info',
+          },
+        },
+      })
+
+      expect(result.status).toBe(ToolCallResponseStatus.Success)
+      expect(readActiveWebviewPage).toHaveBeenCalledWith(
+        mockHandle,
+        expect.objectContaining({ format: 'key_visible_info' }),
+      )
+    })
+
+    it('returns an error when the target web page tab is missing', async () => {
+      jest.mocked(findWebviewHandleByPageId).mockReturnValue(null)
+
+      const result = await callLocalFileTool({
+        app: {
+          vault: { getFileByPath: jest.fn().mockReturnValue(null) },
+        } as unknown as App,
+        toolName: 'fs_read',
+        args: {
+          paths: [pagePath],
+          operation: { type: 'full' },
+        },
+      })
+
+      expect(result.status).toBe(ToolCallResponseStatus.Success)
+      if (result.status !== ToolCallResponseStatus.Success) {
+        throw new Error('expected success')
+      }
+      const payload = JSON.parse(result.text) as {
+        results: Array<{ ok: boolean; error?: string }>
+      }
+      expect(payload.results[0]).toMatchObject({
+        ok: false,
+        error: expect.stringContaining('No open web page'),
+      })
+    })
+  })
+
+  it('reads allowed hidden-directory skills through the skill registry', async () => {
+    // eslint-disable-next-line obsidianmd/hardcoded-config-path -- mock Vault#configDir for adapter paths
+    const configDir = '.obsidian'
+    const hiddenPath = `${configDir}/skills/hidden-open.md`
+    const content = [
+      '---',
+      'name: hidden-open',
+      'description: hidden body',
+      '---',
+      '# Hidden body',
+    ].join('\n')
+    const app = {
+      vault: {
+        configDir,
+        adapter: {
+          exists: jest.fn(
+            async (path: string) => path === `${configDir}/skills`,
+          ),
+          list: jest.fn(async (path: string) =>
+            path === `${configDir}/skills`
+              ? { files: [hiddenPath], folders: [] }
+              : { files: [], folders: [] },
+          ),
+          read: jest.fn(async (path: string) => {
+            if (path !== hiddenPath) {
+              throw new Error(`Unexpected read: ${path}`)
+            }
+            return content
+          }),
+        },
+        getFileByPath: jest.fn().mockReturnValue(null),
+      },
+      metadataCache: {
+        getFileCache: jest.fn().mockReturnValue(undefined),
+      },
+    } as unknown as App
+
+    const result = await callLocalFileTool({
+      app,
+      toolName: 'fs_read',
+      args: {
+        paths: [hiddenPath],
+        operation: {
+          type: 'full',
+        },
+      },
+      allowedSkillPaths: [hiddenPath],
+      settings: {} as YoloSettings,
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    if (result.status !== ToolCallResponseStatus.Success) {
+      throw new Error('expected success')
+    }
+
+    const payload = JSON.parse(result.text) as {
+      results: Array<{
+        ok: boolean
+        path: string
+        content: string
+      }>
+    }
+    expect(payload.results[0]).toMatchObject({
+      ok: true,
+      path: hiddenPath,
+      content: [
+        '1|---',
+        '2|name: hidden-open',
+        '3|description: hidden body',
+        '4|---',
+        '5|# Hidden body',
+      ].join('\n'),
+    })
   })
 
   describe('fs_read image reading gating by chat model modalities', () => {
@@ -1706,7 +2186,7 @@ describe('local fs tool action helpers', () => {
           create,
         },
       } as unknown as App,
-      toolName: 'fs_create_file',
+      toolName: 'fs_write',
       args: {
         path: '99-Assets/YOLO/skills/content-organization/SKILL.md',
         content: '# test',
@@ -1730,146 +2210,185 @@ describe('local fs tool action helpers', () => {
     ).toBe('# test')
   })
 
-  it('supports batch create_file calls with items', async () => {
-    const entries = new Map<string, unknown>()
-    const contents = new Map<string, string>()
-    const createFolder = jest.fn().mockImplementation(async (path: string) => {
-      const folder = Object.assign(new TFolder(), {
-        path,
-        children: [],
-      })
-      entries.set(path, folder)
-      return folder
-    })
-    const create = jest
-      .fn()
-      .mockImplementation(async (path: string, content: string) => {
-        const file = Object.assign(new TFile(), {
-          path,
-          stat: { size: content.length },
-        })
-        entries.set(path, file)
-        contents.set(path, content)
-        return file
-      })
-
-    const result = await callLocalFileTool({
-      app: {
-        vault: {
-          getAbstractFileByPath: jest
-            .fn()
-            .mockImplementation((path: string) => entries.get(path) ?? null),
-          createFolder,
-          create,
-        },
-      } as unknown as App,
-      toolName: 'fs_create_file',
-      args: {
-        items: [
-          { path: 'docs/a.md', content: 'A' },
-          { path: 'docs/b.md', content: 'B' },
-        ],
-      },
-    })
-
-    expect(result.status).toBe(ToolCallResponseStatus.Success)
-    expect(create).toHaveBeenNthCalledWith(1, 'docs/a.md', 'A')
-    expect(create).toHaveBeenNthCalledWith(2, 'docs/b.md', 'B')
-    expect(contents.get('docs/a.md')).toBe('A')
-    expect(contents.get('docs/b.md')).toBe('B')
-  })
-
-  it('supports batch move calls with items and reports partial failures', async () => {
-    const entries = new Map<string, TFile | TFolder>()
-    const docsFolder = Object.assign(new TFolder(), {
-      path: 'docs',
-      children: [],
-    })
-    const sourceA = Object.assign(new TFile(), {
+  it('overwrites an existing file via fs_write and snapshots old content', async () => {
+    const existing = Object.assign(new TFile(), {
       path: 'docs/a.md',
-      stat: { size: 1 },
+      stat: { size: 3 },
     })
-    const sourceB = Object.assign(new TFile(), {
-      path: 'docs/b.md',
-      stat: { size: 1 },
-    })
-    entries.set('docs', docsFolder)
-    entries.set('docs/a.md', sourceA)
-    entries.set('docs/b.md', sourceB)
-
-    const renameFile = jest
-      .fn()
-      .mockImplementation(async (file: TFile | TFolder, newPath: string) => {
-        entries.delete(file.path)
-        file.path = newPath
-        entries.set(newPath, file)
-      })
+    const read = jest.fn().mockResolvedValue('old')
+    const modify = jest.fn()
 
     const result = await callLocalFileTool({
       app: {
         vault: {
-          getAbstractFileByPath: jest
-            .fn()
-            .mockImplementation((path: string) => entries.get(path) ?? null),
+          getAbstractFileByPath: jest.fn().mockReturnValue(existing),
+          read,
+          modify,
+          create: jest.fn(),
           createFolder: jest.fn(),
         },
-        fileManager: {
-          renameFile,
-        },
       } as unknown as App,
-      toolName: 'fs_move',
+      toolCallId: 'tool-call-overwrite-1',
+      toolName: 'fs_write',
       args: {
-        items: [
-          { oldPath: 'docs/a.md', newPath: 'docs/a-renamed.md' },
-          { oldPath: 'docs/missing.md', newPath: 'docs/missing-renamed.md' },
-        ],
+        path: 'docs/a.md',
+        content: 'new content',
       },
     })
 
     expect(result.status).toBe(ToolCallResponseStatus.Success)
-    expect(renameFile).toHaveBeenCalledTimes(1)
-    expect(entries.has('docs/a-renamed.md')).toBe(true)
+    expect(modify).toHaveBeenCalledWith(existing, 'new content')
     if (result.status !== ToolCallResponseStatus.Success) {
       throw new Error('expected success')
     }
-    expect(JSON.parse(result.text)).toMatchObject({
-      tool: 'fs_move',
-      action: 'move',
-      dryRun: false,
-      results: [
-        {
-          ok: true,
-          target: 'docs/a.md -> docs/a-renamed.md',
-        },
-        {
-          ok: false,
-          target: 'docs/missing.md -> docs/missing-renamed.md',
-          message: 'Source path not found: docs/missing.md',
-        },
-      ],
+    expect(result.metadata?.editSummary).toMatchObject({
+      totalFiles: 1,
+      files: [{ operation: 'edit' }],
+    })
+    expect(
+      editUndoSnapshotStore.get('tool-call-overwrite-1', 'docs/a.md'),
+    ).toMatchObject({
+      beforeExists: true,
+      afterExists: true,
+      beforeContent: 'old',
+      afterContent: 'new content',
     })
   })
 
-  it('keeps fs tool schemas batch-friendly without top-level combinators', () => {
+  it('rejects fs_write when the target path is an existing folder', async () => {
+    const folder = Object.assign(new TFolder(), {
+      path: 'docs',
+      children: [],
+    })
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(folder),
+          modify: jest.fn(),
+          create: jest.fn(),
+          createFolder: jest.fn(),
+        },
+      } as unknown as App,
+      toolName: 'fs_write',
+      args: {
+        path: 'docs',
+        content: 'x',
+      },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toMatch(/folder/i)
+    }
+  })
+
+  it('deletes a folder via fs_delete with recursive and reports targetKind', async () => {
+    const child = Object.assign(new TFile(), {
+      path: 'docs/a.md',
+      stat: { size: 1 },
+    })
+    const folder = Object.assign(new TFolder(), {
+      path: 'docs',
+      children: [child],
+    })
+    const trashFile = jest.fn()
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(folder),
+        },
+        fileManager: { trashFile },
+      } as unknown as App,
+      toolName: 'fs_delete',
+      args: {
+        path: 'docs',
+        recursive: true,
+      },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    expect(trashFile).toHaveBeenCalledWith(folder)
+    if (result.status !== ToolCallResponseStatus.Success) {
+      throw new Error('expected success')
+    }
+    // Folder deletions carry no editSummary / chat-undo snapshot.
+    expect(result.metadata).toBeUndefined()
+    expect(JSON.parse(result.text)).toMatchObject({
+      tool: 'fs_delete',
+      action: 'delete',
+      results: [{ ok: true, target: 'docs', targetKind: 'folder' }],
+    })
+  })
+
+  it('refuses to delete a non-empty folder without recursive', async () => {
+    const child = Object.assign(new TFile(), {
+      path: 'docs/a.md',
+      stat: { size: 1 },
+    })
+    const folder = Object.assign(new TFolder(), {
+      path: 'docs',
+      children: [child],
+    })
+
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(folder),
+        },
+        fileManager: { trashFile: jest.fn() },
+      } as unknown as App,
+      toolName: 'fs_delete',
+      args: { path: 'docs' },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toMatch(/not empty/i)
+    }
+  })
+
+  it('returns Error when a single fs_move target fails', async () => {
+    const result = await callLocalFileTool({
+      app: {
+        vault: {
+          getAbstractFileByPath: jest.fn().mockReturnValue(null),
+          createFolder: jest.fn(),
+        },
+        fileManager: { renameFile: jest.fn() },
+      } as unknown as App,
+      toolName: 'fs_move',
+      args: {
+        oldPath: 'docs/missing.md',
+        newPath: 'docs/missing-renamed.md',
+      },
+    })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status === ToolCallResponseStatus.Error) {
+      expect(result.error).toBe('Source path not found: docs/missing.md')
+    }
+  })
+
+  it('keeps fs write tool schemas flat without items or top-level combinators', () => {
     const tools = getLocalFileTools()
     const schemaByName = new Map(
       tools.map((tool) => [tool.name, tool.inputSchema] as const),
     )
 
-    for (const toolName of [
-      'fs_create_file',
-      'fs_delete_file',
-      'fs_create_dir',
-      'fs_delete_dir',
-      'fs_move',
-    ] as const) {
+    const expectedRequired: Record<string, string[]> = {
+      fs_write: ['path', 'content'],
+      fs_delete: ['path'],
+      fs_create_dir: ['path'],
+      fs_move: ['oldPath', 'newPath'],
+    }
+
+    for (const [toolName, required] of Object.entries(expectedRequired)) {
       const schema = schemaByName.get(toolName) as
         | {
-            properties?: {
-              items?: {
-                minItems?: number
-              }
-            }
+            properties?: Record<string, unknown>
+            required?: string[]
             oneOf?: unknown
             anyOf?: unknown
             allOf?: unknown
@@ -1877,31 +2396,11 @@ describe('local fs tool action helpers', () => {
         | undefined
 
       expect(schema).toBeDefined()
-      expect(schema?.properties?.items?.minItems).toBe(1)
+      expect(schema?.properties?.items).toBeUndefined()
+      expect(schema?.required).toEqual(required)
       expect(schema?.oneOf).toBeUndefined()
       expect(schema?.anyOf).toBeUndefined()
       expect(schema?.allOf).toBeUndefined()
-    }
-  })
-
-  it('rejects empty batch items for fs_create_file at runtime', async () => {
-    const result = await callLocalFileTool({
-      app: {
-        vault: {
-          getAbstractFileByPath: jest.fn(),
-          createFolder: jest.fn(),
-          create: jest.fn(),
-        },
-      } as unknown as App,
-      toolName: 'fs_create_file',
-      args: {
-        items: [],
-      },
-    })
-
-    expect(result.status).toBe(ToolCallResponseStatus.Error)
-    if (result.status === ToolCallResponseStatus.Error) {
-      expect(result.error).toContain('items must contain at least one entry')
     }
   })
 
@@ -1956,7 +2455,8 @@ describe('local fs tool action helpers', () => {
         toolName: 'fs_edit',
         args: {
           path: 'secret/a.md',
-          operations: [{ type: 'append', text: 'x' }],
+          oldText: 'x',
+          newText: 'y',
         },
         workspaceScope: allowNotes,
       })
@@ -1988,14 +2488,14 @@ describe('local fs tool action helpers', () => {
       }
     })
 
-    it('rejects fs_delete_file when any batch item is outside scope', async () => {
+    it('rejects fs_delete when path is outside scope', async () => {
       const result = await callLocalFileTool({
         app: {
           vault: { getAbstractFileByPath: jest.fn() },
         } as unknown as App,
-        toolName: 'fs_delete_file',
+        toolName: 'fs_delete',
         args: {
-          items: [{ path: 'Notes/a.md' }, { path: 'secret/b.md' }],
+          path: 'secret/b.md',
         },
         workspaceScope: allowNotes,
       })
@@ -2005,7 +2505,7 @@ describe('local fs tool action helpers', () => {
       }
     })
 
-    it('rejects fs_create_file batch when any item is outside scope', async () => {
+    it('rejects fs_write when path is outside scope', async () => {
       const result = await callLocalFileTool({
         app: {
           vault: {
@@ -2014,19 +2514,17 @@ describe('local fs tool action helpers', () => {
             createFolder: jest.fn(),
           },
         } as unknown as App,
-        toolName: 'fs_create_file',
+        toolName: 'fs_write',
         args: {
-          items: [
-            { path: 'Notes/new.md', content: 'ok' },
-            { path: 'secret/new.md', content: 'leak' },
-          ],
+          path: 'secret/new.md',
+          content: 'leak',
         },
         workspaceScope: allowNotes,
       })
       expect(result.status).toBe(ToolCallResponseStatus.Error)
     })
 
-    it('allows in-scope batch operations when scope is enabled', async () => {
+    it('allows in-scope write operations when scope is enabled', async () => {
       const result = await callLocalFileTool({
         app: {
           vault: {
@@ -2035,12 +2533,10 @@ describe('local fs tool action helpers', () => {
             createFolder: jest.fn(),
           },
         } as unknown as App,
-        toolName: 'fs_create_file',
+        toolName: 'fs_write',
         args: {
-          items: [
-            { path: 'Notes/a.md', content: 'one' },
-            { path: 'Notes/b.md', content: 'two' },
-          ],
+          path: 'Notes/a.md',
+          content: 'one',
         },
         workspaceScope: allowNotes,
       })
@@ -2056,7 +2552,7 @@ describe('local fs tool action helpers', () => {
             createFolder: jest.fn(),
           },
         } as unknown as App,
-        toolName: 'fs_create_file',
+        toolName: 'fs_write',
         args: {
           path: 'secret/a.md',
           content: 'ok',
@@ -2065,6 +2561,98 @@ describe('local fs tool action helpers', () => {
       })
       expect(result.status).toBe(ToolCallResponseStatus.Success)
     })
+  })
+})
+
+describe('delegate_subagent model selection', () => {
+  const buildSettings = (): YoloSettings =>
+    ({
+      providers: [
+        {
+          id: 'openai',
+          presetType: 'openai',
+          apiType: 'openai-compatible',
+          apiKey: 'token',
+        },
+      ],
+      chatModelId: 'openai/gpt-5',
+      chatModels: [
+        {
+          id: 'openai/gpt-5',
+          providerId: 'openai',
+          model: 'gpt-5',
+          enable: true,
+        },
+        {
+          id: 'openai/gpt-4.1-mini',
+          providerId: 'openai',
+          model: 'gpt-4.1-mini',
+          enable: true,
+        },
+      ],
+      mcp: {
+        servers: [],
+        enableToolDisclosure: false,
+        builtinToolOptions: {
+          delegate_subagent: {
+            allowedModelIds: ['openai/gpt-5', 'openai/gpt-4.1-mini'],
+            preferredModelId: 'openai/gpt-4.1-mini',
+          },
+        },
+      },
+    }) as unknown as YoloSettings
+
+  const callDelegateSubagent = (args: Record<string, unknown>) =>
+    callLocalFileTool({
+      app: {} as App,
+      settings: buildSettings(),
+      conversationId: 'conv',
+      conversationMessages: [],
+      toolCallId: 'tool-call',
+      toolName: 'delegate_subagent',
+      args: {
+        description: 'Scan',
+        prompt: 'Scan notes',
+        ...args,
+      },
+      subagentParentContext: {} as never,
+    })
+
+  it('uses explicit modelId when it is in the subagent model pool', async () => {
+    const result = await callDelegateSubagent({ modelId: 'openai/gpt-5' })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    expect(runSubagent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        childModel: expect.objectContaining({
+          model: expect.objectContaining({ id: 'openai/gpt-5' }),
+        }),
+      }),
+    )
+  })
+
+  it('uses the preferred subagent model when modelId is omitted', async () => {
+    const result = await callDelegateSubagent({})
+
+    expect(result.status).toBe(ToolCallResponseStatus.Success)
+    expect(runSubagent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        childModel: expect.objectContaining({
+          model: expect.objectContaining({ id: 'openai/gpt-4.1-mini' }),
+        }),
+      }),
+    )
+  })
+
+  it('rejects modelId values outside the subagent model pool', async () => {
+    const result = await callDelegateSubagent({ modelId: 'openai/forbidden' })
+
+    expect(result.status).toBe(ToolCallResponseStatus.Error)
+    if (result.status !== ToolCallResponseStatus.Error) {
+      throw new Error('Expected delegate_subagent to reject forbidden modelId')
+    }
+    expect(result.error).toContain('not allowed for delegate_subagent')
+    expect(runSubagent).not.toHaveBeenCalled()
   })
 })
 

@@ -12,6 +12,7 @@ import {
   MentionableModel,
   MentionablePDF,
   MentionableUrl,
+  MentionableWebSelection,
 } from '../../../types/mentionable'
 import { getBlockMentionableCountInfo } from '../../../utils/chat/mentionable'
 
@@ -230,6 +231,52 @@ function UrlBadge({
           />
         )}
         <span>{mentionable.url}</span>
+      </div>
+    </BadgeBase>
+  )
+}
+
+function WebSelectionBadge({
+  mentionable,
+  onDelete,
+  onClick,
+  isFocused,
+  showDeleteButton,
+}: {
+  mentionable: MentionableWebSelection
+  onDelete: () => void
+  onClick: () => void
+  isFocused: boolean
+  showDeleteButton?: boolean
+}) {
+  const Icon = getMentionableIcon(mentionable)
+  const { t } = useLanguage()
+  const info = getBlockMentionableCountInfo(mentionable.content)
+  const count = mentionable.contentCount ?? info.count
+  const unit = mentionable.contentUnit ?? info.unit
+  const unitLabel = t(`common.${unit}`, unit)
+  const title = mentionable.title.trim() || mentionable.url
+
+  return (
+    <BadgeBase
+      onDelete={onDelete}
+      onClick={onClick}
+      isFocused={isFocused}
+      showExpandButton={false}
+      showDeleteButton={showDeleteButton}
+      title={`${title}\n${mentionable.url}\n\n${mentionable.content}`}
+    >
+      <div className="yolo-chat-user-input-file-badge-name">
+        {Icon && (
+          <Icon
+            size={12}
+            className="yolo-chat-user-input-file-badge-name-icon"
+          />
+        )}
+        <span>{title}</span>
+      </div>
+      <div className="yolo-chat-user-input-file-badge-name-suffix">
+        {` (${count} ${unitLabel})`}
       </div>
     </BadgeBase>
   )
@@ -458,6 +505,16 @@ export default function MentionableBadge({
     case 'url':
       return (
         <UrlBadge
+          mentionable={mentionable}
+          onDelete={onDelete}
+          onClick={onClick}
+          isFocused={isFocused}
+          showDeleteButton={showDeleteButton}
+        />
+      )
+    case 'web-selection':
+      return (
+        <WebSelectionBadge
           mentionable={mentionable}
           onDelete={onDelete}
           onClick={onClick}

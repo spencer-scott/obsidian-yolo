@@ -16,14 +16,14 @@ import {
 import { isDefaultAssistantId } from '../../../core/agent/default-assistant'
 import { getEnabledAssistantToolNames } from '../../../core/agent/tool-preferences'
 import {
-  LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME,
   LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   LOCAL_MEMORY_SPLIT_ACTION_TOOL_NAMES,
   getLocalFileTools,
 } from '../../../core/mcp/localFileTools'
 import { McpManager } from '../../../core/mcp/mcpManager'
-import { listLiteSkillEntries } from '../../../core/skills/liteSkills'
+import { humanizeSkillName } from '../../../core/skills/liteSkills'
 import { isSkillEnabledForAssistant } from '../../../core/skills/skillPolicy'
+import { useLiteSkillEntries } from '../../../hooks/useLiteSkillEntries'
 import { Assistant } from '../../../types/assistant.types'
 import { McpServerState, McpServerStatus } from '../../../types/mcp.types'
 import { renderAssistantIcon } from '../../../utils/assistant-icon'
@@ -36,7 +36,6 @@ import { AgentToolsModal } from '../modals/AgentToolsModal'
 import { AssistantsModal } from '../modals/AssistantsModal'
 
 import { AgentAutoContextCompactionSection } from './AgentAutoContextCompactionSection'
-import { AgentFocusSyncSection } from './AgentFocusSyncSection'
 import { AgentImageReadingSection } from './AgentImageReadingSection'
 import { NotificationSettingsSection } from './NotificationSettingsSection'
 
@@ -210,8 +209,6 @@ export function AgentSection({ app }: AgentSectionProps) {
     const tools = getLocalFileTools()
       .filter(
         (tool) =>
-          (settings.mcp.enableToolDisclosure ||
-            tool.name !== LOAD_TOOL_SCHEMAS_LOCAL_TOOL_NAME) &&
           !SPLIT_FS_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_MEMORY_TOOL_NAME_SET.has(tool.name) &&
           !SPLIT_WEB_TOOL_NAME_SET.has(tool.name),
@@ -270,11 +267,11 @@ export function AgentSection({ app }: AgentSectionProps) {
       enabled: webSplitToolEnabled,
     }
 
-    const openSkillIndex = tools.findIndex((tool) => tool.id === 'open_skill')
-    if (openSkillIndex >= 0) {
-      tools.splice(openSkillIndex, 0, fileOpsTool)
-      tools.splice(openSkillIndex + 1, 0, memoryOpsTool)
-      tools.splice(openSkillIndex + 2, 0, webOpsTool)
+    const fsReadIndex = tools.findIndex((tool) => tool.id === 'fs_read')
+    if (fsReadIndex >= 0) {
+      tools.splice(fsReadIndex, 0, fileOpsTool)
+      tools.splice(fsReadIndex + 1, 0, memoryOpsTool)
+      tools.splice(fsReadIndex + 2, 0, webOpsTool)
     } else {
       tools.push(fileOpsTool)
       tools.push(memoryOpsTool)
@@ -282,19 +279,16 @@ export function AgentSection({ app }: AgentSectionProps) {
     }
 
     return tools
-  }, [settings.mcp.builtinToolOptions, settings.mcp.enableToolDisclosure, t])
+  }, [settings.mcp.builtinToolOptions, t])
 
-  const allSkillEntries = useMemo(
-    () => listLiteSkillEntries(app, { settings }),
-    [app, settings],
-  )
+  const allSkillEntries = useLiteSkillEntries(app, { settings })
   const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
   const disabledSkillSet = useMemo(
     () => new Set(disabledSkillIds),
     [disabledSkillIds],
   )
   const globallyEnabledSkillEntries = useMemo(
-    () => allSkillEntries.filter((skill) => !disabledSkillSet.has(skill.id)),
+    () => allSkillEntries.filter((skill) => !disabledSkillSet.has(skill.name)),
     [allSkillEntries, disabledSkillSet],
   )
 
@@ -347,7 +341,7 @@ export function AgentSection({ app }: AgentSectionProps) {
       <div className="yolo-settings-desc yolo-agent-intro">
         {t(
           'settings.agent.desc',
-          'Manage global capabilities and configure your agents.',
+          'Manage global tool availability. Enabled tools become selectable by agents; actual use must still be enabled in each agent.',
         )}
       </div>
 
@@ -416,11 +410,11 @@ export function AgentSection({ app }: AgentSectionProps) {
             <div className="yolo-agent-cap-tags">
               {visibleSkillEntries.map((skill) => (
                 <span
-                  key={skill.id}
+                  key={skill.name}
                   className="yolo-agent-chip"
                   title={skill.name}
                 >
-                  {skill.name}
+                  {humanizeSkillName(skill.name)}
                 </span>
               ))}
               {hiddenSkillEntriesCount > 0 && (
@@ -575,8 +569,8 @@ export function AgentSection({ app }: AgentSectionProps) {
                     allSkillEntries.filter((skill) =>
                       isSkillEnabledForAssistant({
                         assistant,
-                        skillId: skill.id,
-                        disabledSkillIds,
+                        skillName: skill.name,
+                        disabledSkillNames: disabledSkillIds,
                       }),
                     ).length
                   } skills`}
@@ -612,7 +606,6 @@ export function AgentSection({ app }: AgentSectionProps) {
             {t('settings.agent.agentCapabilitiesBlockTitle')}
           </div>
         </div>
-        <AgentFocusSyncSection />
         <div className="yolo-agent-sub-card">
           <div className="yolo-agent-sub-card-head">
             {t('settings.agent.imageReadingBlockTitle')}

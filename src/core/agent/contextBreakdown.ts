@@ -15,6 +15,7 @@ import {
   estimateJsonTokens,
   normalizeJsonValue,
 } from '../../utils/llm/contextTokenEstimate'
+import { resolveEffectiveMaxContextTokens } from '../../utils/llm/model-capability-registry'
 import { McpManager } from '../mcp/mcpManager'
 
 import { selectAllowedTools } from './tool-selection'
@@ -42,6 +43,7 @@ const BUCKET_ORDER: PromptSectionBucket[] = [
   'rules',
   'skills',
   'memory',
+  'reasoning',
   'conversation',
 ]
 
@@ -134,9 +136,8 @@ export const estimateContextBreakdown = async ({
   allowedToolNames,
   enableToolDisclosure,
   toolPreferences,
-  allowedSkillIds,
-  allowedSkillNames,
   contextualInjections,
+  runtimeModePrompt,
 }: {
   requestContextBuilder: RequestContextBuilder
   mcpManager: McpManager
@@ -150,9 +151,8 @@ export const estimateContextBreakdown = async ({
   allowedToolNames?: string[]
   enableToolDisclosure?: boolean
   toolPreferences?: Record<string, AssistantToolPreference>
-  allowedSkillIds?: string[]
-  allowedSkillNames?: string[]
   contextualInjections?: ContextualInjection[]
+  runtimeModePrompt?: string
 }): Promise<ContextBreakdown> => {
   const availableTools = enableTools
     ? await mcpManager.listAvailableTools({
@@ -163,8 +163,6 @@ export const estimateContextBreakdown = async ({
   const { hasTools, hasMemoryTools, requestTools } = selectAllowedTools({
     availableTools,
     allowedToolNames,
-    allowedSkillIds,
-    allowedSkillNames,
     toolPreferences,
     apiType,
     enableToolDisclosure,
@@ -179,7 +177,10 @@ export const estimateContextBreakdown = async ({
     conversationId,
     compaction,
     contextualInjections,
+    runtimeModePrompt,
     requestTools,
+    // Token breakdown only: reuse a frozen snapshot if present, never create one.
+    systemPromptSnapshotMode: 'reuse',
   })
 
   const cacheKey = hashSections(sections)
@@ -212,7 +213,7 @@ export const estimateContextBreakdown = async ({
   const result: ContextBreakdown = {
     buckets,
     total,
-    max: model.maxContextTokens ?? null,
+    max: resolveEffectiveMaxContextTokens(model) ?? null,
     computedAt: Date.now(),
   }
   cacheSet(cacheKey, result)

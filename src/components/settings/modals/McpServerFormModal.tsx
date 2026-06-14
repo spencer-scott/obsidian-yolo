@@ -6,6 +6,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import * as z from 'zod'
 
 import { useLanguage } from '../../../contexts/language-context'
+import { renameAssistantToolPreferencesServer } from '../../../core/agent/tool-preferences'
 import { validateServerName } from '../../../core/mcp/tool-name-utils'
 import YoloPlugin from '../../../main'
 import {
@@ -130,6 +131,17 @@ function McpServerFormComponent({
           serverName,
         })
 
+      const isRename = !!existingServer && existingServer.id !== serverName
+      const nextAssistants = isRename
+        ? plugin.settings.assistants.map((assistant) =>
+            renameAssistantToolPreferencesServer(
+              assistant,
+              existingServer.id,
+              serverName,
+            ),
+          )
+        : plugin.settings.assistants
+
       const newSettings = {
         ...plugin.settings,
         mcp: {
@@ -154,6 +166,7 @@ function McpServerFormComponent({
                 },
               ],
         },
+        assistants: nextAssistants,
       }
 
       await plugin.setSettings(newSettings)

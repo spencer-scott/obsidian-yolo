@@ -1,65 +1,9 @@
+import type { YoloSettings } from '../../settings/schema/setting.types'
 import type { McpTool } from '../../types/mcp.types'
 
 import { selectAllowedTools } from './tool-selection'
 
 describe('selectAllowedTools', () => {
-  it('filters out open_skill when no allowed skills are provided', () => {
-    const availableTools: McpTool[] = [
-      {
-        name: 'yolo_local__open_skill',
-        description: 'Open skill',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    ]
-
-    const result = selectAllowedTools({
-      availableTools,
-    })
-
-    expect(result.filteredTools).toEqual([])
-    expect(result.hasTools).toBe(false)
-    expect(result.hasMemoryTools).toBe(false)
-    expect(result.requestTools).toBeUndefined()
-  })
-
-  it('keeps open_skill when skill allowlist is present', () => {
-    const availableTools: McpTool[] = [
-      {
-        name: 'yolo_local__open_skill',
-        description: 'Open skill',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    ]
-
-    const result = selectAllowedTools({
-      availableTools,
-      allowedSkillIds: ['skill-1'],
-    })
-
-    expect(result.filteredTools).toHaveLength(1)
-    expect(result.hasTools).toBe(true)
-    expect(result.hasMemoryTools).toBe(false)
-    expect(result.requestTools).toEqual([
-      {
-        type: 'function',
-        function: {
-          name: 'yolo_local__open_skill',
-          description: 'Open skill',
-          parameters: {
-            type: 'object',
-            properties: {},
-          },
-        },
-      },
-    ])
-  })
-
   it('keeps full schemas for tools left in always mode', () => {
     const availableTools: McpTool[] = [
       {
@@ -93,13 +37,78 @@ describe('selectAllowedTools', () => {
     })
   })
 
-  it('replaces on-demand tools with a permissive stub schema (non-Gemini)', () => {
+  it('injects delegate_subagent model pool into the request schema', () => {
     const availableTools: McpTool[] = [
       {
-        name: 'yolo_local__load_tool_schemas',
-        description: 'Search tools',
-        inputSchema: { type: 'object', properties: {} },
+        name: 'yolo_local__delegate_subagent',
+        description: 'Dispatch a subagent.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            description: { type: 'string' },
+            prompt: { type: 'string' },
+          },
+          required: ['description', 'prompt'],
+        },
       },
+    ]
+    const settings = {
+      providers: [{ id: 'openai', apiType: 'openai-compatible' }],
+      chatModelId: 'openai/gpt-5',
+      chatModels: [
+        {
+          id: 'openai/gpt-5',
+          providerId: 'openai',
+          model: 'gpt-5',
+          enable: true,
+        },
+        {
+          id: 'openai/gpt-4.1-mini',
+          providerId: 'openai',
+          model: 'gpt-4.1-mini',
+          enable: true,
+        },
+      ],
+      mcp: {
+        servers: [],
+        enableToolDisclosure: false,
+        builtinToolOptions: {
+          delegate_subagent: {
+            allowedModelIds: ['openai/gpt-4.1-mini'],
+            preferredModelId: 'openai/gpt-4.1-mini',
+          },
+        },
+      },
+    } as unknown as YoloSettings
+
+    const result = selectAllowedTools({
+      availableTools,
+      allowedToolNames: ['yolo_local__delegate_subagent'],
+      toolPreferences: {
+        yolo_local__delegate_subagent: {
+          enabled: true,
+          disclosureMode: 'always',
+        },
+      },
+      settings,
+    })
+
+    const delegateTool = result.requestTools?.[0]
+    expect(delegateTool?.function.description).toContain(
+      'Recommended default: openai/gpt-4.1-mini',
+    )
+    expect(delegateTool?.function.parameters).toMatchObject({
+      properties: {
+        modelId: {
+          type: 'string',
+          enum: ['openai/gpt-4.1-mini'],
+        },
+      },
+    })
+  })
+
+  it('replaces on-demand tools with a permissive stub schema (non-Gemini)', () => {
+    const availableTools: McpTool[] = [
       {
         name: 'server__tool_a',
         description: 'Tool A real schema',
@@ -113,16 +122,15 @@ describe('selectAllowedTools', () => {
 
     const result = selectAllowedTools({
       availableTools,
-      allowedToolNames: ['yolo_local__load_tool_schemas', 'server__tool_a'],
+      allowedToolNames: ['server__tool_a'],
       toolPreferences: {
-        yolo_local__load_tool_schemas: { enabled: true },
         server__tool_a: { enabled: true, disclosureMode: 'on_demand' },
       },
       apiType: 'anthropic',
     })
 
-    // Tools field stays frozen: both tools are registered every turn so the
-    // prompt-cache prefix never invalidates.
+    // The loader is injected automatically whenever any surviving tool is
+    // on-demand; it stays as a full schema and rides at the head of the list.
     expect(result.requestTools?.map((tool) => tool.function.name)).toEqual([
       'yolo_local__load_tool_schemas',
       'server__tool_a',
@@ -135,8 +143,6 @@ describe('selectAllowedTools', () => {
       properties: {},
       additionalProperties: true,
     })
-    // Stub description must include the on-demand hint so the model knows to
-    // call load_tool_schemas first.
     expect(stub?.function.description).toContain('load_tool_schemas')
   })
 
@@ -158,7 +164,9 @@ describe('selectAllowedTools', () => {
       apiType: 'gemini',
     })
 
-    const stub = result.requestTools?.[0]
+    const stub = result.requestTools?.find(
+      (tool) => tool.function.name === 'server__tool_a',
+    )
     expect(stub?.function.parameters).toEqual({
       type: 'object',
       properties: {
@@ -168,13 +176,8 @@ describe('selectAllowedTools', () => {
     })
   })
 
-  it('uses full schemas and hides the schema loader when disclosure is disabled', () => {
+  it('uses full schemas and skips loader injection when disclosure is disabled', () => {
     const availableTools: McpTool[] = [
-      {
-        name: 'yolo_local__load_tool_schemas',
-        description: 'Search tools',
-        inputSchema: { type: 'object', properties: {} },
-      },
       {
         name: 'server__tool_a',
         description: 'Tool A real schema',
@@ -188,10 +191,9 @@ describe('selectAllowedTools', () => {
 
     const result = selectAllowedTools({
       availableTools,
-      allowedToolNames: ['yolo_local__load_tool_schemas', 'server__tool_a'],
+      allowedToolNames: ['server__tool_a'],
       enableToolDisclosure: false,
       toolPreferences: {
-        yolo_local__load_tool_schemas: { enabled: true },
         server__tool_a: { enabled: true, disclosureMode: 'on_demand' },
       },
     })
@@ -206,13 +208,33 @@ describe('selectAllowedTools', () => {
     })
   })
 
-  it('produces the same tools-field hash before and after a load_tool_schemas load', () => {
+  it('omits the loader when no surviving tool is on-demand', () => {
     const availableTools: McpTool[] = [
       {
-        name: 'yolo_local__load_tool_schemas',
-        description: 'Search tools',
+        name: 'server__tool_a',
+        description: 'Tool A',
         inputSchema: { type: 'object', properties: {} },
       },
+    ]
+
+    const result = selectAllowedTools({
+      availableTools,
+      allowedToolNames: ['server__tool_a'],
+      toolPreferences: {
+        server__tool_a: {
+          enabled: true,
+          disclosureMode: 'always',
+        },
+      },
+    })
+
+    expect(result.requestTools?.map((tool) => tool.function.name)).toEqual([
+      'server__tool_a',
+    ])
+  })
+
+  it('keeps the tools-field stable across identical selections', () => {
+    const availableTools: McpTool[] = [
       {
         name: 'server__tool_a',
         description: 'Tool A',
@@ -224,16 +246,13 @@ describe('selectAllowedTools', () => {
     ]
     const params = {
       availableTools,
-      allowedToolNames: ['yolo_local__load_tool_schemas', 'server__tool_a'],
+      allowedToolNames: ['server__tool_a'],
       toolPreferences: {
-        yolo_local__load_tool_schemas: { enabled: true },
         server__tool_a: { enabled: true, disclosureMode: 'on_demand' as const },
       },
       apiType: 'anthropic' as const,
     }
 
-    // Selection no longer takes loadedToolNames into account at all — the
-    // tools field is frozen across the whole conversation.
     const before = selectAllowedTools(params)
     const after = selectAllowedTools(params)
 

@@ -58,6 +58,19 @@ export const serializeMentionable = (
         type: 'url',
         url: mentionable.url,
       }
+    case 'web-selection':
+      return {
+        type: 'web-selection',
+        content: mentionable.content,
+        url: mentionable.url,
+        title: mentionable.title,
+        pageId: mentionable.pageId,
+        source: mentionable.source,
+        contentHash:
+          mentionable.contentHash ?? getBlockContentHash(mentionable.content),
+        contentCount: mentionable.contentCount,
+        contentUnit: mentionable.contentUnit,
+      }
     case 'image':
       return {
         type: 'image',
@@ -178,6 +191,27 @@ export const deserializeMentionable = (
           url: mentionable.url,
         }
       }
+      case 'web-selection': {
+        if (
+          typeof mentionable.content !== 'string' ||
+          typeof mentionable.url !== 'string' ||
+          typeof mentionable.title !== 'string'
+        ) {
+          return null
+        }
+        return {
+          type: 'web-selection',
+          content: mentionable.content,
+          url: mentionable.url,
+          title: mentionable.title,
+          pageId: mentionable.pageId,
+          source: mentionable.source,
+          contentHash:
+            mentionable.contentHash ?? getBlockContentHash(mentionable.content),
+          contentCount: mentionable.contentCount,
+          contentUnit: mentionable.contentUnit,
+        }
+      }
       case 'image': {
         return {
           type: 'image',
@@ -235,6 +269,8 @@ export function getMentionableKey(mentionable: SerializedMentionable): string {
       return `assistant-quote:${mentionable.conversationId}:${mentionable.messageId}:${mentionable.contentHash ?? (typeof mentionable.content === 'string' ? getBlockContentHash(mentionable.content) : 'nohash')}`
     case 'url':
       return `url:${mentionable.url}`
+    case 'web-selection':
+      return `web-selection:${mentionable.url}:${mentionable.contentHash ?? getBlockContentHash(mentionable.content)}`
     case 'image':
       return `image:${mentionable.name}:${mentionable.data.length}:${mentionable.data.slice(-32)}`
     case 'pdf': {
@@ -349,6 +385,13 @@ export function getMentionableName(
     }
     case 'url':
       return mentionable.url
+    case 'web-selection': {
+      const info = getBlockMentionableCountInfo(mentionable.content)
+      const count = mentionable.contentCount ?? info.count
+      const unit = mentionable.contentUnit ?? info.unit
+      const unitLabel = resolveUnitLabel(unit, options?.unitLabels)
+      return `${mentionable.title || mentionable.url} (${count} ${unitLabel})`
+    }
     case 'image':
       return mentionable.name
     case 'pdf':

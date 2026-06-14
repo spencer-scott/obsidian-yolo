@@ -55,6 +55,17 @@ export type MentionableUrl = {
   type: 'url'
   url: string
 }
+export type MentionableWebSelection = {
+  type: 'web-selection'
+  content: string
+  url: string
+  title: string
+  pageId?: string
+  source?: 'web-selection-sync' | 'web-selection-pinned'
+  contentHash?: string
+  contentCount?: number
+  contentUnit?: 'characters' | 'words' | 'wordsCharacters'
+}
 export type MentionableImage = {
   type: 'image'
   name: string
@@ -86,6 +97,7 @@ export type Mentionable =
   | MentionableBlock
   | MentionableAssistantQuote
   | MentionableUrl
+  | MentionableWebSelection
   | MentionableImage
   | MentionablePDF
   | MentionableModel
@@ -119,6 +131,7 @@ export type SerializedMentionableAssistantQuote = {
   contentUnit?: 'characters' | 'words' | 'wordsCharacters'
 }
 export type SerializedMentionableUrl = MentionableUrl
+export type SerializedMentionableWebSelection = MentionableWebSelection
 export type SerializedMentionableImage = MentionableImage
 export type SerializedMentionablePDF = MentionablePDF
 export type SerializedMentionableModel = MentionableModel
@@ -128,6 +141,7 @@ export type SerializedMentionable =
   | SerializedMentionableBlock
   | SerializedMentionableAssistantQuote
   | SerializedMentionableUrl
+  | SerializedMentionableWebSelection
   | SerializedMentionableImage
   | SerializedMentionablePDF
   | SerializedMentionableModel

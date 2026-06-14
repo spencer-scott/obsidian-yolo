@@ -44,6 +44,6 @@ describe('createQuickAskEditorState', () => {
       type: 'mention',
       mentionName: 'test.md (4 words)',
     })
-    expect(editorStateToPlainText(editorState)).toBe('@test.md (4 words) explain')
+    expect(editorStateToPlainText(editorState)).toBe('test.md (4 words) explain')
   })
 })

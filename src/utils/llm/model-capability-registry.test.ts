@@ -3,6 +3,7 @@ import { ChatModel } from '../../types/chat-model.types'
 import {
   applyKnownMaxContextTokensToChatModels,
   normalizeModelContextLookupKey,
+  resolveEffectiveMaxContextTokens,
   resolveKnownChatModelModalities,
   resolveKnownMaxContextTokens,
 } from './model-capability-registry'
@@ -24,12 +25,15 @@ describe('model-capability-registry', () => {
     )
     expect(resolveKnownMaxContextTokens('gemini-2.5-flash')).toBe(1048576)
     expect(resolveKnownMaxContextTokens('openrouter/grok-4-fast')).toBe(2000000)
+    expect(resolveKnownMaxContextTokens('deepseek/deepseek-v4-pro')).toBe(
+      1048576,
+    )
   })
 
   it('resolves known modalities per model', () => {
-    expect(resolveKnownChatModelModalities('deepseek/deepseek-chat')).toEqual([
-      'text',
-    ])
+    expect(
+      resolveKnownChatModelModalities('deepseek/deepseek-v4-flash'),
+    ).toEqual(['text'])
     expect(
       resolveKnownChatModelModalities('anthropic/claude-sonnet-4.5'),
     ).toEqual(expect.arrayContaining(['text', 'vision']))
@@ -61,5 +65,33 @@ describe('model-capability-registry', () => {
     expect(result.changed).toBe(true)
     expect(result.chatModels[0].maxContextTokens).toBe(1047576)
     expect(result.chatModels[1].maxContextTokens).toBe(999999)
+  })
+
+  it('resolveEffectiveMaxContextTokens prefers user config over registry', () => {
+    expect(
+      resolveEffectiveMaxContextTokens({
+        id: 'openai/gpt-4.1',
+        model: 'gpt-4.1',
+        maxContextTokens: 12345,
+      }),
+    ).toBe(12345)
+  })
+
+  it('resolveEffectiveMaxContextTokens falls back to registry when unset', () => {
+    expect(
+      resolveEffectiveMaxContextTokens({
+        id: 'anthropic/claude-sonnet-4.0',
+        model: 'claude-sonnet-4.0',
+      }),
+    ).toBe(200000)
+  })
+
+  it('resolveEffectiveMaxContextTokens returns undefined for unknown models', () => {
+    expect(
+      resolveEffectiveMaxContextTokens({
+        id: 'custom/unknown-model',
+        model: 'unknown-model',
+      }),
+    ).toBeUndefined()
   })
 })

@@ -1,3 +1,4 @@
+import type { SerializedEditorState } from 'lexical'
 import { TFile, TFolder } from 'obsidian'
 
 jest.mock('../../database/json/chat/promptSnapshotStore', () => ({
@@ -6,6 +7,10 @@ jest.mock('../../database/json/chat/promptSnapshotStore', () => ({
 
 jest.mock('../../core/memory/memoryManager', () => ({
   getMemoryPromptContext: jest.fn(async () => ''),
+  resolveMemoryFilePaths: jest.fn(() => ({
+    global: 'YOLO/memory/global.md',
+    assistant: null,
+  })),
 }))
 
 jest.mock('../llm/image', () => ({
@@ -13,6 +18,14 @@ jest.mock('../llm/image', () => ({
   tFileToImageDataUrl: jest.fn(async () => 'data:image/png;base64,fake'),
 }))
 
+jest.mock('../../core/skills/liteSkills', () => ({
+  ...jest.requireActual('../../core/skills/liteSkills'),
+  getLiteSkillDocument: jest.fn(),
+}))
+
+import { SystemPromptSnapshotStore } from '../../core/agent/systemPromptSnapshotStore'
+import { getMemoryPromptContext } from '../../core/memory/memoryManager'
+import { getLiteSkillDocument } from '../../core/skills/liteSkills'
 import type { YoloSettings } from '../../settings/schema/setting.types'
 import type { ChatUserMessage } from '../../types/chat'
 import type { ChatModel } from '../../types/chat-model.types'
@@ -25,6 +38,10 @@ import {
   extractMarkdownAtxHeadings,
   stripUnsupportedImages,
 } from './requestContextBuilder'
+
+const mockGetLiteSkillDocument = getLiteSkillDocument as jest.MockedFunction<
+  typeof getLiteSkillDocument
+>
 
 function createMockFile(path: string): InstanceType<typeof TFile> {
   const extension = path.split('.').pop() ?? ''
@@ -54,6 +71,40 @@ function createUserMessage(
     promptContent: null,
     mentionables,
   }
+}
+
+function createTextEditorState(text: string): SerializedEditorState {
+  return {
+    root: {
+      children: [
+        {
+          children: [
+            {
+              detail: 0,
+              format: 0,
+              mode: 'normal',
+              style: '',
+              text,
+              type: 'text',
+              version: 1,
+            },
+          ],
+          direction: 'ltr',
+          format: '',
+          indent: 0,
+          type: 'paragraph',
+          version: 1,
+          textFormat: 0,
+          textStyle: '',
+        },
+      ],
+      direction: 'ltr',
+      format: '',
+      indent: 0,
+      type: 'root',
+      version: 1,
+    },
+  } as unknown as SerializedEditorState
 }
 
 function getTextContent(
@@ -110,6 +161,11 @@ function createMockApp({
   }
 }
 
+beforeEach(() => {
+  mockGetLiteSkillDocument.mockReset()
+  mockGetLiteSkillDocument.mockResolvedValue(null)
+})
+
 describe('extractMarkdownAtxHeadings', () => {
   it('extracts ATX headings and ignores fenced code blocks', () => {
     const content = [
@@ -145,6 +201,99 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
     },
     skills: {},
   } as unknown as YoloSettings
+
+  it('does not auto-fetch URL mention content into the prompt', async () => {
+    const app = createMockApp({
+      files: [],
+      fileContents: new Map(),
+    })
+    const builder = new RequestContextBuilder(app as never, settings)
+
+    const result = await builder.compileUserMessagePrompt({
+      message: {
+        ...createUserMessage([{ type: 'url', url: 'https://example.com' }]),
+        content: createTextEditorState('Please check https://example.com'),
+      },
+    })
+
+    const textContent = getTextContent(result.promptContent)
+
+    expect(textContent).toContain('Please check https://example.com')
+    expect(textContent).not.toContain('Potentially Relevant Websearch Results')
+    expect(textContent).not.toContain('Website Content:')
+  })
+
+  it('compiles plain prompts without constructing editor state', async () => {
+    const app = createMockApp({
+      files: [],
+      fileContents: new Map(),
+    })
+    const builder = new RequestContextBuilder(app as never, settings)
+
+    const result = await builder.compilePlainUserMessagePrompt({
+      prompt: 'Explain this note',
+      mentionables: [],
+    })
+
+    expect(getTextContent(result.promptContent)).toBe(
+      '\n\nExplain this note\n\n',
+    )
+  })
+
+  it('reuses file mention compilation for plain prompts', async () => {
+    const explicitFile = createMockFile('notes/explicit.md')
+    const app = createMockApp({
+      files: [explicitFile],
+      fileContents: new Map([[explicitFile.path, '# Explicit\nBody']]),
+    })
+    const builder = new RequestContextBuilder(app as never, settings)
+
+    const result = await builder.compilePlainUserMessagePrompt({
+      prompt: 'Summarize this file',
+      mentionables: [{ type: 'file', file: explicitFile }],
+    })
+
+    const textContent = getTextContent(result.promptContent)
+    expect(textContent).toContain('## Mentioned Vault Files (outline only)')
+    expect(textContent).toContain('- `notes/explicit.md`\n  - L1 # Explicit')
+    expect(textContent).toContain('Summarize this file')
+  })
+
+  it('adds selected skill content for plain prompts', async () => {
+    mockGetLiteSkillDocument.mockResolvedValueOnce({
+      entry: {
+        name: 'skill-creator',
+        description: 'Create skills',
+        mode: 'lazy',
+        path: 'builtin://skills/skill-creator',
+      },
+      content: '# skill body',
+    })
+
+    const app = createMockApp({
+      files: [],
+      fileContents: new Map(),
+    })
+    const builder = new RequestContextBuilder(app as never, settings)
+
+    const result = await builder.compilePlainUserMessagePrompt({
+      prompt: 'Use the skill',
+      mentionables: [],
+      selectedSkills: [
+        {
+          name: 'skill-creator',
+          description: 'Create skills',
+          path: 'builtin://skills/skill-creator',
+        },
+      ],
+    })
+
+    expect(getTextContent(result.promptContent)).toContain(
+      '<user_selected_skills>',
+    )
+    expect(getTextContent(result.promptContent)).toContain('# skill body')
+    expect(getTextContent(result.promptContent)).toContain('Use the skill')
+  })
 
   it('builds unified mentioned file context with outlines for files, current file, and folder files', async () => {
     const explicitFile = createMockFile('notes/explicit.md')
@@ -573,6 +722,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
         name: 'gpt-test',
       } as never,
       conversationId: 'conversation-1',
+      systemPromptSnapshotMode: 'create',
     })
 
     expect(
@@ -613,6 +763,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -724,6 +875,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'assistant',
@@ -806,6 +958,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -868,6 +1021,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -941,6 +1095,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     const builder = new RequestContextBuilder(app as never, settings)
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -1076,6 +1231,7 @@ describe('RequestContextBuilder generateRequestMessages', () => {
     }
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: historyMessages,
       hasTools: false,
       hasMemoryTools: false,
@@ -1150,6 +1306,7 @@ describe('RequestContextBuilder project instructions injection', () => {
   ): Promise<string> {
     const builder = new RequestContextBuilder(app as never, settings)
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -1306,6 +1463,7 @@ describe('RequestContextBuilder generateRequestMessages currentFile merging', ()
     const currentFile = createMockFile('notes/focus.md')
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -1348,6 +1506,7 @@ describe('RequestContextBuilder generateRequestMessages currentFile merging', ()
     const currentFile = createMockFile('notes/focus.md')
 
     const requestMessages = await builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -1576,6 +1735,7 @@ describe('parseToolMessage document hoisting', () => {
   ) => {
     const builder = new RequestContextBuilder(mockApp as never, mockSettings)
     return builder.generateRequestMessages({
+      systemPromptSnapshotMode: 'create',
       messages: [
         {
           role: 'user',
@@ -1727,5 +1887,312 @@ describe('parseToolMessage document hoisting', () => {
     expect(headerPart?.type === 'text' && headerPart.text).toContain(
       'Attachments from tool call',
     )
+  })
+})
+
+describe('RequestContextBuilder system prompt freezing', () => {
+  const baseSettings = {
+    systemPrompt: '',
+    currentAssistantId: undefined,
+    assistants: [],
+    yolo: { baseDir: 'YOLO' },
+    chatOptions: {
+      includeCurrentFileContent: false,
+      mentionContextMode: 'light',
+    },
+    skills: {},
+  } as unknown as YoloSettings
+
+  const model = {
+    provider: 'openai',
+    model: 'gpt-test',
+    name: 'gpt-test',
+  } as never
+
+  const userMessages: ChatUserMessage[] = [
+    {
+      role: 'user',
+      id: 'u1',
+      content: null,
+      promptContent: 'hello',
+      mentionables: [],
+    },
+  ]
+
+  const memMock = jest.mocked(getMemoryPromptContext)
+
+  const makeApp = () =>
+    createMockApp({ files: [], fileContents: new Map() }) as never
+
+  const getSystemContent = (messages: RequestMessage[]): string => {
+    const system = messages.find((message) => message.role === 'system')
+    if (!system || typeof system.content !== 'string') {
+      throw new Error('Expected a string system message')
+    }
+    return system.content
+  }
+
+  afterAll(() => {
+    memMock.mockResolvedValue({ global: null, assistant: null })
+  })
+
+  it('freezes memory in the system prompt for the conversation lifetime (create mode)', async () => {
+    const store = new SystemPromptSnapshotStore()
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+
+    memMock.mockResolvedValue({ global: 'MEM_V1', assistant: null })
+    memMock.mockClear()
+
+    const first = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(first)).toContain('MEM_V1')
+
+    // Memory is rewritten mid-conversation (e.g. a memory_add tool call).
+    memMock.mockResolvedValue({ global: 'MEM_V2', assistant: null })
+
+    const second = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    // Frozen: still V1, and memory was not re-read for the second iteration.
+    expect(getSystemContent(second)).toContain('MEM_V1')
+    expect(getSystemContent(second)).not.toContain('MEM_V2')
+    expect(memMock).toHaveBeenCalledTimes(1)
+
+    // A fresh conversation picks up the latest memory.
+    const other = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-2',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(other)).toContain('MEM_V2')
+  })
+
+  it('refreshes on the next real request after an external prompt source change', async () => {
+    const store = new SystemPromptSnapshotStore()
+    let revision = 0
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+      getPromptSourceRevision: () => revision,
+    })
+
+    memMock.mockResolvedValue({ global: 'MEM_V1', assistant: null })
+    memMock.mockClear()
+
+    const first = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(first)).toContain('MEM_V1')
+
+    revision += 1
+    memMock.mockResolvedValue({ global: 'MEM_EXTERNAL', assistant: null })
+
+    const second = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+
+    expect(getSystemContent(second)).toContain('MEM_EXTERNAL')
+    expect(memMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes memory in the system prompt after conversation compaction', async () => {
+    const store = new SystemPromptSnapshotStore()
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+
+    memMock.mockResolvedValue({ global: 'MEM_BEFORE_COMPACT', assistant: null })
+    memMock.mockClear()
+
+    const beforeCompact = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(beforeCompact)).toContain('MEM_BEFORE_COMPACT')
+
+    memMock.mockResolvedValue({ global: 'MEM_AFTER_COMPACT', assistant: null })
+
+    const afterMemoryWrite = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(afterMemoryWrite)).toContain('MEM_BEFORE_COMPACT')
+    expect(getSystemContent(afterMemoryWrite)).not.toContain(
+      'MEM_AFTER_COMPACT',
+    )
+
+    const afterCompact = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      compaction: {
+        anchorMessageId: 'tool-compact',
+        summary: 'Earlier context summary',
+        compactedAt: 1,
+        triggerToolCallId: 'compact-1',
+      },
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(afterCompact)).toContain('MEM_AFTER_COMPACT')
+    expect(memMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes the snapshot when a prompt-relevant setting changes', async () => {
+    const store = new SystemPromptSnapshotStore()
+    memMock.mockResolvedValue({ global: 'MEM', assistant: null })
+
+    const builderA = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+    const a = await builderA.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(a)).not.toContain('CUSTOM_SP')
+
+    // settings.systemPrompt changes -> fingerprint changes -> snapshot refreshes
+    // even within the same conversationId (a new RCB instance, shared store).
+    const builderB = new RequestContextBuilder(
+      makeApp(),
+      { ...baseSettings, systemPrompt: 'CUSTOM_SP' } as unknown as YoloSettings,
+      { includeSkills: false, systemPromptSnapshotStore: store },
+    )
+    const b = await builderB.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(b)).toContain('CUSTOM_SP')
+  })
+
+  it('injects runtime mode prompt and refreshes when it changes', async () => {
+    const store = new SystemPromptSnapshotStore()
+    memMock.mockResolvedValue({ global: 'MEM', assistant: null })
+
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+    const ask = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      runtimeModePrompt: '<runtime_mode>Ask mode prompt</runtime_mode>',
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(ask)).toContain('Ask mode prompt')
+
+    const agent = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(agent)).not.toContain('Ask mode prompt')
+  })
+
+  it('does NOT refresh the snapshot for a setting that never reaches the system prompt', async () => {
+    const store = new SystemPromptSnapshotStore()
+    memMock.mockResolvedValue({ global: 'MEM_V1', assistant: null })
+
+    const builderA = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+    const a = await builderA.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(a)).toContain('MEM_V1')
+
+    // Memory changes AND an unrelated, non-system setting (chatOptions) changes.
+    // The fingerprint must be unchanged, so the frozen V1 snapshot is kept.
+    memMock.mockResolvedValue({ global: 'MEM_V2', assistant: null })
+    const builderB = new RequestContextBuilder(
+      makeApp(),
+      {
+        ...baseSettings,
+        chatOptions: {
+          includeCurrentFileContent: true,
+          mentionContextMode: 'full',
+        },
+      } as unknown as YoloSettings,
+      { includeSkills: false, systemPromptSnapshotStore: store },
+    )
+    const b = await builderB.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(b)).toContain('MEM_V1')
+    expect(getSystemContent(b)).not.toContain('MEM_V2')
+  })
+
+  it('reuse mode never freezes ahead of the real request', async () => {
+    const store = new SystemPromptSnapshotStore()
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+
+    memMock.mockResolvedValue({ global: 'MEM_V1', assistant: null })
+    const estimate = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'reuse',
+    })
+    expect(getSystemContent(estimate)).toContain('MEM_V1')
+
+    // The estimate must not have frozen V1: the real request sees current memory.
+    memMock.mockResolvedValue({ global: 'MEM_V2', assistant: null })
+    const real = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-1',
+      hasMemoryTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(real)).toContain('MEM_V2')
   })
 })

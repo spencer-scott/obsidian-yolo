@@ -1,5 +1,6 @@
 import {
   bindLLMDebugTraceToSignal,
+  captureLLMDebugOperation,
   createLLMDebugFetch,
   createLLMDebugTrace,
   flushLLMDebugTraceReads,
@@ -140,6 +141,61 @@ describe('debugCapture', () => {
 
     expect(omitted).toMatch(/\[OMITTED long JSON string: \d+ chars\]/)
     expect(omitted).not.toContain('Truncated long JSON string')
+  })
+
+  it('omits base64 data from captured operation responses before storage', async () => {
+    setLLMDebugCaptureEnabled(true)
+    const trace = createLLMDebugTrace({ requestKind: 'streaming' })
+    const base64 = 'A'.repeat(1024)
+
+    await runWithLLMDebugTrace(trace.id, async () => {
+      await expect(
+        captureLLMDebugOperation({
+          traceId: trace.id,
+          transportMode: 'mcp',
+          url: 'mcp://yolo_local/fs_read',
+          method: 'callTool',
+          requestBody: { name: 'fs_read' },
+          responseContentType: 'application/json',
+          run: async () => ({
+            status: 'success',
+            content: [{ type: 'text', data: base64 }],
+          }),
+        }),
+      ).resolves.toEqual({
+        status: 'success',
+        content: [{ type: 'text', data: base64 }],
+      })
+    })
+
+    const responseBody = getLLMDebugTrace(trace.id)?.exchanges[0]?.response
+      ?.body
+    expect(responseBody).toContain('[OMITTED base64 data: 1024 chars]')
+    expect(responseBody).not.toContain(base64)
+  })
+
+  it('adds debug capture context to serialization failures', async () => {
+    setLLMDebugCaptureEnabled(true)
+    const trace = createLLMDebugTrace({ requestKind: 'streaming' })
+
+    await runWithLLMDebugTrace(trace.id, async () => {
+      await expect(
+        captureLLMDebugOperation({
+          traceId: trace.id,
+          transportMode: 'mcp',
+          url: 'mcp://yolo_local/fs_read',
+          method: 'callTool',
+          requestBody: { name: 'fs_read' },
+          responseContentType: 'application/json',
+          run: async () => ({ ok: true }),
+          getResponseBody: () => {
+            throw new RangeError('Maximum call stack size exceeded')
+          },
+        }),
+      ).rejects.toThrow(
+        'LLM debug capture failed while serializing response body.',
+      )
+    })
   })
 
   it('redacts sensitive params in form-urlencoded request bodies', async () => {

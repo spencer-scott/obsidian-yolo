@@ -80,6 +80,13 @@ const TEST_MODEL: ChatModel = {
   model: 'gpt-4.1',
 }
 
+const createMockMcpManager = (tools: unknown[] = []): McpManager =>
+  ({
+    listAvailableTools: jest.fn().mockResolvedValue(tools),
+    getJsSandboxSettings: jest.fn(() => ({})),
+    getSettingsSnapshot: jest.fn(() => ({})),
+  }) as unknown as McpManager
+
 describe('AgentLlmTurnExecutor', () => {
   beforeEach(() => {
     mockExecuteSingleTurn.mockReset()
@@ -102,10 +109,7 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+    const mcpManager = createMockMcpManager()
 
     const executor = new AgentLlmTurnExecutor({
       providerClient: provider,
@@ -203,19 +207,16 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([
-        {
-          name: 'yolo_local__fs_move',
-          description: 'Move path',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
+    const mcpManager = createMockMcpManager([
+      {
+        name: 'yolo_local__fs_move',
+        description: 'Move path',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-      ]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+      },
+    ])
 
     const observedAssistantMessages: ChatAssistantMessage[] = []
     const executor = new AgentLlmTurnExecutor({
@@ -281,10 +282,7 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+    const mcpManager = createMockMcpManager()
 
     mockExecuteSingleTurn.mockRejectedValue(new Error('network exploded'))
 
@@ -328,6 +326,59 @@ describe('AgentLlmTurnExecutor', () => {
     )
   })
 
+  it('includes nested cause details in assistant error messages', async () => {
+    const provider = new MockProvider()
+    const requestContextBuilder = {
+      generateRequestMessages: jest
+        .fn()
+        .mockResolvedValue([{ role: 'user', content: 'hello' }]),
+    } as unknown as RequestContextBuilder
+
+    const mcpManager = createMockMcpManager()
+
+    const wrappedError = new Error('Connection error.') as Error & {
+      cause?: unknown
+    }
+    wrappedError.cause = new Error(
+      'LLM debug capture failed while reading request body.',
+    )
+    mockExecuteSingleTurn.mockRejectedValue(wrappedError)
+
+    const observedAssistantMessages: ChatAssistantMessage[] = []
+    const executor = new AgentLlmTurnExecutor({
+      providerClient: provider,
+      model: TEST_MODEL,
+      requestContextBuilder,
+      mcpManager,
+      conversationId: 'conv-1',
+      messages: [],
+      enableTools: false,
+      includeBuiltinTools: false,
+      requestParams: {
+        stream: true,
+      },
+      onAssistantMessage: (message) => {
+        observedAssistantMessages.push({
+          ...message,
+          metadata: message.metadata
+            ? {
+                ...message.metadata,
+              }
+            : undefined,
+        })
+      },
+    })
+
+    await expect(executor.run()).rejects.toThrow('Connection error.')
+
+    expect(observedAssistantMessages.at(-1)?.metadata?.errorMessage).toBe(
+      [
+        'Connection error.',
+        'Caused by: LLM debug capture failed while reading request body.',
+      ].join('\n'),
+    )
+  })
+
   it('marks assistant message aborted on abort errors', async () => {
     const provider = new MockProvider()
     const requestContextBuilder = {
@@ -336,10 +387,7 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+    const mcpManager = createMockMcpManager()
     const abortController = new AbortController()
     abortController.abort()
 
@@ -391,10 +439,7 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+    const mcpManager = createMockMcpManager()
 
     mockExecuteSingleTurn.mockImplementation(async ({ onStreamDelta }) => {
       onStreamDelta?.({
@@ -453,19 +498,16 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([
-        {
-          name: 'yolo_local__memory_add',
-          description: 'Add memory',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
+    const mcpManager = createMockMcpManager([
+      {
+        name: 'yolo_local__memory_add',
+        description: 'Add memory',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-      ]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+      },
+    ])
 
     mockExecuteSingleTurn.mockResolvedValue({
       content: 'done',
@@ -511,19 +553,16 @@ describe('AgentLlmTurnExecutor', () => {
         .mockResolvedValue([{ role: 'user', content: 'hello' }]),
     } as unknown as RequestContextBuilder
 
-    const mcpManager = {
-      listAvailableTools: jest.fn().mockResolvedValue([
-        {
-          name: 'yolo_local__fs_read',
-          description: 'Read file',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
+    const mcpManager = createMockMcpManager([
+      {
+        name: 'yolo_local__fs_read',
+        description: 'Read file',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-      ]),
-      getJsSandboxSettings: jest.fn().mockReturnValue({}),
-    } as unknown as McpManager
+      },
+    ])
 
     mockExecuteSingleTurn.mockResolvedValue({
       content: 'done',

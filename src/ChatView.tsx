@@ -3,7 +3,11 @@ import { ItemView, TFile, TFolder, WorkspaceLeaf } from 'obsidian'
 import React from 'react'
 import { Root, createRoot } from 'react-dom/client'
 
-import type { ChatProps, ChatRef } from './components/chat-view/Chat'
+import type {
+  ChatProps,
+  ChatRef,
+  ChatRuntimeSnapshot,
+} from './components/chat-view/Chat'
 import ChatSidebarTabs from './components/chat-view/ChatSidebarTabs'
 import { CHAT_VIEW_TYPE } from './constants'
 import { AppProvider } from './contexts/app-context'
@@ -20,13 +24,31 @@ import type { PendingChatOpenPayload } from './features/chat/chatLeafSessionMana
 import { getConversationDisplayTitle } from './hooks/useChatHistory'
 import YoloPlugin from './main'
 import { ConversationOverrideSettings } from './types/conversation-settings.types'
-import { MentionableBlockData, MentionableImage } from './types/mentionable'
+import {
+  MentionableBlockData,
+  MentionableImage,
+  MentionableWebSelection,
+} from './types/mentionable'
 
 export class ChatView extends ItemView {
   private displayTitle = 'Yolo chat'
   private root: Root | null = null
   private initialChatProps?: ChatProps
   private chatRef: React.RefObject<ChatRef> = React.createRef()
+  // Host DOM rebuild tracking: on Windows, Obsidian pop-out destroys the old view-content
+  // and creates a new empty one — we need to detect this and migrate the React tree to the new host.
+  private mountedHost: HTMLElement | null = null
+  // ownerDocument at mount time. On macOS, Obsidian pop-out *reparents* the
+  // same DOM node to the new window — `mountedHost` reference is unchanged
+  // but its `ownerDocument` is now the new window's document. We must rebuild
+  // in this case too so Lexical re-binds its `selectionchange` listener.
+  private mountedDoc: Document | null = null
+  private hostObserver: MutationObserver | null = null
+  private windowMigratedDisposer: (() => void) | null = null
+  private runtimeSnapshot: ChatRuntimeSnapshot | null = null
+  private rebuildScheduled = false
+  private rebuildRafId: number | null = null
+  private isClosed = false
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -48,6 +70,7 @@ export class ChatView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.isClosed = false
     const manager = this.plugin.getChatLeafSessionManager()
     const pendingPayload = manager.consumePendingPayload(this.leaf)
     const placement =
@@ -63,20 +86,96 @@ export class ChatView extends ItemView {
 
     this.initialChatProps = undefined
 
-    void this.plugin.checkForUpdateOnce()
+    // Host replacement signal 1: containerEl.onWindowMigrated (Obsidian public API)
+    this.windowMigratedDisposer = this.containerEl.onWindowMigrated(() => {
+      this.scheduleRebuildCheck()
+    })
+    // Host replacement signal 2: workspace events — window open/close, layout changes
+    this.registerEvent(
+      this.plugin.app.workspace.on('window-open', () => {
+        this.scheduleRebuildCheck()
+      }),
+    )
+    this.registerEvent(
+      this.plugin.app.workspace.on('window-close', () => {
+        this.scheduleRebuildCheck()
+      }),
+    )
+    this.registerEvent(
+      this.plugin.app.workspace.on('layout-change', () => {
+        this.scheduleRebuildCheck()
+      }),
+    )
+    // Host replacement signal 3: direct MutationObserver fallback — on Windows during pop-out,
+    // view-content is destroyed and recreated in place, and the two event sources above may not cover it reliably.
+    this.hostObserver = new MutationObserver(() => {
+      this.scheduleRebuildCheck()
+    })
+    this.hostObserver.observe(this.containerEl, { childList: true })
+
     this.plugin.refreshInstallationIncompleteBanner()
   }
 
   onClose(): Promise<void> {
+    this.isClosed = true
+    if (this.rebuildRafId !== null) {
+      window.cancelAnimationFrame(this.rebuildRafId)
+      this.rebuildRafId = null
+    }
+    this.rebuildScheduled = false
     this.plugin.getChatLeafSessionManager().unregisterLeaf(this.leaf)
+    this.hostObserver?.disconnect()
+    this.hostObserver = null
+    this.windowMigratedDisposer?.()
+    this.windowMigratedDisposer = null
     this.root?.unmount()
+    this.root = null
+    this.mountedHost = null
+    this.mountedDoc = null
     return Promise.resolve()
+  }
+
+  private scheduleRebuildCheck(): void {
+    if (this.isClosed) return
+    if (this.rebuildScheduled) return
+    this.rebuildScheduled = true
+    this.rebuildRafId = window.requestAnimationFrame(() => {
+      this.rebuildRafId = null
+      this.rebuildScheduled = false
+      // Bail out if the view was closed between scheduling and firing.
+      if (this.isClosed) return
+      const expectedHost = this.containerEl.children[1] as
+        | HTMLElement
+        | undefined
+      if (!expectedHost) return
+      const hostChanged = expectedHost !== this.mountedHost
+      const docChanged = expectedHost.ownerDocument !== this.mountedDoc
+      if (!hostChanged && !docChanged) return
+      void this.rebuild()
+    })
+  }
+
+  private async rebuild(): Promise<void> {
+    const newHost = this.containerEl.children[1] as HTMLElement | undefined
+    if (!newHost) return
+    this.root?.unmount()
+    this.root = createRoot(newHost)
+    this.mountedHost = newHost
+    this.mountedDoc = newHost.ownerDocument
+    await this.render()
   }
 
   render(): Promise<void> {
     if (!this.root) {
-      this.root = createRoot(this.containerEl.children[1])
+      const host = this.containerEl.children[1] as HTMLElement
+      this.root = createRoot(host)
+      this.mountedHost = host
+      this.mountedDoc = host.ownerDocument
     }
+
+    // When rebuild moves the React tree to a new host, pass the current snapshot as initial props
+    // so Chat's internal useState initializes with the snapshot values, preventing draft/conversation ID loss.
+    const seededRuntimeSnapshot = this.runtimeSnapshot ?? undefined
 
     const placement =
       this.plugin.getChatLeafSessionManager().getLeafPlacement(this.leaf) ??
@@ -127,7 +226,10 @@ export class ChatView extends ItemView {
                               <ChatSidebarTabs
                                 chatRef={this.chatRef}
                                 placement={placement}
-                                initialChatProps={this.initialChatProps}
+                                initialChatProps={{
+                                  ...(this.initialChatProps ?? {}),
+                                  seededRuntimeSnapshot,
+                                }}
                                 onConversationContextChange={(context) => {
                                   const manager =
                                     this.plugin.getChatLeafSessionManager()
@@ -135,6 +237,9 @@ export class ChatView extends ItemView {
                                   this.updateDisplayTitle(
                                     context.currentConversationTitle,
                                   )
+                                }}
+                                onRuntimeSnapshotChange={(snapshot) => {
+                                  this.runtimeSnapshot = snapshot
                                 }}
                               />
                             </DialogContainerProvider>
@@ -197,6 +302,11 @@ export class ChatView extends ItemView {
   syncSelectionToInput(selectedBlock: MentionableBlockData) {
     this.plugin.getChatLeafSessionManager().touchLeafInteracted(this.leaf)
     this.chatRef.current?.syncSelectionToInput(selectedBlock)
+  }
+
+  syncWebSelectionToInput(selection: MentionableWebSelection) {
+    this.plugin.getChatLeafSessionManager().touchLeafInteracted(this.leaf)
+    this.chatRef.current?.syncWebSelectionToInput(selection)
   }
 
   clearSelectionFromChat() {

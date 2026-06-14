@@ -1,22 +1,29 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query'
-import { TFile } from 'obsidian'
+import { Platform, TFile } from 'obsidian'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useApp } from '../../contexts/app-context'
 import { useMcp } from '../../contexts/mcp-context'
 import { usePlugin } from '../../contexts/plugin-context'
 import { useSettings } from '../../contexts/settings-context'
+import { resolveAssistantIncludeCurrentFileContent } from '../../core/agent/assistant-capabilities'
+import { DEFAULT_BLOCKED_PREFIXES } from '../../core/agent/bash/command-classifier'
 import {
+  CONTEXT_COMPACT_TOOL_NAME,
   buildManualCompactionState,
   createConversationCompactionSummary,
   getLastAssistantPromptTokens,
+  resolveAutoContextCompactionChatOptions,
 } from '../../core/agent/compaction'
 import { estimateContinuationRequestContextTokens } from '../../core/agent/requestContextEstimate'
-import type {
-  AgentConversationRunSummary,
-  AgentConversationState,
+import {
+  type AgentConversationRunSummary,
+  type AgentConversationState,
+  buildAgentConversationRunSummary,
 } from '../../core/agent/service'
 import { getEnabledAssistantToolNames } from '../../core/agent/tool-preferences'
+import { selectAllowedTools } from '../../core/agent/tool-selection'
+import type { AgentRuntimeRunInput } from '../../core/agent/types'
 import {
   LLMAPIKeyInvalidException,
   LLMAPIKeyNotSetException,
@@ -24,10 +31,17 @@ import {
   LLMModelNotFoundException,
 } from '../../core/llm/exception'
 import { getChatModelClient } from '../../core/llm/manager'
+import type { AutoPromotedTransportMode } from '../../core/llm/requestTransport'
 import { shouldUseStreamingForProvider } from '../../core/llm/streamingPolicy'
 import { promoteProviderTransportModeToObsidian } from '../../core/llm/transportModePromotion'
+import {
+  TERMINAL_COMMAND_TOOL_NAME,
+  getLocalFileToolServerName,
+} from '../../core/mcp/localFileTools'
+import { getToolName } from '../../core/mcp/tool-name-utils'
 import { listLiteSkillEntries } from '../../core/skills/liteSkills'
 import { isSkillEnabledForAssistant } from '../../core/skills/skillPolicy'
+import type { AssistantToolPreference } from '../../types/assistant.types'
 import {
   ChatConversationCompaction,
   ChatConversationCompactionState,
@@ -35,15 +49,22 @@ import {
   ChatToolMessage,
 } from '../../types/chat'
 import { ConversationOverrideSettings } from '../../types/conversation-settings.types'
-import { ReasoningLevel } from '../../types/reasoning'
-import { ToolCallResponseStatus } from '../../types/tool-call.types'
+import {
+  ReasoningLevel,
+  normalizeStoredReasoningLevel,
+  resolveRequestReasoningLevel,
+} from '../../types/reasoning'
 import type { ContextualInjection } from '../../utils/chat/contextual-injections'
 import { RequestContextBuilder } from '../../utils/chat/requestContextBuilder'
+import { resolveEffectiveMaxContextTokens } from '../../utils/llm/model-capability-registry'
 import { ErrorModal } from '../modals/ErrorModal'
 
 import { ChatMode } from './chat-input/ChatModeSelect'
 import { resolveWorkspaceScopeForRuntimeInput } from './chat-runtime-inputs'
-import { resolveChatModeRuntime } from './chat-runtime-profiles'
+import {
+  type ChatModeRuntime,
+  resolveChatModeRuntime,
+} from './chat-runtime-profiles'
 import type { ContextBreakdownInputs } from './useContextBreakdown'
 
 type UseChatStreamManagerParams = {
@@ -82,35 +103,50 @@ type BranchRetryTarget = {
   branchLabel?: string
 }
 
-const buildRunSummary = ({
-  conversationId,
-  status,
-  messages,
-}: AgentConversationState): AgentConversationRunSummary => {
-  let hasApproval = false
-  let hasAwaitingUser = false
-  for (const message of messages) {
-    if (message.role !== 'tool') continue
-    for (const toolCall of message.toolCalls) {
-      if (toolCall.response.status === ToolCallResponseStatus.PendingApproval) {
-        hasApproval = true
-      } else if (
-        toolCall.response.status === ToolCallResponseStatus.AwaitingUserInput
-      ) {
-        hasAwaitingUser = true
-      }
-      if (hasApproval && hasAwaitingUser) break
-    }
-    if (hasApproval && hasAwaitingUser) break
+const AUTO_CONTEXT_COMPACT_TOOL_FQN = getToolName(
+  getLocalFileToolServerName(),
+  CONTEXT_COMPACT_TOOL_NAME,
+)
+
+const AUTO_CONTEXT_COMPACT_TOOL_PREFERENCE: AssistantToolPreference = {
+  enabled: true,
+  approvalMode: 'full_access',
+  disclosureMode: 'always',
+}
+
+const enableAutoContextCompactionTool = (
+  runtime: ChatModeRuntime,
+  enabled: boolean,
+): ChatModeRuntime => {
+  if (!enabled) {
+    return runtime
   }
-  const isWaitingApproval = hasApproval || hasAwaitingUser
+
+  const allowedToolNames =
+    runtime.allowedToolNames === undefined && runtime.loopConfig.enableTools
+      ? undefined
+      : [
+          ...new Set([
+            ...(runtime.allowedToolNames ?? []),
+            AUTO_CONTEXT_COMPACT_TOOL_FQN,
+          ]),
+        ]
 
   return {
-    conversationId,
-    status,
-    isRunning: status === 'running' && !isWaitingApproval,
-    isWaitingApproval,
-    isWaitingUserInput: hasAwaitingUser,
+    ...runtime,
+    loopConfig: {
+      ...runtime.loopConfig,
+      enableTools: true,
+      includeBuiltinTools: true,
+    },
+    allowedToolNames,
+    toolPreferences: {
+      ...(runtime.toolPreferences ?? {}),
+      [AUTO_CONTEXT_COMPACT_TOOL_FQN]: {
+        ...(runtime.toolPreferences?.[AUTO_CONTEXT_COMPACT_TOOL_FQN] ?? {}),
+        ...AUTO_CONTEXT_COMPACT_TOOL_PREFERENCE,
+      },
+    },
   }
 }
 
@@ -139,33 +175,45 @@ export type UseChatStreamManager = {
 }
 
 const isRunSummaryActive = (summary: AgentConversationRunSummary): boolean => {
-  return summary.isRunning || summary.isWaitingApproval
+  return summary.isActive
 }
 
 /**
- * Sidebar Chat focus sync → current-file-pointer injection.
- * Returns an empty array when the user has disabled focus sync or no file
- * is active.
+ * Sidebar Chat contextual injections.
  */
 const buildChatContextualInjections = ({
-  includeCurrentFileContent,
+  app,
+  includeFocusSync,
   currentFile,
   currentFileViewState,
 }: {
-  includeCurrentFileContent: boolean
+  app: import('obsidian').App
+  includeFocusSync: boolean
   currentFile: TFile | null | undefined
   currentFileViewState?: import('../../types/mentionable').CurrentFileViewState
 }): ContextualInjection[] => {
-  if (!includeCurrentFileContent || !currentFile) {
-    return []
+  const injections: ContextualInjection[] = []
+
+  if (!includeFocusSync) {
+    return injections
   }
-  return [
-    {
+
+  if (currentFile) {
+    injections.push({
       type: 'current-file-pointer',
       file: currentFile,
       viewState: currentFileViewState,
-    },
-  ]
+    })
+  }
+
+  if (!Platform.isMobile) {
+    injections.push({
+      type: 'browser-context',
+      app,
+    })
+  }
+
+  return injections
 }
 
 const annotateBranchMessages = (
@@ -173,7 +221,7 @@ const annotateBranchMessages = (
   branch: ActiveBranchRun,
   branchState: AgentConversationState,
 ): ChatMessage[] => {
-  const branchRunSummary = buildRunSummary(branchState)
+  const branchRunSummary = buildAgentConversationRunSummary(branchState)
 
   return messages.map((message) => {
     if (message.role === 'assistant') {
@@ -304,7 +352,7 @@ export function useChatStreamManager({
         activeBranchRunsRef.current.values(),
       ).map((branch) => {
         const state = branchStateMapRef.current.get(branch.branchConversationId)
-        return state ? buildRunSummary(state) : null
+        return state ? buildAgentConversationRunSummary(state) : null
       })
       const activeSummaries = branchSummaries.filter(
         (summary): summary is AgentConversationRunSummary =>
@@ -319,8 +367,11 @@ export function useChatStreamManager({
         )
         setCurrentConversationRunSummary({
           conversationId: currentConversationId,
-          status: hasWaitingApproval ? 'running' : 'running',
+          status: 'running',
           isRunning: activeSummaries.some((summary) => summary.isRunning),
+          isActive: true,
+          isAbortable: activeSummaries.some((summary) => summary.isAbortable),
+          isQueueable: activeSummaries.some((summary) => summary.isQueueable),
           isWaitingApproval: hasWaitingApproval,
           isWaitingUserInput: hasWaitingUserInput,
         })
@@ -330,7 +381,7 @@ export function useChatStreamManager({
   )
 
   const handleAutoPromoteTransportMode = useCallback(
-    (providerId: string, mode: 'node' | 'obsidian') => {
+    (providerId: string, mode: AutoPromotedTransportMode) => {
       void promoteProviderTransportModeToObsidian({
         getSettings: () => plugin.settings,
         setSettings,
@@ -347,7 +398,7 @@ export function useChatStreamManager({
     const syncConversationState = (state: AgentConversationState) => {
       baseConversationMessagesRef.current = state.messages
       baseCompactionStateRef.current = state.compaction ?? []
-      const runSummary = buildRunSummary(state)
+      const runSummary = buildAgentConversationRunSummary(state)
       const hasTrackedState =
         state.messages.length > 0 || state.status !== 'idle'
       if (!hasTrackedState) {
@@ -362,10 +413,7 @@ export function useChatStreamManager({
       setPendingCompactionAnchorMessageId(
         state.pendingCompactionAnchorMessageId ?? null,
       )
-      if (
-        !(state.status === 'running' || runSummary.isWaitingApproval) &&
-        activeBranchRunsRef.current.size === 0
-      ) {
+      if (!runSummary.isActive && activeBranchRunsRef.current.size === 0) {
         return
       }
 
@@ -422,52 +470,6 @@ export function useChatStreamManager({
     [plugin],
   )
 
-  const resolveCompactionClient = useCallback(() => {
-    const effectiveAssistantId =
-      assistantIdOverride ?? settings.currentAssistantId
-    const selectedAssistant = effectiveAssistantId
-      ? (settings.assistants || []).find(
-          (assistant) => assistant.id === effectiveAssistantId,
-        ) || null
-      : null
-
-    const requestedModelId =
-      modelId || selectedAssistant?.modelId || settings.chatModelId
-    const compactionModelId = settings.chatTitleModelId || requestedModelId
-
-    let resolvedClient: ReturnType<typeof getChatModelClient>
-    try {
-      resolvedClient = getChatModelClient({
-        settings,
-        modelId: requestedModelId,
-        onAutoPromoteTransportMode: handleAutoPromoteTransportMode,
-      })
-    } catch (error) {
-      if (
-        error instanceof LLMModelNotFoundException &&
-        settings.chatModels.length > 0
-      ) {
-        resolvedClient = getChatModelClient({
-          settings,
-          modelId: settings.chatModels[0].id,
-          onAutoPromoteTransportMode: handleAutoPromoteTransportMode,
-        })
-      } else {
-        throw error
-      }
-    }
-
-    try {
-      return getChatModelClient({
-        settings,
-        modelId: compactionModelId,
-        onAutoPromoteTransportMode: handleAutoPromoteTransportMode,
-      })
-    } catch {
-      return resolvedClient
-    }
-  }, [assistantIdOverride, handleAutoPromoteTransportMode, modelId, settings])
-
   const compactConversation = useCallback(
     async (messages: ChatMessage[]) => {
       if (messages.length === 0) {
@@ -507,72 +509,117 @@ export function useChatStreamManager({
       }
 
       const effectiveModel = resolvedClient.model
-      const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
-      const enabledSkillEntries = selectedAssistant
-        ? listLiteSkillEntries(app, { settings }).filter((skill) =>
-            isSkillEnabledForAssistant({
-              assistant: selectedAssistant,
-              skillId: skill.id,
-              disabledSkillIds,
-            }),
-          )
-        : []
-      const allowedSkillIds = enabledSkillEntries.map((skill) => skill.id)
-      const allowedSkillNames = enabledSkillEntries.map((skill) => skill.name)
-      const chatModeRuntime = resolveChatModeRuntime({
-        mode: chatMode,
-        assistant: selectedAssistant,
-        assistantEnabledToolNames:
-          getEnabledAssistantToolNames(selectedAssistant),
-      })
+      const autoContextCompactionOptions =
+        resolveAutoContextCompactionChatOptions(settings.chatOptions)
+      const chatModeRuntime = enableAutoContextCompactionTool(
+        resolveChatModeRuntime({
+          mode: chatMode,
+          assistant: selectedAssistant,
+          assistantEnabledToolNames:
+            getEnabledAssistantToolNames(selectedAssistant),
+        }),
+        autoContextCompactionOptions.autoContextCompactionEnabled,
+      )
       const effectiveEnableTools = chatModeRuntime.loopConfig.enableTools
       const effectiveIncludeBuiltinTools =
         chatModeRuntime.loopConfig.includeBuiltinTools
       const effectiveAllowedToolNames = chatModeRuntime.allowedToolNames
-      const resolvedCompactionClient = resolveCompactionClient()
+      const manualProvider = settings.providers.find(
+        (provider) => provider.id === effectiveModel.providerId,
+      )
+      const manualApiType = manualProvider?.apiType ?? null
+      const manualContextualInjections = buildChatContextualInjections({
+        app,
+        includeFocusSync: resolveAssistantIncludeCurrentFileContent(
+          selectedAssistant,
+          settings,
+        ),
+        currentFile: currentFileOverride,
+        currentFileViewState,
+      })
+      const manualCompaction = baseCompactionStateRef.current
+      // Paths 2/3 mirror the main line: reasoning comes from the last user
+      // message's stored level (same source as resolveReasoningLevelForMessages
+      // in Chat.tsx). This keeps the compaction request's thinking config
+      // aligned with the prior turn so the cache-warm prefix still matches.
+      const lastUserMessage = [...messages]
+        .reverse()
+        .find((message) => message.role === 'user')
+      const manualReasoning = resolveRequestReasoningLevel(
+        effectiveModel,
+        lastUserMessage?.role === 'user'
+          ? (normalizeStoredReasoningLevel(lastUserMessage.reasoningLevel) ??
+              undefined)
+          : undefined,
+      )
+
+      // Path 2/3: rebuild a cache-warm prefix + tools that match what the main
+      // line just sent, so the out-of-band summarize request can hit the
+      // provider's prefix cache (same model, same serialized prefix, same tools).
+      const mcpManager = await getMcpManager()
+      const availableTools = effectiveEnableTools
+        ? await mcpManager.listAvailableTools({
+            includeBuiltinTools: effectiveIncludeBuiltinTools,
+            chatModelModalities: effectiveModel.modalities,
+          })
+        : []
+      const { hasTools, hasMemoryTools, requestTools } = selectAllowedTools({
+        availableTools,
+        allowedToolNames: effectiveAllowedToolNames,
+        toolPreferences: chatModeRuntime.toolPreferences,
+        apiType: manualApiType,
+        enableToolDisclosure: settings.mcp.enableToolDisclosure,
+        jsSandboxSettings: mcpManager.getJsSandboxSettings(),
+      })
+      const compactionPrefix =
+        await requestContextBuilder.generateRequestMessages({
+          messages,
+          hasTools,
+          hasMemoryTools,
+          model: effectiveModel,
+          conversationId: currentConversationId,
+          compaction: manualCompaction,
+          contextualInjections: manualContextualInjections,
+          runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
+          // Reuse the frozen snapshot; never create one outside the real request.
+          systemPromptSnapshotMode: 'reuse',
+        })
+
       const summary = await createConversationCompactionSummary({
-        providerClient: resolvedCompactionClient.providerClient,
-        model: resolvedCompactionClient.model,
-        messages,
-        retainLatestToolBoundary: false,
+        providerClient: resolvedClient.providerClient,
+        model: effectiveModel,
+        requestMessages: compactionPrefix,
+        tools: requestTools,
+        reasoningLevel: manualReasoning,
       })
 
       const nextCompaction = await buildManualCompactionState({
         messages,
         summary,
-        summaryModelId: resolvedCompactionClient.model.id,
+        summaryModelId: effectiveModel.id,
       })
 
       if (!nextCompaction) {
         return null
       }
 
-      const manualEstimateProvider = settings.providers.find(
-        (provider) => provider.id === effectiveModel.providerId,
-      )
       try {
         nextCompaction.estimatedNextContextTokens =
           await estimateContinuationRequestContextTokens({
             requestContextBuilder,
-            mcpManager: await getMcpManager(),
+            mcpManager,
             model: effectiveModel,
             messages,
             conversationId: currentConversationId,
             compaction: nextCompaction,
             enableTools: effectiveEnableTools,
             includeBuiltinTools: effectiveIncludeBuiltinTools,
-            apiType: manualEstimateProvider?.apiType ?? null,
+            apiType: manualApiType,
             allowedToolNames: effectiveAllowedToolNames,
             enableToolDisclosure: settings.mcp.enableToolDisclosure,
             toolPreferences: chatModeRuntime.toolPreferences,
-            allowedSkillIds,
-            allowedSkillNames,
-            contextualInjections: buildChatContextualInjections({
-              includeCurrentFileContent:
-                settings.chatOptions.includeCurrentFileContent,
-              currentFile: currentFileOverride,
-              currentFileViewState,
-            }),
+            runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
+            contextualInjections: manualContextualInjections,
           })
       } catch (error) {
         console.warn(
@@ -606,7 +653,6 @@ export function useChatStreamManager({
       handleAutoPromoteTransportMode,
       modelId,
       requestContextBuilder,
-      resolveCompactionClient,
       settings,
     ],
   )
@@ -691,7 +737,6 @@ export function useChatStreamManager({
         const currentProvider = settings.providers.find(
           (provider) => provider.id === resolvedClient.model.providerId,
         )
-        const resolvedCompactionClient = resolveCompactionClient()
         const shouldStreamResponse = shouldUseStreamingForProvider({
           requestedStream: conversationOverrides?.stream ?? true,
           provider: currentProvider,
@@ -701,29 +746,42 @@ export function useChatStreamManager({
         const modelTopP = resolvedClient.model.topP
         const modelMaxTokens = resolvedClient.model.maxOutputTokens
         const effectiveModel = resolvedClient.model
-        const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
+        const disabledSkillNames = settings.skills?.disabledSkillIds ?? []
         const enabledSkillEntries = selectedAssistant
-          ? listLiteSkillEntries(app, { settings }).filter((skill) =>
+          ? (await listLiteSkillEntries(app, { settings })).filter((skill) =>
               isSkillEnabledForAssistant({
                 assistant: selectedAssistant,
-                skillId: skill.id,
-                disabledSkillIds,
+                skillName: skill.name,
+                disabledSkillNames,
               }),
             )
           : []
-        const allowedSkillIds = enabledSkillEntries.map((skill) => skill.id)
-        const allowedSkillNames = enabledSkillEntries.map((skill) => skill.name)
+        const allowedSkillPaths = enabledSkillEntries.map((skill) => skill.path)
 
-        const chatModeRuntime = resolveChatModeRuntime({
-          mode: chatMode,
-          assistant: selectedAssistant,
-          assistantEnabledToolNames:
-            getEnabledAssistantToolNames(selectedAssistant),
-        })
+        const autoContextCompactionOptions =
+          resolveAutoContextCompactionChatOptions(settings.chatOptions)
+        const chatModeRuntime = enableAutoContextCompactionTool(
+          resolveChatModeRuntime({
+            mode: chatMode,
+            assistant: selectedAssistant,
+            assistantEnabledToolNames:
+              getEnabledAssistantToolNames(selectedAssistant),
+          }),
+          autoContextCompactionOptions.autoContextCompactionEnabled,
+        )
 
         const mcpManager = await getMcpManager()
 
         const loopConfig = chatModeRuntime.loopConfig
+        const buildAutoContextCompactionInput = (
+          model: AgentRuntimeRunInput['model'],
+        ): AgentRuntimeRunInput['autoContextCompaction'] =>
+          autoContextCompactionOptions.autoContextCompactionEnabled
+            ? {
+                chatOptions: autoContextCompactionOptions,
+                maxContextTokens: resolveEffectiveMaxContextTokens(model),
+              }
+            : undefined
         const requestParams = {
           stream: shouldStreamResponse,
           temperature: conversationOverrides?.temperature ?? modelTemperature,
@@ -741,21 +799,26 @@ export function useChatStreamManager({
           requestContextBuilder,
           mcpManager,
           compaction: effectiveCompactionForRequest,
-          compactionProviderClient: resolvedCompactionClient.providerClient,
-          compactionModel: resolvedCompactionClient.model,
           apiType: currentProvider?.apiType ?? null,
           reasoningLevel,
           allowedToolNames: chatModeRuntime.allowedToolNames,
           enableToolDisclosure: settings.mcp.enableToolDisclosure,
           toolPreferences: chatModeRuntime.toolPreferences,
+          runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
+          bypassToolApproval: chatModeRuntime.bypassToolApproval,
+          blockedCommandPrefixes: settings.mcp.builtinToolOptions[
+            TERMINAL_COMMAND_TOOL_NAME
+          ]?.blockedPrefixes ?? [...DEFAULT_BLOCKED_PREFIXES],
           workspaceScope:
             resolveWorkspaceScopeForRuntimeInput(selectedAssistant),
-          allowedSkillIds,
-          allowedSkillNames,
+          allowedSkillPaths,
           requestParams,
           contextualInjections: buildChatContextualInjections({
-            includeCurrentFileContent:
-              settings.chatOptions.includeCurrentFileContent,
+            app,
+            includeFocusSync: resolveAssistantIncludeCurrentFileContent(
+              selectedAssistant,
+              settings,
+            ),
             currentFile: currentFileOverride,
             currentFileViewState,
           }),
@@ -788,6 +851,8 @@ export function useChatStreamManager({
               providerClient: resolvedClient.providerClient,
               model: effectiveModel,
               conversationId,
+              autoContextCompaction:
+                buildAutoContextCompactionInput(effectiveModel),
               branchId: branchTarget.branchId,
               sourceUserMessageId: branchTarget.sourceUserMessageId,
               branchLabel:
@@ -811,6 +876,8 @@ export function useChatStreamManager({
               providerClient: resolvedClient.providerClient,
               model: effectiveModel,
               conversationId,
+              autoContextCompaction:
+                buildAutoContextCompactionInput(effectiveModel),
               abortSignal: abortController.signal,
             },
           })
@@ -852,6 +919,8 @@ export function useChatStreamManager({
                 model: branchModel,
                 apiType: branchProvider?.apiType ?? null,
                 conversationId,
+                autoContextCompaction:
+                  buildAutoContextCompactionInput(branchModel),
                 branchId,
                 sourceUserMessageId: lastMessage.id,
                 branchLabel,
@@ -969,16 +1038,6 @@ export function useChatStreamManager({
       }
 
       const effectiveModel = resolvedClient.model
-      const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
-      const enabledSkillEntries = selectedAssistant
-        ? listLiteSkillEntries(app, { settings }).filter((skill) =>
-            isSkillEnabledForAssistant({
-              assistant: selectedAssistant,
-              skillId: skill.id,
-              disabledSkillIds,
-            }),
-          )
-        : []
       const chatModeRuntime = resolveChatModeRuntime({
         mode: chatMode,
         assistant: selectedAssistant,
@@ -1003,11 +1062,13 @@ export function useChatStreamManager({
         allowedToolNames: chatModeRuntime.allowedToolNames,
         enableToolDisclosure: settings.mcp.enableToolDisclosure,
         toolPreferences: chatModeRuntime.toolPreferences,
-        allowedSkillIds: enabledSkillEntries.map((s) => s.id),
-        allowedSkillNames: enabledSkillEntries.map((s) => s.name),
+        runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
         contextualInjections: buildChatContextualInjections({
-          includeCurrentFileContent:
-            settings.chatOptions.includeCurrentFileContent,
+          app,
+          includeFocusSync: resolveAssistantIncludeCurrentFileContent(
+            selectedAssistant,
+            settings,
+          ),
           currentFile: currentFileOverride,
           currentFileViewState,
         }),

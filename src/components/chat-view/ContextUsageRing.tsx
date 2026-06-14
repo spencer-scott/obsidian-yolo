@@ -1,5 +1,6 @@
 import { type ButtonHTMLAttributes, forwardRef } from 'react'
 
+import { useLanguage } from '../../contexts/language-context'
 import { formatTokenCount } from '../../utils/llm/formatTokenCount'
 
 // viewBox 20x20 with radius 9 circle + stroke-width 2, so the stroke outer
@@ -32,7 +33,8 @@ const getUsageTone = (ratio: number) => {
 
 export type ContextUsageRingProps = {
   promptTokens: number
-  maxContextTokens: number
+  /** Null when the model context window is unknown — track only, no progress arc. */
+  maxContextTokens: number | null
   label: string
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'>
 
@@ -50,14 +52,33 @@ export type ContextUsageRingProps = {
  */
 const ContextUsageRing = forwardRef<HTMLButtonElement, ContextUsageRingProps>(
   function ContextUsageRing(
-    { promptTokens, maxContextTokens, label, className, title, ...rest },
+    {
+      promptTokens,
+      maxContextTokens,
+      label,
+      className,
+      title: _title,
+      ...rest
+    },
     ref,
   ) {
-    const ratio = clampRatio(promptTokens / maxContextTokens)
-    const dashOffset = RING_CIRCUMFERENCE * (1 - ratio)
-    const tone = getUsageTone(ratio)
-    const percentLabel = `${Math.round(ratio * 100)}%`
-    const titleLabel = `${label}: ${formatTokenCount(promptTokens)} / ${formatTokenCount(maxContextTokens)} (${percentLabel})`
+    const { t } = useLanguage()
+    const hasMax =
+      typeof maxContextTokens === 'number' &&
+      maxContextTokens > 0 &&
+      Number.isFinite(maxContextTokens)
+    const ratio = hasMax ? clampRatio(promptTokens / maxContextTokens) : null
+    const dashOffset =
+      ratio === null ? RING_CIRCUMFERENCE : RING_CIRCUMFERENCE * (1 - ratio)
+    const tone = ratio === null ? 'normal' : getUsageTone(ratio)
+    const percentLabel = ratio === null ? null : `${Math.round(ratio * 100)}%`
+    const unknownMaxSuffix = t(
+      'chat.contextUsageUnknownMaxSuffix',
+      ' (no context window limit set)',
+    )
+    const titleLabel = hasMax
+      ? `${label}: ${formatTokenCount(promptTokens)} / ${formatTokenCount(maxContextTokens)} (${percentLabel})`
+      : `${label}: ${formatTokenCount(promptTokens)}${unknownMaxSuffix}`
 
     return (
       <button
@@ -70,8 +91,8 @@ const ContextUsageRing = forwardRef<HTMLButtonElement, ContextUsageRingProps>(
             : 'yolo-context-usage-ring'
         }
         data-tone={tone}
+        data-has-max={hasMax ? 'true' : 'false'}
         aria-label={titleLabel}
-        title={title ?? titleLabel}
       >
         <svg
           className="yolo-context-usage-ring__svg"
@@ -84,16 +105,29 @@ const ContextUsageRing = forwardRef<HTMLButtonElement, ContextUsageRingProps>(
             cy="10"
             r={RING_RADIUS}
           />
-          <circle
-            className="yolo-context-usage-ring__progress"
-            cx="10"
-            cy="10"
-            r={RING_RADIUS}
-            strokeDasharray={RING_CIRCUMFERENCE}
-            strokeDashoffset={dashOffset}
-          />
+          {hasMax ? (
+            <circle
+              className="yolo-context-usage-ring__progress"
+              cx="10"
+              cy="10"
+              r={RING_RADIUS}
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={dashOffset}
+            />
+          ) : null}
         </svg>
-        <span className="yolo-context-usage-ring__sr-only">{percentLabel}</span>
+        {!hasMax ? (
+          <span
+            className="yolo-context-usage-ring__unknown-mark"
+            aria-hidden="true"
+          >
+            ?
+          </span>
+        ) : null}
+        <span className="yolo-context-usage-ring__sr-only">
+          {percentLabel ??
+            `${formatTokenCount(promptTokens)}${unknownMaxSuffix}`}
+        </span>
       </button>
     )
   },

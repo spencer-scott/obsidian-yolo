@@ -28,6 +28,7 @@ const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
         selectedSkills: message.selectedSkills ?? [],
         selectedModelIds: message.selectedModelIds ?? [],
         reasoningLevel: message.reasoningLevel,
+        timeContext: message.timeContext,
       }
     case 'assistant':
       return {
@@ -71,6 +72,8 @@ const serializeChatMessage = (message: ChatMessage): SerializedChatMessage => {
         metadata: message.metadata,
       }
     case 'external_agent_result':
+    case 'subagent_result':
+    case 'terminal_command_result':
       return message
   }
 }

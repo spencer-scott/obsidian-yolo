@@ -614,6 +614,32 @@ export async function getMemoryPromptContext({
   }
 }
 
+/**
+ * Resolve the exact memory file paths that {@link getMemoryPromptContext} would
+ * read for the given assistant, mirroring its decision (assistant memory is
+ * only read when the assistant has instructions). Used by the system-prompt
+ * snapshot fingerprint: the assistant memory path depends on sibling
+ * same-named assistants (duplicate index), so adding/renaming a sibling can
+ * change which file the current assistant reads — that must invalidate the
+ * frozen snapshot even though the current assistant's own fields are unchanged.
+ */
+export const resolveMemoryFilePaths = ({
+  settings,
+  assistantId,
+}: {
+  settings?: MemorySettingsLike
+  assistantId?: string
+}): { global: string; assistant: string | null } => {
+  const assistant = getAssistantById(settings, assistantId)
+  return {
+    global: getGlobalMemoryPath(settings),
+    assistant:
+      assistant && hasAssistantInstructions(assistant)
+        ? getAssistantMemoryPath({ settings, assistant })
+        : null,
+  }
+}
+
 export async function memoryAdd({
   app,
   settings,
@@ -621,6 +647,7 @@ export async function memoryAdd({
   category,
   scope,
   assistantId,
+  onInternalWrite,
 }: {
   app: App
   settings?: MemorySettingsLike
@@ -628,6 +655,7 @@ export async function memoryAdd({
   category?: unknown
   scope?: unknown
   assistantId?: string
+  onInternalWrite?: (path: string) => void
 }): Promise<{ id: string; scope: MemoryScope; filePath: string }> {
   const normalizedContent = normalizeMemoryContent(content, 'content')
   const normalizedCategory = normalizeMemoryCategory(category)
@@ -641,6 +669,7 @@ export async function memoryAdd({
   return await withMemoryFileLock({
     filePath: path,
     task: async () => {
+      onInternalWrite?.(path)
       const file = await ensureMemoryFile({
         app,
         filePath: path,
@@ -701,6 +730,7 @@ export async function memoryUpdate({
   newContent,
   scope,
   assistantId,
+  onInternalWrite,
 }: {
   app: App
   settings?: MemorySettingsLike
@@ -708,6 +738,7 @@ export async function memoryUpdate({
   newContent: unknown
   scope?: unknown
   assistantId?: string
+  onInternalWrite?: (path: string) => void
 }): Promise<{ id: string; scope: MemoryScope; filePath: string }> {
   const normalizedId = normalizeMemoryContent(id, 'id')
   const normalizedContent = normalizeMemoryContent(newContent, 'new_content')
@@ -721,6 +752,7 @@ export async function memoryUpdate({
   return await withMemoryFileLock({
     filePath: path,
     task: async () => {
+      onInternalWrite?.(path)
       const file = await ensureMemoryFile({
         app,
         filePath: path,
@@ -760,12 +792,14 @@ export async function memoryDelete({
   id,
   scope,
   assistantId,
+  onInternalWrite,
 }: {
   app: App
   settings?: MemorySettingsLike
   id: unknown
   scope?: unknown
   assistantId?: string
+  onInternalWrite?: (path: string) => void
 }): Promise<{ id: string; scope: MemoryScope; filePath: string }> {
   const normalizedId = normalizeMemoryContent(id, 'id')
   const normalizedScope = normalizeMemoryScope(scope)
@@ -778,6 +812,7 @@ export async function memoryDelete({
   return await withMemoryFileLock({
     filePath: path,
     task: async () => {
+      onInternalWrite?.(path)
       const file = await ensureMemoryFile({
         app,
         filePath: path,

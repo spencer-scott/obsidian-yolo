@@ -1,5 +1,7 @@
 import { SerializedEditorState } from 'lexical'
 
+import { CitationSource } from '../core/agent/citationRegistry'
+
 import { ChatModel } from './chat-model.types'
 import { ContentPart } from './llm/request'
 import { Annotation, ProviderMetadata, ResponseUsage } from './llm/response'
@@ -11,7 +13,10 @@ export type PromptSnapshotRef = {
 }
 
 export type ChatSelectedSkill = {
-  id: string
+  /**
+   * Canonical skill name (the frontmatter `name`, trim-only, case-sensitive).
+   * Also the identity used to dedupe and to re-resolve the skill on continue.
+   */
   name: string
   description: string
   path: string
@@ -78,6 +83,14 @@ export type ChatUserMessage = {
   selectedSkills?: ChatSelectedSkill[]
   selectedModelIds?: string[]
   reasoningLevel?: string
+  /**
+   * Current time string frozen at the moment this message entered the
+   * conversation as a new user turn (e.g. `2026-05-30 14:53 (Friday, UTC+8)`).
+   * Prepended at request-build time via a pure function and never rewritten
+   * after that — so it doesn't break the prefix cache. Older conversations
+   * without this field skip injection.
+   */
+  timeContext?: string
 }
 export type ChatAssistantMessage = {
   role: 'assistant'
@@ -101,6 +114,7 @@ export type ChatAssistantMessage = {
     branchConversationId?: string
     branchRunStatus?: 'idle' | 'running' | 'completed' | 'aborted' | 'error'
     branchWaitingApproval?: boolean
+    sources?: CitationSource[]
   }
 }
 export type ChatToolMessage = {
@@ -154,16 +168,64 @@ export type ChatExternalAgentResultMessage = {
   }
 }
 
+export type SubagentResultStatus = 'completed' | 'failed' | 'aborted'
+
+export type ChatSubagentResultMessage = {
+  role: 'subagent_result'
+  id: string
+  taskId: string
+  source: TaskSource
+  title: string
+  status: SubagentResultStatus
+  content: string
+  activityLog?: string
+  durationMs: number
+  toolUseCount: number
+  usage?: ResponseUsage
+  prompt?: string
+  modelName?: string
+  transcript?: ChatMessage[]
+  delegateAssistantMessageId: string
+  delegateToolCallId: string
+  metadata?: {
+    branchId?: string
+    branchConversationId?: string
+  }
+}
+
+export type ChatTerminalCommandResultMessage = {
+  role: 'terminal_command_result'
+  id: string
+  taskId: string
+  source: TaskSource
+  title: string
+  status: 'running' | AsyncTaskStatus
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  durationMs: number
+  delegateAssistantMessageId: string
+  delegateToolCallId: string
+  metadata?: {
+    branchId?: string
+    branchConversationId?: string
+  }
+}
+
 export type ChatMessage =
   | ChatUserMessage
   | ChatAssistantMessage
   | ChatToolMessage
   | ChatExternalAgentResultMessage
+  | ChatSubagentResultMessage
+  | ChatTerminalCommandResultMessage
 
 export type AssistantToolMessageGroup = (
   | ChatAssistantMessage
   | ChatToolMessage
   | ChatExternalAgentResultMessage
+  | ChatSubagentResultMessage
+  | ChatTerminalCommandResultMessage
 )[]
 
 export type SerializedChatUserMessage = {
@@ -176,6 +238,7 @@ export type SerializedChatUserMessage = {
   selectedSkills?: ChatSelectedSkill[]
   selectedModelIds?: string[]
   reasoningLevel?: string
+  timeContext?: string
 }
 export type SerializedChatAssistantMessage = {
   role: 'assistant'
@@ -199,6 +262,7 @@ export type SerializedChatAssistantMessage = {
     branchConversationId?: string
     branchRunStatus?: 'idle' | 'running' | 'completed' | 'aborted' | 'error'
     branchWaitingApproval?: boolean
+    sources?: CitationSource[]
   }
 }
 export type SerializedChatToolMessage = {
@@ -220,12 +284,17 @@ export type SerializedChatToolMessage = {
 }
 export type SerializedChatExternalAgentResultMessage =
   ChatExternalAgentResultMessage
+export type SerializedChatSubagentResultMessage = ChatSubagentResultMessage
+export type SerializedChatTerminalCommandResultMessage =
+  ChatTerminalCommandResultMessage
 
 export type SerializedChatMessage =
   | SerializedChatUserMessage
   | SerializedChatAssistantMessage
   | SerializedChatToolMessage
   | SerializedChatExternalAgentResultMessage
+  | SerializedChatSubagentResultMessage
+  | SerializedChatTerminalCommandResultMessage
 
 export type ChatConversation = {
   schemaVersion: number

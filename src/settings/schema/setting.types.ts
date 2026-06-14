@@ -111,6 +111,7 @@ export const DEFAULT_TAB_COMPLETION_OPTIONS: TabCompletionOptionDefaults = {
 }
 
 export const DEFAULT_MODEL_REQUEST_TIMEOUT_MS = 60000
+export const MAX_MODEL_REQUEST_TIMEOUT_MS = 60 * 60 * 1000
 
 const notificationOptionsSchema = z
   .object({
@@ -296,11 +297,27 @@ export const yoloSettingsSchema = z.object({
   embeddingModels: resilientArraySchema(embeddingModelSchema),
 
   chatModelId: z.string().catch(''), // model for default chat feature
-  chatTitleModelId: z.string().catch(''), // model for automatic conversation naming and compact summaries
+  chatTitleModelId: z.string().catch(''), // model for automatic conversation naming
   embeddingModelId: z.string().catch(''), // model for embedding
 
   // System Prompt
   systemPrompt: z.string().catch(''),
+
+  // Time-context awareness: when enabled, each new user message pins the
+  // current time at send and injects it as a <current_time> prefix. Only
+  // affects subsequent messages; historical messages stay frozen.
+  timeContextEnabled: z.boolean().catch(true),
+
+  // Update prompt: first time the user dismisses an update for this version,
+  // record it as a soft dismiss — we still prompt once more on next launch.
+  softDismissedUpdateVersion: z.string().catch(''),
+
+  // Update prompt: second dismiss for the same version mutes that version
+  // permanently; only a higher version will re-prompt.
+  mutedUpdateVersion: z.string().catch(''),
+
+  /** Auto-download release files in the background when a new version is detected; installation still requires user confirmation. */
+  pluginUpdateAutoDownloadEnabled: z.boolean().catch(true),
 
   // RAG Options
   ragOptions: ragOptionsSchema.catch({
@@ -351,6 +368,9 @@ export const yoloSettingsSchema = z.object({
   // Skills configuration
   skills: z
     .object({
+      // Globally disabled skills, stored by canonical skill *name* (frontmatter
+      // `name`, trim-only, case-sensitive). Field name kept for backwards
+      // compatibility; its elements are skill names, not a separate id.
       disabledSkillIds: z.array(z.string()).catch([]),
     })
     .catch({
@@ -383,19 +403,18 @@ export const yoloSettingsSchema = z.object({
       chatInputHeight: z.number().int().min(80).max(520).optional(),
       chatApplyMode: z.enum(['review-required', 'direct-apply']).optional(),
       chatTitlePrompt: z.string().optional(),
-      // Chat mode (chat/agent)
-      chatMode: z.enum(['chat', 'agent']).optional(),
+      // Chat mode (ask/agent/agent-full)
+      chatMode: z.enum(['ask', 'agent', 'agent-full']).optional(),
       // Whether the user has acknowledged the first-time agent mode warning
       agentModeWarningConfirmed: z.boolean().optional(),
+      // Whether the user has acknowledged the first-time full access warning
+      fullAccessWarningConfirmed: z.boolean().optional(),
       // Persist preferred reasoning level per model id in Chat input
       reasoningLevelByModelId: z
         .record(z.string(), z.enum(REASONING_LEVELS))
         .optional(),
-      // Collapse older non-pinned conversations into an archive group
-      historyArchiveEnabled: z.boolean().optional(),
-      // Maximum number of recent non-pinned conversations shown before archive
-      historyArchiveThreshold: z.number().int().min(20).max(500).optional(),
-      // Auto context compaction before next user send (based on last assistant usage)
+      // Auto context compaction prompt injected at runtime LLM boundaries
+      // (based on last assistant usage).
       autoContextCompactionEnabled: z.boolean().optional(),
       autoContextCompactionThresholdMode: z
         .enum(['tokens', 'ratio'])
@@ -410,6 +429,10 @@ export const yoloSettingsSchema = z.object({
       imageCompressionQuality: z.number().min(1).max(100).optional(),
       // Fetch external (http/https) image URLs referenced in Markdown
       externalImageFetchEnabled: z.boolean().optional(),
+      // Include assistant reasoning in exported chat markdown
+      chatExportIncludeThinking: z.boolean().optional(),
+      // Include tool call blocks in exported chat markdown
+      chatExportIncludeToolCalls: z.boolean().optional(),
       // Where the ribbon icon should open the Chat view
       ribbonClickAction: z
         .enum(['sidebar', 'tab', 'split', 'window', 'last'])
@@ -429,9 +452,8 @@ export const yoloSettingsSchema = z.object({
       chatTitlePrompt: '',
       chatMode: 'agent',
       agentModeWarningConfirmed: false,
+      fullAccessWarningConfirmed: false,
       reasoningLevelByModelId: {},
-      historyArchiveEnabled: true,
-      historyArchiveThreshold: 50,
       autoContextCompactionEnabled: false,
       autoContextCompactionThresholdMode: 'tokens',
       autoContextCompactionThresholdTokens: 24000,
@@ -441,6 +463,8 @@ export const yoloSettingsSchema = z.object({
       imageCompressionEnabled: true,
       imageCompressionQuality: 85,
       externalImageFetchEnabled: false,
+      chatExportIncludeThinking: false,
+      chatExportIncludeToolCalls: false,
       ribbonClickAction: 'sidebar',
       lastChatPlacement: undefined,
     }),
@@ -532,9 +556,7 @@ export const yoloSettingsSchema = z.object({
       // trigger character for quick ask (default: @)
       quickAskTrigger: z.string().optional(),
       // quick ask mode: support legacy ask/edit values and current chat/agent values
-      quickAskMode: z
-        .enum(['ask', 'edit', 'edit-direct', 'chat', 'agent'])
-        .optional(),
+      quickAskMode: z.enum(['ask', 'edit', 'edit-direct', 'agent']).optional(),
       // auto dock quick ask to editor top right after sending
       quickAskAutoDockToTopRight: z.boolean().optional(),
       // quick ask context chars before cursor
@@ -548,7 +570,7 @@ export const yoloSettingsSchema = z.object({
         .number()
         .int()
         .min(1000)
-        .max(600000)
+        .max(MAX_MODEL_REQUEST_TIMEOUT_MS)
         .optional(),
     })
     .catch({
@@ -580,7 +602,7 @@ export const yoloSettingsSchema = z.object({
       smartSpaceUseUrlContext: false,
       enableQuickAsk: true,
       quickAskTrigger: '@',
-      quickAskMode: 'chat',
+      quickAskMode: 'ask',
       quickAskAutoDockToTopRight: true,
       quickAskContextBeforeChars: 5000,
       quickAskContextAfterChars: 2000,

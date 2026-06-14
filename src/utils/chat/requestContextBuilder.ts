@@ -1,5 +1,5 @@
 import type { App, TFile, TFolder } from 'obsidian'
-import { Notice } from 'obsidian'
+import { normalizePath } from 'obsidian'
 
 import { editorStateToPlainText } from '../../components/chat-view/chat-input/utils/editor-state-to-plain-text'
 import type { QueryProgressState } from '../../components/chat-view/QueryProgress'
@@ -7,8 +7,18 @@ import {
   buildCompactionResumeMessage,
   buildCompactionSummaryMessage,
 } from '../../core/agent/compaction'
-import { getMemoryPromptContext } from '../../core/memory/memoryManager'
-import { getProjectInstructionsSection } from '../../core/project-instructions'
+import type {
+  SystemPromptSnapshot,
+  SystemPromptSnapshotStore,
+} from '../../core/agent/systemPromptSnapshotStore'
+import {
+  getMemoryPromptContext,
+  resolveMemoryFilePaths,
+} from '../../core/memory/memoryManager'
+import {
+  getProjectInstructionsSection,
+  resolveProjectInstructionFilePaths,
+} from '../../core/project-instructions'
 import {
   getLiteSkillDocument,
   listLiteSkillEntries,
@@ -17,7 +27,6 @@ import {
   isSkillEnabledForAssistant,
   resolveAssistantSkillPolicy,
 } from '../../core/skills/skillPolicy'
-import { scrapeUrlGeneric } from '../../core/web-search'
 import { readPromptSnapshotEntries } from '../../database/json/chat/promptSnapshotStore'
 import type { YoloSettings } from '../../settings/schema/setting.types'
 import type {
@@ -26,6 +35,8 @@ import type {
   ChatExternalAgentResultMessage,
   ChatMessage,
   ChatSelectedSkill,
+  ChatSubagentResultMessage,
+  ChatTerminalCommandResultMessage,
   ChatToolMessage,
   ChatUserMessage,
 } from '../../types/chat'
@@ -33,13 +44,14 @@ import { getLatestChatConversationCompaction } from '../../types/chat'
 import type { ChatModel } from '../../types/chat-model.types'
 import type { ContentPart, RequestMessage } from '../../types/llm/request'
 import type {
+  Mentionable,
   MentionableAssistantQuote,
   MentionableBlock,
   MentionableFile,
   MentionableFolder,
   MentionableImage,
   MentionablePDF,
-  MentionableUrl,
+  MentionableWebSelection,
 } from '../../types/mentionable'
 import type { ToolCallRequest } from '../../types/tool-call.types'
 import {
@@ -47,6 +59,7 @@ import {
   getToolCallArgumentsObject,
 } from '../../types/tool-call.types'
 import { ToolCallResponseStatus } from '../../types/tool-call.types'
+import { stableStringify } from '../json/stableStringify'
 import { collectWikilinkPaths } from '../llm/annotate-wikilinks'
 import { isImageTFile, tFileToImageDataUrl } from '../llm/image'
 import {
@@ -60,13 +73,15 @@ import {
   extractPdfText,
   extractPdfTextFromBase64,
 } from '../pdf/extractPdfText'
-import { resolvePromptVariables } from '../prompt/promptVariables'
+import { prefixTimeContext } from '../prompt/timeContext'
 
 import {
   type ContextualInjection,
   appendContextualInjectionsToLastUserMessage,
 } from './contextual-injections'
 import { serializeExternalAgentResultToUserMessage } from './externalAgentResultSerializer'
+import { serializeSubagentResultToUserMessage } from './subagentResultSerializer'
+import { serializeTerminalCommandResultToUserMessage } from './terminalCommandResultSerializer'
 import {
   filterEmptyAssistantMessages,
   filterRequestMessagesByToolBoundary,
@@ -85,6 +100,16 @@ const USER_SELECTED_SKILLS_BLOCK_RE =
 
 const stripUserSelectedSkillsFromString = (text: string): string =>
   text.replace(USER_SELECTED_SKILLS_BLOCK_RE, '')
+
+const escapeXmlAttr = (raw: string): string =>
+  raw
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+const escapeXmlText = (raw: string): string =>
+  raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 /** Stable signature for the `<previously-loaded-tools>` compaction disclosure
  * message. The disclosure is built by `buildCompactionDisclosureInjection` and
@@ -169,7 +194,26 @@ const stripUserSelectedSkillsFromMessage = (
 
 type RequestContextBuilderOptions = {
   includeSkills?: boolean
+  /**
+   * Optional per-conversation system-prompt snapshot store. When omitted the
+   * builder degrades to computing the system prompt fresh on every call
+   * (current behavior), which keeps tests and non-injected callers unaffected.
+   */
+  systemPromptSnapshotStore?: SystemPromptSnapshotStore
+  getPromptSourceRevision?: () => number
+  promptSourcePathsCallback?: (paths: Set<string>) => void
 }
+
+/**
+ * Snapshot lookup mode, set explicitly by each caller (never inferred from the
+ * method name — `generateRequestMessages` serves both real requests and
+ * compaction estimates):
+ * - `create`: real request path. A miss builds and writes the snapshot; later
+ *   iterations / turns reuse it via fingerprint hit.
+ * - `reuse`: estimate / breakdown path. A hit is reused; a miss is computed
+ *   fresh and NOT written, so estimates never freeze the real-request prompt.
+ */
+export type SystemPromptSnapshotMode = 'create' | 'reuse'
 
 /**
  * A semantic slice of the upcoming LLM request. Used by the UI to break down
@@ -185,6 +229,7 @@ export type PromptSectionBucket =
   | 'skills'
   | 'memory'
   | 'conversation'
+  | 'reasoning'
 
 export type PromptSection = {
   bucket: PromptSectionBucket
@@ -194,9 +239,11 @@ export type PromptSection = {
   content: unknown
 }
 
-/** Internal: ordered system-prompt-side sections produced by the builder.
- * Their string content joined with `\n\n` is the system message content. */
-type SystemPromptSections = PromptSection[]
+/** Ordered system-prompt-side sections produced by the builder.
+ * Their string content joined with `\n\n` is the system message content.
+ * Exported so the per-conversation snapshot store can type its payload
+ * against the same shape without duplicating the definition. */
+export type SystemPromptSections = PromptSection[]
 
 type MarkdownAtxHeading = {
   level: number
@@ -450,6 +497,9 @@ export class RequestContextBuilder {
   private app: App
   private settings: YoloSettings
   private includeSkills: boolean
+  private systemPromptSnapshotStore?: SystemPromptSnapshotStore
+  private getPromptSourceRevision?: () => number
+  private promptSourcePathsCallback?: (paths: Set<string>) => void
 
   constructor(
     app: App,
@@ -459,6 +509,9 @@ export class RequestContextBuilder {
     this.app = app
     this.settings = settings
     this.includeSkills = options?.includeSkills ?? true
+    this.systemPromptSnapshotStore = options?.systemPromptSnapshotStore
+    this.getPromptSourceRevision = options?.getPromptSourceRevision
+    this.promptSourcePathsCallback = options?.promptSourcePathsCallback
   }
 
   private getMentionContextMode(): MentionContextMode {
@@ -485,6 +538,9 @@ export class RequestContextBuilder {
     conversationId: string
     compaction?: ChatConversationCompactionLike | null
     contextualInjections?: ContextualInjection[]
+    runtimeModePrompt?: string
+    systemPromptOverride?: string
+    systemPromptSnapshotMode: SystemPromptSnapshotMode
   }): Promise<RequestMessage[]> {
     const { requestMessages } = await this.assembleRequest(args)
     return requestMessages
@@ -505,6 +561,9 @@ export class RequestContextBuilder {
     conversationId,
     compaction,
     contextualInjections,
+    runtimeModePrompt,
+    systemPromptOverride,
+    systemPromptSnapshotMode,
   }: {
     messages: ChatMessage[]
     hasTools?: boolean
@@ -513,6 +572,9 @@ export class RequestContextBuilder {
     conversationId: string
     compaction?: ChatConversationCompactionLike | null
     contextualInjections?: ContextualInjection[]
+    runtimeModePrompt?: string
+    systemPromptOverride?: string
+    systemPromptSnapshotMode: SystemPromptSnapshotMode
   }): Promise<{
     requestMessages: RequestMessage[]
     systemSections: SystemPromptSections
@@ -585,16 +647,26 @@ export class RequestContextBuilder {
       }
     }
 
-    const systemSections = await this.buildSystemPromptSections(
-      hasTools,
-      hasMemoryTools,
-    )
-    const systemContent = systemSections
-      .map((section) =>
-        typeof section.content === 'string' ? section.content : '',
-      )
-      .filter((text) => text.length > 0)
-      .join('\n\n')
+    const override = systemPromptOverride?.trim()
+    const { systemSections, systemContent } = override
+      ? {
+          systemSections: [
+            {
+              bucket: 'system' as const,
+              id: 'system.subagent-override',
+              content: override,
+            },
+          ],
+          systemContent: override,
+        }
+      : await this.resolveSystemPromptSnapshot({
+          conversationId,
+          hasTools,
+          hasMemoryTools,
+          compaction,
+          runtimeModePrompt,
+          mode: systemPromptSnapshotMode,
+        })
     const systemMessage: RequestMessage = {
       role: 'system',
       content: systemContent,
@@ -648,7 +720,9 @@ export class RequestContextBuilder {
     conversationId: string
     compaction?: ChatConversationCompactionLike | null
     contextualInjections?: ContextualInjection[]
+    runtimeModePrompt?: string
     requestTools?: unknown[] | undefined
+    systemPromptSnapshotMode: SystemPromptSnapshotMode
   }): Promise<PromptSection[]> {
     const { requestMessages, systemSections } = await this.assembleRequest(args)
 
@@ -717,14 +791,63 @@ export class RequestContextBuilder {
 
       const stripped =
         skillsBlocks.length > 0 ? stripUserSelectedSkillsFromMessage(msg) : msg
+
+      // Carve out assistant reasoning (chain-of-thought) into its own bucket so
+      // the popover can show how much of the context is spent on prior-turn
+      // thinking. Reasoning is already a separate field on RequestMessage, so
+      // stripping it from the conversation section preserves the total token
+      // count (split ≈ original).
+      let conversationContent: RequestMessage = stripped
+      if (
+        stripped.role === 'assistant' &&
+        typeof stripped.reasoning === 'string' &&
+        stripped.reasoning.length > 0
+      ) {
+        sections.push({
+          bucket: 'reasoning',
+          id: `reasoning.${i}`,
+          content: { reasoning: stripped.reasoning },
+        })
+        const { reasoning: _reasoning, ...rest } = stripped
+        conversationContent = rest
+      }
+
       sections.push({
         bucket: 'conversation',
         id: `conversation.${i}.${msg.role}`,
-        content: stripped,
+        content: conversationContent,
       })
     }
 
     return sections
+  }
+
+  /**
+   * Convert a slice of newly-produced turn messages (assistant + tool, e.g.
+   * the `context_compact` call and its result) into provider-ready
+   * `RequestMessage[]`, reusing the exact same parsing + tool-boundary
+   * filtering as the main request pipeline. Synchronous: turn messages never
+   * contain user content that requires snapshot/I-O resolution.
+   *
+   * Used by the compaction bypass to append the in-flight turn onto the
+   * cache-warm prefix without re-running `generateRequestMessages`.
+   */
+  public parseTurnMessagesToRequestMessages(
+    messages: ChatMessage[],
+  ): RequestMessage[] {
+    const requestMessages: RequestMessage[] = []
+    for (const message of messages) {
+      if (message.role === 'assistant') {
+        requestMessages.push(...this.parseAssistantMessage({ message }))
+        continue
+      }
+      if (message.role === 'tool') {
+        requestMessages.push(...this.parseToolMessage({ message }))
+      }
+    }
+    return filterRequestMessagesByToolBoundary(
+      filterEmptyAssistantMessages(requestMessages),
+    )
   }
 
   private async getChatHistoryMessages({
@@ -779,6 +902,18 @@ export class RequestContextBuilder {
             continue
           }
 
+          if (message.role === 'subagent_result') {
+            requestMessages.push(this.parseSubagentResultMessage(message))
+            continue
+          }
+
+          if (message.role === 'terminal_command_result') {
+            requestMessages.push(
+              this.parseTerminalCommandResultMessage(message),
+            )
+            continue
+          }
+
           requestMessages.push(
             ...this.parseToolMessage({ message, prunedToolCallIds }),
           )
@@ -820,6 +955,16 @@ export class RequestContextBuilder {
         continue
       }
 
+      if (message.role === 'subagent_result') {
+        requestMessages.push(this.parseSubagentResultMessage(message))
+        continue
+      }
+
+      if (message.role === 'terminal_command_result') {
+        requestMessages.push(this.parseTerminalCommandResultMessage(message))
+        continue
+      }
+
       requestMessages.push(
         ...this.parseToolMessage({ message, prunedToolCallIds }),
       )
@@ -837,14 +982,23 @@ export class RequestContextBuilder {
     message: ChatUserMessage
     snapshotEntries: Record<string, string | ContentPart[]>
   }): Promise<string | ContentPart[]> {
-    if (message.promptContent) {
-      return message.promptContent
+    const withTimeContext = (
+      content: string | ContentPart[],
+    ): string | ContentPart[] =>
+      message.timeContext
+        ? prefixTimeContext(content, message.timeContext)
+        : content
+
+    // Note: use `!= null` (not truthy) so an empty-string promptContent still
+    // counts as "compiled" — it must not fall through to the recompute fallback below.
+    if (message.promptContent != null) {
+      return withTimeContext(message.promptContent)
     }
 
     if (message.snapshotRef?.hash) {
       const snapshotContent = snapshotEntries[message.snapshotRef.hash]
       if (snapshotContent) {
-        return snapshotContent
+        return withTimeContext(snapshotContent)
       }
     }
 
@@ -873,6 +1027,9 @@ export class RequestContextBuilder {
     const pdfs = message.mentionables.filter(
       (m): m is MentionablePDF => m.type === 'pdf',
     )
+    const webSelections = message.mentionables.filter(
+      (m): m is MentionableWebSelection => m.type === 'web-selection',
+    )
     const blockPrompt = blocks
       .map(({ file, content, startLine, pageNumber }) => {
         const pageTag = pageNumber !== undefined ? ` (page ${pageNumber})` : ''
@@ -889,6 +1046,7 @@ export class RequestContextBuilder {
       })
       .join('')
     const assistantQuotePrompt = this.buildAssistantQuotePrompt(assistantQuotes)
+    const webSelectionPrompt = this.buildWebSelectionPrompt(webSelections)
     const {
       documentParts: pdfDocumentParts,
       legacyText: legacyPdfFallbackText,
@@ -897,19 +1055,19 @@ export class RequestContextBuilder {
     const selectedSkillsPrompt = await this.buildSelectedSkillsPrompt(
       message.selectedSkills,
     )
-    const textContent = `${blockPrompt}${assistantQuotePrompt}${legacyPdfFallbackText}${selectedSkillsPrompt}\n\n${query}\n\n`
+    const textContent = `${blockPrompt}${assistantQuotePrompt}${webSelectionPrompt}${legacyPdfFallbackText}${selectedSkillsPrompt}\n\n${query}\n\n`
     if (imageParts.length === 0 && pdfDocumentParts.length === 0) {
-      return textContent
+      return withTimeContext(textContent)
     }
 
-    return [
+    return withTimeContext([
       ...imageParts,
       ...pdfDocumentParts,
       {
         type: 'text',
         text: textContent,
       },
-    ]
+    ])
   }
 
   private requiresSnapshotRebuild(message: ChatUserMessage): boolean {
@@ -920,6 +1078,7 @@ export class RequestContextBuilder {
           mentionable.type === 'file' ||
           mentionable.type === 'folder' ||
           mentionable.type === 'url' ||
+          mentionable.type === 'web-selection' ||
           mentionable.type === 'assistant-quote',
       )
     )
@@ -936,7 +1095,6 @@ export class RequestContextBuilder {
       selectedSkills.map(async (skill) => {
         const document = await getLiteSkillDocument({
           app: this.app,
-          id: skill.id,
           name: skill.name,
           settings: this.settings,
         })
@@ -962,7 +1120,7 @@ export class RequestContextBuilder {
     return `<user_selected_skills>\n${validSkills
       .map(
         (skill) =>
-          `<skill id="${skill.entry.id}" name="${skill.entry.name}" path="${skill.entry.path}">\n${skill.content}\n</skill>`,
+          `<skill name="${skill.entry.name}" path="${skill.entry.path}">\n${skill.content}\n</skill>`,
       )
       .join('\n\n')}\n</user_selected_skills>\n`
   }
@@ -1040,6 +1198,18 @@ ${message.annotations
     message: ChatExternalAgentResultMessage,
   ): RequestMessage {
     return serializeExternalAgentResultToUserMessage(message)
+  }
+
+  private parseSubagentResultMessage(
+    message: ChatSubagentResultMessage,
+  ): RequestMessage {
+    return serializeSubagentResultToUserMessage(message)
+  }
+
+  private parseTerminalCommandResultMessage(
+    message: ChatTerminalCommandResultMessage,
+  ): RequestMessage {
+    return serializeTerminalCommandResultToUserMessage(message)
   }
 
   private parseToolMessage({
@@ -1154,127 +1324,13 @@ ${message.annotations
             ignoreMentionableTypes: ['model'],
           })
         : ''
-
-      onQueryProgressChange?.({
-        type: 'reading-mentionables',
-      })
-
-      const allMentionedFiles = message.mentionables
-        .filter((m): m is MentionableFile => m.type === 'file')
-        .map((m) => this.app.vault.getFileByPath(m.file.path))
-        .filter((file): file is TFile => Boolean(file))
-      const mentionedImageFiles = allMentionedFiles.filter(isImageTFile)
-      const files = allMentionedFiles.filter((f) => !isImageTFile(f))
-      const folders = message.mentionables
-        .filter((m): m is MentionableFolder => m.type === 'folder')
-        .map((m) => this.app.vault.getFolderByPath(m.folder.path))
-        .filter((folder): folder is TFolder => Boolean(folder))
-
-      const filePrompt = await this.buildMentionedFilePrompt({
-        files,
-        folders,
-      })
-
-      const blocks = message.mentionables.filter(
-        (m): m is MentionableBlock => m.type === 'block',
-      )
-      const assistantQuotes = message.mentionables.filter(
-        (m): m is MentionableAssistantQuote => m.type === 'assistant-quote',
-      )
-      const pdfs = message.mentionables.filter(
-        (m): m is MentionablePDF => m.type === 'pdf',
-      )
-      const blockPrompt = blocks
-        .map(({ file, content, startLine, pageNumber }) => {
-          const pageTag =
-            pageNumber !== undefined ? ` (page ${pageNumber})` : ''
-          const header = `${file.path}${pageTag}`
-          if (pageNumber !== undefined) {
-            // PDF block: skip line numbering (startLine/endLine are 0)
-            return `\`\`\`${header}\n${content}\n\`\`\`\n`
-          }
-          const numberedContent = this.addLineNumbersToContent({
-            content,
-            startLine,
-          })
-          return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
-        })
-        .join('')
-      const assistantQuotePrompt =
-        this.buildAssistantQuotePrompt(assistantQuotes)
-      const {
-        documentParts: pdfDocumentParts,
-        legacyText: legacyPdfFallbackText,
-      } = this.buildPdfAttachments(pdfs)
-
-      const urls = message.mentionables.filter(
-        (m): m is MentionableUrl => m.type === 'url',
-      )
-
-      const urlPrompt =
-        urls.length > 0
-          ? `## Potentially Relevant Websearch Results
-${(
-  await Promise.all(
-    urls.map(
-      async ({ url }) => `\`\`\`
-Website URL: ${url}
-Website Content:
-${await this.getWebsiteContent(url)}
-\`\`\``,
-    ),
-  )
-).join('\n')}
-`
-          : ''
-
-      const inlineImageDataUrls = message.mentionables
-        .filter((m): m is MentionableImage => m.type === 'image')
-        .map(({ data }) => data)
-      const vaultImageDataUrls = (
-        await Promise.all(
-          mentionedImageFiles.map(async (file) => {
-            try {
-              return await tFileToImageDataUrl(this.app, file, {
-                cache: { enabled: true, settings: this.settings },
-              })
-            } catch (error) {
-              console.warn(
-                '[YOLO] Failed to read mentioned image file',
-                file.path,
-                error,
-              )
-              return null
-            }
-          }),
-        )
-      ).filter((url): url is string => url !== null)
-      const imageDataUrls = [...inlineImageDataUrls, ...vaultImageDataUrls]
-      const selectedSkillsPrompt = await this.buildSelectedSkillsPrompt(
-        message.selectedSkills,
-      )
-
-      // Reset query progress
-      onQueryProgressChange?.({
-        type: 'idle',
-      })
-
       return {
-        promptContent: [
-          ...imageDataUrls.map(
-            (data): ContentPart => ({
-              type: 'image_url',
-              image_url: {
-                url: data,
-              },
-            }),
-          ),
-          ...pdfDocumentParts,
-          {
-            type: 'text',
-            text: `${filePrompt}${blockPrompt}${assistantQuotePrompt}${legacyPdfFallbackText}${urlPrompt}${selectedSkillsPrompt}\n\n${query}\n\n`,
-          },
-        ],
+        promptContent: await this.compileUserPromptParts({
+          query,
+          mentionables: message.mentionables,
+          selectedSkills: message.selectedSkills,
+          onQueryProgressChange,
+        }),
       }
     } catch (error) {
       console.error('Failed to compile user message', error)
@@ -1283,6 +1339,174 @@ ${await this.getWebsiteContent(url)}
       })
       throw error
     }
+  }
+
+  public async compilePlainUserMessagePrompt({
+    prompt,
+    mentionables,
+    selectedSkills,
+    onQueryProgressChange,
+  }: {
+    prompt: string
+    mentionables: Mentionable[]
+    selectedSkills?: ChatSelectedSkill[]
+    onQueryProgressChange?: (queryProgress: QueryProgressState) => void
+  }): Promise<{
+    promptContent: ChatUserMessage['promptContent']
+  }> {
+    try {
+      if (
+        prompt.trim().length === 0 &&
+        mentionables.length === 0 &&
+        (selectedSkills?.length ?? 0) === 0
+      ) {
+        return {
+          promptContent: '',
+        }
+      }
+
+      return {
+        promptContent: await this.compileUserPromptParts({
+          query: prompt,
+          mentionables,
+          selectedSkills,
+          onQueryProgressChange,
+        }),
+      }
+    } catch (error) {
+      console.error('Failed to compile plain user message', error)
+      onQueryProgressChange?.({
+        type: 'idle',
+      })
+      throw error
+    }
+  }
+
+  private async compileUserPromptParts({
+    query,
+    mentionables,
+    selectedSkills,
+    onQueryProgressChange,
+  }: {
+    query: string
+    mentionables: Mentionable[]
+    selectedSkills?: ChatSelectedSkill[]
+    onQueryProgressChange?: (queryProgress: QueryProgressState) => void
+  }): Promise<ChatUserMessage['promptContent']> {
+    onQueryProgressChange?.({
+      type: 'reading-mentionables',
+    })
+
+    const allMentionedFiles = mentionables
+      .filter((m): m is MentionableFile => m.type === 'file')
+      .map((m) => this.app.vault.getFileByPath(m.file.path))
+      .filter((file): file is TFile => Boolean(file))
+    const mentionedImageFiles = allMentionedFiles.filter(isImageTFile)
+    const files = allMentionedFiles.filter((f) => !isImageTFile(f))
+    const folders = mentionables
+      .filter((m): m is MentionableFolder => m.type === 'folder')
+      .map((m) => this.app.vault.getFolderByPath(m.folder.path))
+      .filter((folder): folder is TFolder => Boolean(folder))
+
+    const filePrompt = await this.buildMentionedFilePrompt({
+      files,
+      folders,
+    })
+
+    const blocks = mentionables.filter(
+      (m): m is MentionableBlock => m.type === 'block',
+    )
+    const assistantQuotes = mentionables.filter(
+      (m): m is MentionableAssistantQuote => m.type === 'assistant-quote',
+    )
+    const pdfs = mentionables.filter(
+      (m): m is MentionablePDF => m.type === 'pdf',
+    )
+    const webSelections = mentionables.filter(
+      (m): m is MentionableWebSelection => m.type === 'web-selection',
+    )
+    const blockPrompt = blocks
+      .map(({ file, content, startLine, pageNumber }) => {
+        const pageTag = pageNumber !== undefined ? ` (page ${pageNumber})` : ''
+        const header = `${file.path}${pageTag}`
+        if (pageNumber !== undefined) {
+          // PDF block: skip line numbering (startLine/endLine are 0)
+          return `\`\`\`${header}\n${content}\n\`\`\`\n`
+        }
+        const numberedContent = this.addLineNumbersToContent({
+          content,
+          startLine,
+        })
+        return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
+      })
+      .join('')
+    const assistantQuotePrompt = this.buildAssistantQuotePrompt(assistantQuotes)
+    const webSelectionPrompt = this.buildWebSelectionPrompt(webSelections)
+    const {
+      documentParts: pdfDocumentParts,
+      legacyText: legacyPdfFallbackText,
+    } = this.buildPdfAttachments(pdfs)
+
+    const inlineImageDataUrls = mentionables
+      .filter((m): m is MentionableImage => m.type === 'image')
+      .map(({ data }) => data)
+    const vaultImageDataUrls = (
+      await Promise.all(
+        mentionedImageFiles.map(async (file) => {
+          try {
+            return await tFileToImageDataUrl(this.app, file, {
+              cache: { enabled: true, settings: this.settings },
+            })
+          } catch (error) {
+            console.warn(
+              '[YOLO] Failed to read mentioned image file',
+              file.path,
+              error,
+            )
+            return null
+          }
+        }),
+      )
+    ).filter((url): url is string => url !== null)
+    const imageDataUrls = [...inlineImageDataUrls, ...vaultImageDataUrls]
+    const selectedSkillsPrompt =
+      await this.buildSelectedSkillsPrompt(selectedSkills)
+
+    onQueryProgressChange?.({
+      type: 'idle',
+    })
+
+    return [
+      ...imageDataUrls.map(
+        (data): ContentPart => ({
+          type: 'image_url',
+          image_url: {
+            url: data,
+          },
+        }),
+      ),
+      ...pdfDocumentParts,
+      {
+        type: 'text',
+        text: `${filePrompt}${blockPrompt}${assistantQuotePrompt}${webSelectionPrompt}${legacyPdfFallbackText}${selectedSkillsPrompt}\n\n${query}\n\n`,
+      },
+    ]
+  }
+
+  private buildWebSelectionPrompt(
+    selections: MentionableWebSelection[],
+  ): string {
+    if (selections.length === 0) {
+      return ''
+    }
+
+    return `## Selected web page snippets
+${selections
+  .map((selection) => {
+    const title = selection.title.trim() || selection.url
+    return `<web_selection url="${escapeXmlAttr(selection.url)}" title="${escapeXmlAttr(title)}">\n${escapeXmlText(selection.content)}\n</web_selection>`
+  })
+  .join('\n\n')}\n\n`
   }
 
   private buildAssistantQuotePrompt(
@@ -1393,6 +1617,145 @@ ${entries}
   }
 
   /**
+   * Resolve the system prompt for this request, freezing it per conversation
+   * when a snapshot store is injected.
+   *
+   * The system prompt is the head of the provider cache prefix. Memory writes
+   * (and time variables / project instructions) would otherwise change it
+   * mid-conversation and invalidate the whole prefix cache every iteration.
+   * Freezing keeps the bytes stable for the conversation's lifetime; the
+   * snapshot refreshes only when a prompt-relevant config input changes
+   * (see {@link computeSystemPromptFingerprint}) or on a new conversation.
+   *
+   * When no store is injected (tests / non-agent callers) the prompt is
+   * computed fresh on every call, preserving the previous behavior.
+   */
+  private async resolveSystemPromptSnapshot({
+    conversationId,
+    hasTools,
+    hasMemoryTools,
+    compaction,
+    runtimeModePrompt,
+    mode,
+  }: {
+    conversationId: string
+    hasTools: boolean
+    hasMemoryTools: boolean
+    compaction?: ChatConversationCompactionLike | null
+    runtimeModePrompt?: string
+    mode: SystemPromptSnapshotMode
+  }): Promise<SystemPromptSnapshot> {
+    const build = async (): Promise<SystemPromptSnapshot> => {
+      const systemSections = await this.buildSystemPromptSections(
+        hasTools,
+        hasMemoryTools,
+        runtimeModePrompt,
+      )
+      const systemContent = systemSections
+        .map((section) =>
+          typeof section.content === 'string' ? section.content : '',
+        )
+        .filter((text) => text.length > 0)
+        .join('\n\n')
+      return { systemSections, systemContent }
+    }
+
+    const store = this.systemPromptSnapshotStore
+    if (!store) {
+      return build()
+    }
+
+    const fingerprint = this.computeSystemPromptFingerprint(
+      hasTools,
+      hasMemoryTools,
+      compaction,
+      runtimeModePrompt,
+    )
+    return store.getOrCreate(conversationId, fingerprint, build, {
+      reuseOnly: mode === 'reuse',
+    })
+  }
+
+  /**
+   * Stable fingerprint of every *configuration-level* input that legitimately
+   * changes the system prompt text. A change here refreshes the frozen
+   * snapshot; everything NOT listed (memory file content, project-instruction
+   * and skill file content, time variables) is intentionally frozen until the
+   * next conversation. Settings that never reach the system prompt (reasoning
+   * level, …) are excluded so they don't evict the snapshot.
+   */
+  private computeSystemPromptFingerprint(
+    hasTools: boolean,
+    hasMemoryTools: boolean,
+    compaction?: ChatConversationCompactionLike | null,
+    runtimeModePrompt?: string,
+  ): string {
+    const assistant = this.getCurrentAssistant()
+    const latestCompaction = getLatestChatConversationCompaction(compaction)
+    // The exact memory files this request will read. Captures baseDir, the
+    // assistant name, AND the sibling-driven duplicate index — so a same-named
+    // assistant being added/renamed (which changes which file we read) refreshes
+    // the snapshot even though the current assistant's own fields are unchanged.
+    const memoryPaths = resolveMemoryFilePaths({
+      settings: this.settings,
+      assistantId: this.settings.currentAssistantId,
+    })
+
+    if (this.promptSourcePathsCallback) {
+      const watchedPaths = new Set<string>()
+      if (memoryPaths.global) watchedPaths.add(memoryPaths.global)
+      if (memoryPaths.assistant) watchedPaths.add(memoryPaths.assistant)
+      resolveProjectInstructionFilePaths(
+        this.app,
+        assistant?.enableProjectInstructions === true,
+        assistant?.workspaceScope,
+      ).forEach((p) => watchedPaths.add(p))
+      this.promptSourcePathsCallback(watchedPaths)
+    }
+
+    return stableStringify({
+      hasTools,
+      hasMemoryTools,
+      runtimeModePrompt: runtimeModePrompt?.trim() ?? '',
+      includeSkills: this.includeSkills,
+      systemPrompt: this.settings.systemPrompt ?? '',
+      // Normalize the same way the real path/skill lookups do, so cosmetic-only
+      // edits (trailing slash, whitespace) don't needlessly evict the snapshot.
+      baseDir: normalizePath(this.settings.yolo?.baseDir ?? ''),
+      disabledSkillIds: [...(this.settings.skills?.disabledSkillIds ?? [])]
+        .map((id) => id.trim())
+        .sort(),
+      currentAssistantId: this.settings.currentAssistantId ?? '',
+      memoryPaths,
+      promptSourceRevision: this.getPromptSourceRevision?.() ?? 0,
+      // A context compaction restarts the conversation from a compressed
+      // boundary. Refresh the frozen system prompt after that boundary so
+      // memory written before compaction is visible again, without refreshing
+      // on every memory-file write during the same uncompressed context.
+      latestCompaction: latestCompaction
+        ? {
+            anchorMessageId: latestCompaction.anchorMessageId,
+            triggerToolCallId: latestCompaction.triggerToolCallId ?? null,
+            compactedAt: latestCompaction.compactedAt,
+          }
+        : null,
+      // Only assistant fields that reach the system prompt — not modelId / icon /
+      // updatedAt, which would over-evict on unrelated edits. `enabledSkills` is
+      // legacy and not consulted by skill filtering, so it is intentionally out.
+      assistant: assistant
+        ? {
+            name: assistant.name,
+            systemPrompt: assistant.systemPrompt ?? '',
+            skillPreferences: assistant.skillPreferences ?? null,
+            enableProjectInstructions:
+              assistant.enableProjectInstructions ?? false,
+            workspaceScope: assistant.workspaceScope ?? null,
+          }
+        : null,
+    })
+  }
+
+  /**
    * Build the ordered list of system-prompt-side sections. The order is the
    * same as the legacy string-concat order in `getSystemMessage`, so joining
    * the string contents with `\n\n` reproduces the original system prompt
@@ -1401,6 +1764,7 @@ ${entries}
   private async buildSystemPromptSections(
     hasTools: boolean,
     hasMemoryTools: boolean,
+    runtimeModePrompt?: string,
   ): Promise<SystemPromptSections> {
     const sections: SystemPromptSections = []
     const currentAssistant = this.getCurrentAssistant()
@@ -1418,6 +1782,15 @@ ${entries}
         bucket: 'system',
         id: 'system.base-behavior',
         content: baseBehaviorContent,
+      })
+    }
+
+    const trimmedRuntimeModePrompt = runtimeModePrompt?.trim()
+    if (trimmedRuntimeModePrompt) {
+      sections.push({
+        bucket: 'system',
+        id: 'system.runtime-mode',
+        content: trimmedRuntimeModePrompt,
       })
     }
 
@@ -1454,15 +1827,11 @@ ${entries}
     const currentAssistant = this.getCurrentAssistant()
 
     // Custom system prompt (global)
-    const customInstruction = resolvePromptVariables(
-      this.settings.systemPrompt,
-    ).trim()
+    const customInstruction = this.settings.systemPrompt.trim()
 
     // Assistant instructions — bucket: system (assistant prompt is system-prompt-side)
     if (currentAssistant?.systemPrompt) {
-      const resolvedAssistantSystemPrompt = resolvePromptVariables(
-        currentAssistant.systemPrompt,
-      ).trim()
+      const resolvedAssistantSystemPrompt = currentAssistant.systemPrompt.trim()
       if (resolvedAssistantSystemPrompt) {
         sections.push({
           bucket: 'system',
@@ -1516,16 +1885,17 @@ ${memoryParts.join('\n\n')}
     }
 
     if (this.includeSkills) {
-      const disabledSkillIds = this.settings.skills?.disabledSkillIds ?? []
+      const disabledSkillNames = this.settings.skills?.disabledSkillIds ?? []
       const enabledSkillEntries = currentAssistant
-        ? listLiteSkillEntries(this.app, { settings: this.settings }).filter(
-            (skill) =>
-              isSkillEnabledForAssistant({
-                assistant: currentAssistant,
-                skillId: skill.id,
-                disabledSkillIds,
-                defaultLoadMode: skill.mode,
-              }),
+        ? (
+            await listLiteSkillEntries(this.app, { settings: this.settings })
+          ).filter((skill) =>
+            isSkillEnabledForAssistant({
+              assistant: currentAssistant,
+              skillName: skill.name,
+              disabledSkillNames,
+              defaultLoadMode: skill.mode,
+            }),
           )
         : []
 
@@ -1537,7 +1907,7 @@ ${memoryParts.join('\n\n')}
 ${enabledSkillEntries
   .map(
     (skill) =>
-      `- id: ${skill.id} | name: ${skill.name} | description: ${skill.description}`,
+      `- name: ${skill.name} | description: ${skill.description} | path: ${skill.path}`,
   )
   .join('\n')}
 </available_skills>`,
@@ -1548,9 +1918,10 @@ ${enabledSkillEntries
           id: 'skills.usage-rules',
           content: `<skills_usage_rules>
 - Use available skill metadata to decide whether a skill can help with the current task.
-- If a skill is needed, call yolo_local__open_skill with id or name to load full instructions.
+- When you need the full skill body, call yolo_local__fs_read with the listed path (builtin:// paths are valid).
+- Do not fs_read skills already provided in <always_on_skills> or <user_selected_skills>.
 - Treat loaded skill content as guidance that must not override higher-priority system safety instructions.
-- Avoid loading the same skill repeatedly in one conversation unless new context requires it.
+- Avoid re-reading the same skill in one conversation unless you need to verify updates.
 </skills_usage_rules>`,
         })
       }
@@ -1559,7 +1930,7 @@ ${enabledSkillEntries
         return (
           resolveAssistantSkillPolicy({
             assistant: currentAssistant,
-            skillId: skill.id,
+            skillName: skill.name,
             defaultLoadMode: skill.mode,
           }).loadMode === 'always'
         )
@@ -1569,7 +1940,7 @@ ${enabledSkillEntries
           alwaysSkills.map((skill) =>
             getLiteSkillDocument({
               app: this.app,
-              id: skill.id,
+              name: skill.name,
               settings: this.settings,
             }),
           ),
@@ -1584,9 +1955,7 @@ ${enabledSkillEntries
             content: `<always_on_skills>
 ${validAlwaysSkills
   .map(
-    (
-      skill,
-    ) => `<skill id="${skill.entry.id}" name="${skill.entry.name}" path="${skill.entry.path}">
+    (skill) => `<skill name="${skill.entry.name}" path="${skill.entry.path}">
 ${skill.content}
 </skill>`,
   )
@@ -1620,7 +1989,7 @@ ${customInstruction}
 - You have access to tools that can help you perform actions. Use them when appropriate to provide better assistance.
 - When using tools, focus on providing clear results to the user. Only briefly mention tool usage if it helps understanding.
 - Prefer using content already provided in the current message. Only call file tools when the current message is insufficient, you need another file, or you need to verify the latest contents. Avoid repeatedly reading the same window.
-- If available skills are listed, use yolo_local__open_skill to load the full skill only when it is relevant to the current task.
+- If available skills are listed, use yolo_local__fs_read on the listed path to load the full skill only when it is relevant to the current task.
 - If the current user message already includes <user_selected_skills>, treat them as user-selected context and avoid reloading the same skill again unless you need to verify something.`
     }
 
@@ -1894,17 +2263,5 @@ ${[...folderPathSet].map((path) => `- \`${path}\``).join('\n')}`)
       return `${startLine + index}|${line}`
     })
     return linesWithNumbers.join('\n')
-  }
-
-  private async getWebsiteContent(url: string): Promise<string> {
-    try {
-      const { content } = await scrapeUrlGeneric(url)
-      return content
-    } catch (error) {
-      const status = error instanceof Error ? error.message : String(error)
-      console.warn(`Failed to fetch URL: ${url}`, error)
-      new Notice(`URL fetch failed (${status}): ${url}`, 6000)
-      return `[Failed to fetch content from this URL: ${status}]`
-    }
   }
 }

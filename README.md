@@ -3,7 +3,10 @@
   Agent-native AI assistant for Obsidian — chat, write, knowledge base, and orchestration, all in one place.
 </p>
 
-<p align="center"><a href="https://github.com/Lapis0x0/obsidian-yolo/stargazers">
+<p align="center"><a href="https://github.com/Lapis0x0/obsidian-yolo/commits/main">
+    <img src="https://img.shields.io/github/last-commit/Lapis0x0/obsidian-yolo/main?style=flat-square&color=6c5ce7" alt="Last Commit">
+  </a>
+  <a href="https://github.com/Lapis0x0/obsidian-yolo/stargazers">
     <img src="https://img.shields.io/github/stars/Lapis0x0/obsidian-yolo?style=flat-square&color=6c5ce7" alt="GitHub Stars">
   </a>
   <a href="https://github.com/Lapis0x0/obsidian-yolo/releases/latest">
@@ -23,13 +26,7 @@
 
 ## What's New
 
-- `1.5.7`: YOLO can now sense what you're reading—focus sync keeps the AI aware of your current file and position, with deep PDF support for vision reading, selection sync, and region screenshots.
-- `1.5.6`: Built-in web search is here—Agents can now browse the internet directly, with multiple search providers and unified web scraping.
-- `1.5.5`: Refreshed knowledge-base foundations with fully upgraded hybrid search and indexing—and smarter, more relevant results.
-- `1.5.4`: Built for long chats and complex tasks: smarter context pruning and compression, multi-model branches, a virtualized chat timeline, and automatic compression to keep agents running smoothly.
-- `1.5.3`: Native multi-window chat plus background Agents—automation that stays out of your way.
-- `1.5.2`: The new memory system is now live, allowing YOLO to more naturally remember your preferences, habits, and long-term context across conversations.
-- `1.5.1`: YOLO introduced an all-new Agent mode, turning AI from a chat assistant into something that can call tools, organize steps, and actively help get real work done.
+- **`1.5`**: Introduces a new Agent runtime that turns AI from Q&A into active collaboration—with full tool calling, MCP, Skills, desktop Bash, subagents, and web search—plus smarter long-session context and memory, refreshed hybrid RAG, focus/PDF awareness, and multi-window chat with background Agents.
 
 ## Highlights
 

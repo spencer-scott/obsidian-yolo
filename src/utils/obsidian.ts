@@ -1,6 +1,15 @@
 import { EditorView } from '@codemirror/view'
-import { App, Editor, MarkdownView, TFile, TFolder, Vault } from 'obsidian'
+import {
+  App,
+  Editor,
+  MarkdownView,
+  TFile,
+  TFolder,
+  Vault,
+  WorkspaceLeaf,
+} from 'obsidian'
 
+import { CHAT_VIEW_TYPE } from '../constants'
 import { MentionableBlockData } from '../types/mentionable'
 
 export async function readTFileContent(
@@ -176,6 +185,47 @@ export function calculateFileDistance(
   return distance
 }
 
+/**
+ * Open a new tab in the main editor area (rootSplit) and return it.
+ *
+ * Calling `workspace.getLeaf('tab')` directly opens the tab inside the parent
+ * split of the currently-active leaf, so when the chat view is active the new
+ * tab gets jammed into the chat's column (whether chat lives in the sidebar
+ * or inside a main-area split) and covers the chat panel. We lock onto a
+ * non-chat main-area leaf as an anchor and let Obsidian open the tab next to it.
+ */
+function openTabInMainArea(app: App): WorkspaceLeaf {
+  const anchor = findMainAreaAnchorLeaf(app)
+  if (anchor) {
+    app.workspace.setActiveLeaf(anchor, { focus: false })
+    return app.workspace.getLeaf('tab')
+  }
+
+  // Main area only has chat: split a new leaf to the right of chat (matches most
+  // editors' "preview/jump opens to the right" intuition).
+  const chatLeaf = app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)[0]
+  if (chatLeaf) {
+    return app.workspace.createLeafBySplit(chatLeaf, 'vertical', false)
+  }
+
+  return app.workspace.getLeaf(false)
+}
+
+function findMainAreaAnchorLeaf(app: App): WorkspaceLeaf | null {
+  const recent = app.workspace.getMostRecentLeaf(app.workspace.rootSplit)
+  if (recent && recent.view.getViewType() !== CHAT_VIEW_TYPE) {
+    return recent
+  }
+
+  let anchor: WorkspaceLeaf | null = null
+  app.workspace.iterateRootLeaves((leaf) => {
+    if (anchor) return
+    if (leaf.view.getViewType() === CHAT_VIEW_TYPE) return
+    anchor = leaf
+  })
+  return anchor
+}
+
 export function openMarkdownFile(
   app: App,
   filePath: string,
@@ -198,7 +248,7 @@ export function openMarkdownFile(
       existingLeaf.view.setEphemeralState({ line: startLine - 1 }) // -1 because line is 0-indexed
     }
   } else {
-    const leaf = app.workspace.getLeaf('tab')
+    const leaf = openTabInMainArea(app)
     void leaf.openFile(file, {
       eState: startLine ? { line: startLine - 1 } : undefined, // -1 because line is 0-indexed
     })
@@ -211,7 +261,9 @@ export function openPdfFileAtPage(
   filePath: string,
   page: number,
 ): void {
+  const file = app.vault.getFileByPath(filePath)
+  if (!file) return
   const safePage = Math.max(1, Math.floor(page))
-  const link = `${filePath}#page=${safePage}`
-  app.workspace.openLinkText(link, '', true)
+  const leaf = openTabInMainArea(app)
+  void leaf.openFile(file, { eState: { subpath: `#page=${safePage}` } })
 }

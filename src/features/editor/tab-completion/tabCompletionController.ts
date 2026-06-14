@@ -2,6 +2,7 @@ import type { Extension, Text } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import type { Editor, MarkdownView } from 'obsidian'
 
+import { executeSingleTurn } from '../../../core/ai/single-turn'
 import { getChatModelClient } from '../../../core/llm/manager'
 import { promoteProviderTransportModeToObsidian } from '../../../core/llm/transportModePromotion'
 import {
@@ -17,12 +18,7 @@ import {
   splitContextRange,
 } from '../../../settings/schema/setting.types'
 import type { ConversationOverrideSettings } from '../../../types/conversation-settings.types'
-import type {
-  LLMRequestNonStreaming,
-  LLMRequestStreaming,
-  RequestMessage,
-} from '../../../types/llm/request'
-import type { LLMResponseStreaming } from '../../../types/llm/response'
+import type { LLMRequestBase, RequestMessage } from '../../../types/llm/request'
 import { escapeMarkdownSpecialChars } from '../../../utils/markdown-escape'
 import type { InlineSuggestionGhostPayload } from '../inline-suggestion/inlineSuggestion'
 
@@ -435,10 +431,9 @@ export class TabCompletionController {
       this.deps.clearInlineSuggestion()
       this.tabCompletionPending = null
 
-      const baseRequest: LLMRequestNonStreaming = {
+      const baseRequest: LLMRequestBase = {
         model: model.model,
         messages: requestMessages,
-        stream: false,
         max_tokens: Math.max(16, Math.min(options.maxTokens, 2000)),
         // Tab completion is latency-sensitive; default is 'off'. Users can change to 'low'/'auto' in settings to support models that require reasoning
         reasoningLevel: options.reasoningLevel,
@@ -512,29 +507,41 @@ export class TabCompletionController {
         }
 
         try {
-          let stream: AsyncIterable<LLMResponseStreaming>
+          let rawText = ''
+          let requestInvalidated = false
           try {
-            const streamingRequest: LLMRequestStreaming = {
-              ...baseRequest,
+            const result = await executeSingleTurn({
+              providerClient,
+              model,
+              request: baseRequest,
               stream: true,
-            }
-            stream = await providerClient.streamResponse(
-              model,
-              streamingRequest,
-              { signal: controller.signal },
-            )
-          } catch (error) {
-            const msg = String(error?.message ?? '')
-            const shouldFallback =
-              /protocol error|unexpected EOF|incomplete envelope/i.test(msg)
-            if (!shouldFallback) throw error
+              purpose: 'lightweight',
+              signal: controller.signal,
+              onStreamDelta: ({ contentDelta }) => {
+                if (!contentDelta) return
+                rawText += contentDelta
 
-            const response = await providerClient.generateResponse(
-              model,
-              baseRequest,
-              { signal: controller.signal },
-            )
-            const suggestion = response.choices?.[0]?.message?.content ?? ''
+                const currentView = this.deps.getEditorView(editor)
+                if (
+                  !currentView ||
+                  currentView.state.selection.main.head !==
+                    scheduledCursorOffset ||
+                  editor.getSelection()?.length
+                ) {
+                  requestInvalidated = true
+                  controller.abort()
+                  return
+                }
+
+                if (!rawText.trim()) return
+                updateSuggestion(rawText, currentView)
+              },
+            })
+
+            if (requestInvalidated) return
+
+            const finalText = result.content || rawText
+            if (finalText.length === 0) return
 
             const currentView = this.deps.getEditorView(editor)
             if (!currentView) return
@@ -542,37 +549,13 @@ export class TabCompletionController {
               return
             if (editor.getSelection()?.length) return
 
-            updateSuggestion(suggestion, currentView)
+            updateSuggestion(finalText, currentView)
             if (timeoutHandle) clearTimeout(timeoutHandle)
             return
+          } catch (error) {
+            if (requestInvalidated) return
+            throw error
           }
-
-          let rawText = ''
-          for await (const chunk of stream) {
-            const delta = chunk.choices?.[0]?.delta?.content ?? ''
-            if (!delta) continue
-            rawText += delta
-
-            const currentView = this.deps.getEditorView(editor)
-            if (!currentView) return
-            if (currentView.state.selection.main.head !== scheduledCursorOffset)
-              return
-            if (editor.getSelection()?.length) return
-
-            if (!rawText.trim()) continue
-            updateSuggestion(rawText, currentView)
-          }
-
-          if (rawText.length === 0) return
-          const currentView = this.deps.getEditorView(editor)
-          if (!currentView) return
-          if (currentView.state.selection.main.head !== scheduledCursorOffset)
-            return
-          if (editor.getSelection()?.length) return
-
-          updateSuggestion(rawText, currentView)
-          if (timeoutHandle) clearTimeout(timeoutHandle)
-          return
         } catch (error) {
           if (timeoutHandle) clearTimeout(timeoutHandle)
 

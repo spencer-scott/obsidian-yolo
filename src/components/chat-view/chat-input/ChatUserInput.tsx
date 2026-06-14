@@ -15,7 +15,6 @@ import {
 import { Notice } from 'obsidian'
 import {
   type CSSProperties,
-  type FocusEvent,
   type MouseEvent as ReactMouseEvent,
   forwardRef,
   useCallback,
@@ -30,9 +29,9 @@ import { useApp } from '../../../contexts/app-context'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
 import { getYoloSnippetsPath } from '../../../core/paths/yoloPaths'
-import { listLiteSkillEntries } from '../../../core/skills/liteSkills'
 import { isSkillEnabledForAssistant } from '../../../core/skills/skillPolicy'
 import { openSnippetsFileInVault } from '../../../core/snippets/snippetsFile'
+import { useLiteSkillEntries } from '../../../hooks/useLiteSkillEntries'
 import { ChatSelectedSkill } from '../../../types/chat'
 import { ChatModel } from '../../../types/chat-model.types'
 import {
@@ -59,6 +58,7 @@ import ContextUsageRing from '../ContextUsageRing'
 import { useSnippetEntries } from '../hooks/useSnippetEntries'
 import type { ContextBreakdownInputs } from '../useContextBreakdown'
 
+import { ChatMode, ChatModeSelect } from './ChatModeSelect'
 import ChatSkillBadge from './ChatSkillBadge'
 import { FileUploadButton } from './FileUploadButton'
 import LexicalContentEditable from './LexicalContentEditable'
@@ -78,6 +78,7 @@ import type { SlashCommand } from './plugins/mention/SkillSlashPlugin'
 import { NodeMutations } from './plugins/on-mutation/OnMutationPlugin'
 import { ReasoningSelect, supportsReasoning } from './ReasoningSelect'
 import { SubmitButton } from './SubmitButton'
+import { classifyUploadFiles } from './utils/file-upload'
 
 export type ChatUserInputRef = {
   focus: () => void
@@ -86,6 +87,8 @@ export type ChatUserInputRef = {
   replaceText: (text: string) => void
   submit: () => void
 }
+
+export type ChatUserInputControlLayout = 'composer-toolbar' | 'inline'
 
 export type ChatUserInputProps = {
   initialSerializedEditorState: SerializedEditorState | null
@@ -113,23 +116,27 @@ export type ChatUserInputProps = {
   compact?: boolean
   hideBadgeMentionables?: boolean
   onToggleCompact?: () => void
-  onBlur?: () => void
   currentAssistantId?: string
   onSelectAssistantForConversation?: (assistantId: string) => void
-  currentChatMode?: 'chat' | 'agent'
-  onSelectChatModeForConversation?: (mode: 'chat' | 'agent') => void
+  currentChatMode?: ChatMode
+  onSelectChatModeForConversation?: (mode: ChatMode) => void
+  chatMode?: ChatMode
+  onChatModeChange?: (mode: ChatMode) => void
+  controlLayout?: ChatUserInputControlLayout
+  onControlPopoverOpenChange?: (isOpen: boolean) => void
   allowAgentModeOption?: boolean
   enableResize?: boolean
   onRunSlashCommand?: (command: SlashCommand) => void
   // When the parent is running a conversation, the submit button switches to a stop button (circle + square)
   isGenerating?: boolean
+  canQueueWhileGenerating?: boolean
   onAbort?: () => void
   // When the input is empty with no mentionables and no skills, the submit button appears faded and is not clickable
   submitDisabled?: boolean
   // Context window usage ring, displayed to the left of the submit button when provided
   contextUsage?: {
     promptTokens: number
-    maxContextTokens: number
+    maxContextTokens: number | null
     label: string
     /** When provided, the ring becomes a popover trigger that opens the
      * per-bucket context breakdown. Builder is called lazily on open and may
@@ -147,6 +154,7 @@ const INLINE_MENTIONABLE_TYPES = [
   'folder',
   'block',
   'assistant-quote',
+  'web-selection',
   'model',
   'image',
 ]
@@ -177,15 +185,19 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       compact = false,
       hideBadgeMentionables = false,
       onToggleCompact,
-      onBlur,
       currentAssistantId,
       onSelectAssistantForConversation,
       currentChatMode,
       onSelectChatModeForConversation,
+      chatMode,
+      onChatModeChange,
+      controlLayout = 'composer-toolbar',
+      onControlPopoverOpenChange,
       allowAgentModeOption = true,
       enableResize = false,
       onRunSlashCommand,
       isGenerating = false,
+      canQueueWhileGenerating = true,
       onAbort,
       submitDisabled = false,
       contextUsage,
@@ -227,7 +239,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     const containerRef = useRef<HTMLDivElement>(null)
     const [isEditorReady, setIsEditorReady] = useState(false)
     const suppressedDestroyedMentionableKeysRef = useRef<Set<string>>(new Set())
-    const suppressedDestroyedSkillIdsRef = useRef<Set<string>>(new Set())
+    const suppressedDestroyedSkillNamesRef = useRef<Set<string>>(new Set())
     const [inputText, setInputText] = useState('')
     const [resizedHeight, setResizedHeight] = useState<number | null>(
       rememberedInputHeight,
@@ -270,6 +282,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       [mentionables],
     )
 
+    const allSkillEntries = useLiteSkillEntries(app, { settings })
     const availableSkills = useMemo(() => {
       const assistants = settings.assistants || []
       const currentAssistant = currentAssistantId
@@ -282,16 +295,16 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         return []
       }
 
-      const disabledSkillIds = settings.skills?.disabledSkillIds ?? []
-      return listLiteSkillEntries(app, { settings }).filter((skill) =>
+      const disabledSkillNames = settings.skills?.disabledSkillIds ?? []
+      return allSkillEntries.filter((skill) =>
         isSkillEnabledForAssistant({
           assistant: currentAssistant,
-          skillId: skill.id,
-          disabledSkillIds,
+          skillName: skill.name,
+          disabledSkillNames,
           defaultLoadMode: skill.mode,
         }),
       )
-    }, [app, currentAssistantId, settings])
+    }, [allSkillEntries, currentAssistantId, settings])
 
     const availableSnippets = useSnippetEntries()
 
@@ -311,20 +324,6 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       if (reasoningLevel) return reasoningLevel
       return getDefaultReasoningLevel(currentModel)
     }, [currentModel, reasoningLevel])
-
-    const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
-      if (!onBlur) return
-      const nextTarget = event.relatedTarget as Node | null
-      if (
-        nextTarget &&
-        nextTarget instanceof HTMLElement &&
-        nextTarget.closest('.yolo-popover-surface')
-      ) {
-        return
-      }
-      if (nextTarget && event.currentTarget.contains(nextTarget)) return
-      onBlur()
-    }
 
     useEffect(() => {
       if (isEditorReady) return
@@ -356,7 +355,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         return
       }
 
-      const activeElement = document.activeElement
+      const activeElement = (containerRef.current?.ownerDocument ?? document)
+        .activeElement
       if (
         activeElement instanceof HTMLElement &&
         containerRef.current?.contains(activeElement)
@@ -375,7 +375,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
     useEffect(() => {
       return () => {
-        document.body.setCssProps({
+        ;(containerRef.current?.ownerDocument ?? document).body.setCssProps({
           '--yolo-chat-input-resize-cursor': '',
           '--yolo-chat-input-resize-user-select': '',
         })
@@ -552,34 +552,34 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         return
       }
 
-      const destroyedSkillIds: string[] = []
+      const destroyedSkillNames: string[] = []
       const addedSkills: ChatSelectedSkill[] = []
 
       mutations.forEach((mutation) => {
         const skill = mutation.node.getSkill()
         if (mutation.mutation === 'destroyed') {
-          if (suppressedDestroyedSkillIdsRef.current.has(skill.id)) {
-            suppressedDestroyedSkillIdsRef.current.delete(skill.id)
+          if (suppressedDestroyedSkillNamesRef.current.has(skill.name)) {
+            suppressedDestroyedSkillNamesRef.current.delete(skill.name)
             return
           }
 
           const nodeWithSameSkill = editorRef.current?.read(() =>
             $nodesOfType(SkillNode).find(
-              (node) => node.getSkill().id === skill.id,
+              (node) => node.getSkill().name === skill.name,
             ),
           )
 
           if (!nodeWithSameSkill) {
-            destroyedSkillIds.push(skill.id)
+            destroyedSkillNames.push(skill.name)
           }
           return
         }
 
         if (
           effectiveSelectedSkills.some(
-            (selectedSkill) => selectedSkill.id === skill.id,
+            (selectedSkill) => selectedSkill.name === skill.name,
           ) ||
-          addedSkills.some((selectedSkill) => selectedSkill.id === skill.id)
+          addedSkills.some((selectedSkill) => selectedSkill.name === skill.name)
         ) {
           return
         }
@@ -587,13 +587,13 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         addedSkills.push(skill)
       })
 
-      if (destroyedSkillIds.length === 0 && addedSkills.length === 0) {
+      if (destroyedSkillNames.length === 0 && addedSkills.length === 0) {
         return
       }
 
       setSelectedSkills(
         effectiveSelectedSkills
-          .filter((skill) => !destroyedSkillIds.includes(skill.id))
+          .filter((skill) => !destroyedSkillNames.includes(skill.name))
           .concat(addedSkills),
       )
     }
@@ -615,7 +615,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       )
 
       const shouldMoveCursor =
-        contentEditableRef.current === document.activeElement
+        contentEditableRef.current ===
+        (contentEditableRef.current?.ownerDocument ?? document).activeElement
 
       editor.update(() => {
         const mirrorTypeSet = new Set(INLINE_MENTIONABLE_TYPES)
@@ -730,19 +731,20 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
       const skillsToMirror =
         mentionDisplayMode === 'inline' ? effectiveSelectedSkills : []
-      const skillsById = new Map(
-        skillsToMirror.map((skill) => [skill.id, skill] as const),
+      const skillsByName = new Map(
+        skillsToMirror.map((skill) => [skill.name, skill] as const),
       )
 
       const shouldMoveCursor =
-        contentEditableRef.current === document.activeElement
+        contentEditableRef.current ===
+        (contentEditableRef.current?.ownerDocument ?? document).activeElement
 
       editor.update(() => {
         $nodesOfType(SkillNode).forEach((node) => {
           const skill = node.getSkill()
-          if (skillsById.has(skill.id)) return
+          if (skillsByName.has(skill.name)) return
 
-          suppressedDestroyedSkillIdsRef.current.add(skill.id)
+          suppressedDestroyedSkillNamesRef.current.add(skill.name)
           const prevSibling = node.getPreviousSibling()
           if (
             prevSibling &&
@@ -765,8 +767,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
         if (skillsToMirror.length === 0) return
 
-        const existingIds = new Set(
-          $nodesOfType(SkillNode).map((node) => node.getSkill().id),
+        const existingNames = new Set(
+          $nodesOfType(SkillNode).map((node) => node.getSkill().name),
         )
         const root = $getRoot()
         let paragraphNode = root.getFirstChild()
@@ -780,7 +782,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
         let didInsert = false
         skillsToMirror.forEach((skill) => {
-          if (existingIds.has(skill.id)) return
+          if (existingNames.has(skill.name)) return
 
           const skillNode = $createSkillNode(skill.name, skill)
           const spacer = $createTextNode(' ')
@@ -947,24 +949,17 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
     const handleUploadFiles = useCallback(
       (files: File[]) => {
-        const imageFiles: File[] = []
-        const pdfFiles: File[] = []
-        const unsupported: File[] = []
-        for (const file of files) {
-          if (file.type.startsWith('image/')) {
-            imageFiles.push(file)
-          } else if (
-            file.type === 'application/pdf' ||
-            file.name.toLowerCase().endsWith('.pdf')
-          ) {
-            pdfFiles.push(file)
-          } else {
-            unsupported.push(file)
-          }
-        }
-        if (unsupported.length > 0) {
+        const { imageFiles, pdfFiles, unsupportedFiles } =
+          classifyUploadFiles(files)
+        if (unsupportedFiles.length > 0) {
           new Notice(
-            `Unsupported file type: ${unsupported.map((f) => f.name).join(', ')}`,
+            t(
+              'chat.unsupportedFileType',
+              'Unsupported file type: {names}',
+            ).replace(
+              '{names}',
+              unsupportedFiles.map((file) => file.name).join(', '),
+            ),
           )
         }
         if (imageFiles.length > 0) {
@@ -976,7 +971,12 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             })
             .catch((error) => {
               console.error('Failed to process uploaded images', error)
-              new Notice('Failed to process uploaded images')
+              new Notice(
+                t(
+                  'chat.processImagesFailed',
+                  'Failed to process uploaded images',
+                ),
+              )
             })
         }
         if (pdfFiles.length > 0) {
@@ -993,11 +993,17 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
                 const name = pdfFiles[idx]?.name ?? 'PDF'
                 console.error(`Failed to extract PDF ${name}`, result.reason)
                 new Notice(
-                  `Failed to read PDF "${name}": ${
-                    result.reason instanceof Error
-                      ? result.reason.message
-                      : 'unknown error'
-                  }`,
+                  t(
+                    'chat.readPdfFailed',
+                    'Failed to read PDF "{name}": {error}',
+                  )
+                    .replace('{name}', name)
+                    .replace(
+                      '{error}',
+                      result.reason instanceof Error
+                        ? result.reason.message
+                        : 'unknown error',
+                    ),
                 )
               }
             })
@@ -1007,7 +1013,12 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           })
         }
       },
-      [handleCreateImageMentionables, handleCreatePdfMentionables],
+      [
+        app,
+        handleCreateImageMentionables,
+        handleCreatePdfMentionables,
+        settings,
+      ],
     )
 
     const handleSelectMentionableForBadge = useCallback(
@@ -1050,18 +1061,12 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     )
 
     const handleSelectSkill = useCallback(
-      (skill: {
-        id: string
-        name: string
-        description: string
-        path: string
-      }) => {
+      (skill: { name: string; description: string; path: string }) => {
         if (!setSelectedSkills) {
           return
         }
 
         const nextSkill: ChatSelectedSkill = {
-          id: skill.id,
           name: skill.name,
           description: skill.description,
           path: skill.path,
@@ -1069,7 +1074,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
 
         if (
           effectiveSelectedSkills.some(
-            (selectedSkill) => selectedSkill.id === nextSkill.id,
+            (selectedSkill) => selectedSkill.name === nextSkill.name,
           )
         ) {
           return
@@ -1081,12 +1086,12 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     )
 
     const handleDeleteSelectedSkill = useCallback(
-      (skillId: string) => {
+      (skillName: string) => {
         if (!setSelectedSkills) {
           return
         }
         setSelectedSkills(
-          effectiveSelectedSkills.filter((skill) => skill.id !== skillId),
+          effectiveSelectedSkills.filter((skill) => skill.name !== skillName),
         )
       },
       [effectiveSelectedSkills, setSelectedSkills],
@@ -1136,7 +1141,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     )
 
     const clearResizeBodyStyles = useCallback(() => {
-      document.body.setCssProps({
+      ;(containerRef.current?.ownerDocument ?? document).body.setCssProps({
         '--yolo-chat-input-resize-cursor': '',
         '--yolo-chat-input-resize-user-select': '',
       })
@@ -1175,7 +1180,9 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           contentEditableRef.current?.offsetHeight ??
           DEFAULT_INPUT_HEIGHT
 
-        document.body.setCssProps({
+        const ownerDoc = containerRef.current?.ownerDocument ?? document
+        const ownerWin = ownerDoc.defaultView ?? window
+        ownerDoc.body.setCssProps({
           '--yolo-chat-input-resize-cursor': 'ns-resize',
           '--yolo-chat-input-resize-user-select': 'none',
         })
@@ -1190,14 +1197,14 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         }
 
         const handleMouseUp = () => {
-          window.removeEventListener('mousemove', handleMouseMove)
-          window.removeEventListener('mouseup', handleMouseUp)
+          ownerWin.removeEventListener('mousemove', handleMouseMove)
+          ownerWin.removeEventListener('mouseup', handleMouseUp)
           clearResizeBodyStyles()
           void persistResizedHeight(resizedHeightRef.current)
         }
 
-        window.addEventListener('mousemove', handleMouseMove)
-        window.addEventListener('mouseup', handleMouseUp)
+        ownerWin.addEventListener('mousemove', handleMouseMove)
+        ownerWin.addEventListener('mouseup', handleMouseUp)
       },
       [clearResizeBodyStyles, persistResizedHeight, resizedHeight],
     )
@@ -1241,6 +1248,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         }
 
         if (
+          target.closest('.yolo-chat-user-input-send-row') ||
           target.closest('.yolo-chat-user-input-controls') ||
           target.closest('button') ||
           target.closest('[role="button"]')
@@ -1269,10 +1277,76 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       }
     }, [compact, enableResize, resizedHeight])
 
+    const renderChatModeControl = () =>
+      onChatModeChange && chatMode ? (
+        <ChatModeSelect
+          mode={chatMode}
+          onChange={onChatModeChange}
+          side="top"
+          sideOffset={8}
+        />
+      ) : null
+
+    const renderModelControl = () => (
+      <ModelSelect
+        modelId={modelId}
+        onChange={onModelChange}
+        onMenuOpenChange={onControlPopoverOpenChange}
+        align="center"
+        sideOffset={8}
+        popover={{
+          variant: 'default',
+          minWidth: 240,
+          maxWidth: 320,
+          maxHeight: 560,
+        }}
+      />
+    )
+
+    const renderReasoningControl = () =>
+      showReasoningSelect && supportsReasoning(currentModel) ? (
+        <ReasoningSelect
+          model={currentModel}
+          value={resolvedReasoningLevel}
+          onChange={(level) => onReasoningChange?.(level)}
+          onMenuOpenChange={onControlPopoverOpenChange}
+          side="top"
+          sideOffset={8}
+        />
+      ) : null
+
+    const renderContextUsageControl = () =>
+      contextUsage ? (
+        contextUsage.buildBreakdownInputs ? (
+          <ContextUsagePopover
+            promptTokens={contextUsage.promptTokens}
+            maxContextTokens={contextUsage.maxContextTokens}
+            label={contextUsage.label}
+            anchorRef={containerRef}
+            buildInputs={contextUsage.buildBreakdownInputs}
+          />
+        ) : (
+          <ContextUsageRing
+            promptTokens={contextUsage.promptTokens}
+            maxContextTokens={contextUsage.maxContextTokens}
+            label={contextUsage.label}
+          />
+        )
+      ) : null
+
+    const renderSubmitControl = () => (
+      <SubmitButton
+        onClick={() => handleSubmit()}
+        isGenerating={isGenerating}
+        canQueue={canQueueWhileGenerating}
+        onAbort={onAbort}
+        disabled={submitDisabled}
+      />
+    )
+
     return (
       <div
         className={`yolo-chat-user-input-wrapper${compact ? ' yolo-chat-user-input-wrapper--compact' : ''}`}
-        onBlur={handleBlur}
         role="presentation"
       >
         {enableResize && !compact && (
@@ -1288,9 +1362,9 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             <div className="yolo-chat-user-input-files">
               {effectiveSelectedSkills.map((skill) => (
                 <ChatSkillBadge
-                  key={skill.id}
+                  key={skill.name}
                   skill={skill}
-                  onDelete={() => handleDeleteSelectedSkill(skill.id)}
+                  onDelete={() => handleDeleteSelectedSkill(skill.name)}
                 />
               ))}
             </div>
@@ -1417,6 +1491,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               onMentionNodeMutation={handleMentionNodeMutation}
               onSkillNodeMutation={handleSkillNodeMutation}
               onCreateImageMentionables={handleCreateImageMentionables}
+              onPasteFiles={handleUploadFiles}
               mentionDisplayMode={mentionDisplayMode}
               onSelectMentionable={handleSelectMentionableForBadge}
               mentionMenuMode={
@@ -1434,8 +1509,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               models={enabledChatModels}
               selectedModelIds={selectedModelIds}
               skills={availableSkills}
-              selectedSkillIds={effectiveSelectedSkills.map(
-                (skill) => skill.id,
+              selectedSkillNames={effectiveSelectedSkills.map(
+                (skill) => skill.name,
               )}
               onSelectSkill={handleSelectSkill}
               onRunSlashCommand={onRunSlashCommand}
@@ -1452,59 +1527,41 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             />
           </div>
 
-          {!compact && (
+          {!compact && controlLayout === 'inline' && (
             <div className="yolo-chat-user-input-controls">
               <div className="yolo-chat-user-input-controls__left">
                 <FileUploadButton onUpload={handleUploadFiles} />
-                <ModelSelect
-                  modelId={modelId}
-                  onChange={onModelChange}
-                  align="center"
-                  sideOffset={8}
-                  popover={{
-                    variant: 'default',
-                    minWidth: 240,
-                    maxWidth: 320,
-                    maxHeight: 560,
-                  }}
-                />
-                {showReasoningSelect && supportsReasoning(currentModel) && (
-                  <ReasoningSelect
-                    model={currentModel}
-                    value={resolvedReasoningLevel}
-                    onChange={(level) => onReasoningChange?.(level)}
-                    side="top"
-                    sideOffset={8}
-                  />
-                )}
+                {renderModelControl()}
+                {renderReasoningControl()}
               </div>
               <div className="yolo-chat-user-input-controls__right">
-                {contextUsage &&
-                  (contextUsage.buildBreakdownInputs ? (
-                    <ContextUsagePopover
-                      promptTokens={contextUsage.promptTokens}
-                      maxContextTokens={contextUsage.maxContextTokens}
-                      label={contextUsage.label}
-                      anchorRef={containerRef}
-                      buildInputs={contextUsage.buildBreakdownInputs}
-                    />
-                  ) : (
-                    <ContextUsageRing
-                      promptTokens={contextUsage.promptTokens}
-                      maxContextTokens={contextUsage.maxContextTokens}
-                      label={contextUsage.label}
-                    />
-                  ))}
-                <SubmitButton
-                  onClick={() => handleSubmit()}
-                  isGenerating={isGenerating}
-                  onAbort={onAbort}
-                  disabled={submitDisabled}
-                />
+                {renderContextUsageControl()}
+                {renderSubmitControl()}
+              </div>
+            </div>
+          )}
+
+          {!compact && controlLayout === 'composer-toolbar' && (
+            <div className="yolo-chat-user-input-send-row">
+              <FileUploadButton onUpload={handleUploadFiles} />
+              <div className="yolo-chat-user-input-send-row__right">
+                {renderContextUsageControl()}
+                {renderSubmitControl()}
               </div>
             </div>
           )}
         </div>
+        {!compact && controlLayout === 'composer-toolbar' && (
+          <div className="yolo-chat-user-input-toolbar">
+            <div className="yolo-chat-user-input-toolbar__left">
+              {renderChatModeControl()}
+            </div>
+            <div className="yolo-chat-user-input-toolbar__right">
+              {renderModelControl()}
+              {renderReasoningControl()}
+            </div>
+          </div>
+        )}
       </div>
     )
   },

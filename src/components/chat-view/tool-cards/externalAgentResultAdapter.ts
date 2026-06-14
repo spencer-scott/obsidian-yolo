@@ -1,10 +1,5 @@
-// Synthesize an internal async dispatch result message (ChatExternalAgentResultMessage)
-// into a regular ChatToolMessage, feeding it to the <ToolMessage> component to reuse
-// the full UI (collapsible header, headline summary, expanded ExternalAgentToolCard, etc.).
-//
-// This way the visual appearance of async results is identical to synchronously completed
-// tool cards. The only difference is the status badge shows "completed / failed / cancelled / timed out"
-// instead of "running".
+// Legacy display adapter for persisted external_agent_result messages.
+// Synthesizes a terminal_command tool card so old conversations stay readable.
 
 import { getLocalFileToolServerName } from '../../../core/mcp/localFileTools'
 import { getToolName } from '../../../core/mcp/tool-name-utils'
@@ -21,32 +16,31 @@ import {
 export function buildSynthToolMessageFromResult(
   message: ChatExternalAgentResultMessage,
 ): ChatToolMessage {
-  const request = buildSynthRequest(message)
-  const response = buildSynthResponse(message)
   return {
     role: 'tool',
     id: message.id,
-    toolCalls: [{ request, response }],
+    toolCalls: [
+      {
+        request: buildSynthRequest(message),
+        response: buildSynthResponse(message),
+      },
+    ],
   }
 }
 
 function buildSynthRequest(
   message: ChatExternalAgentResultMessage,
 ): ToolCallRequest {
-  // Use taskId as toolCallId - will not match stream bus snapshot, naturally falls back.
-  // arguments only contain provider + a short prompt (title), so headline summary
-  // can compose "{provider} | {title}" instead of the raw first 80 chars of stdout.
   return {
     id: `result-${message.taskId}`,
-    // Must use the full server-qualified name (e.g. yolo_local__delegate_external_agent),
-    // otherwise ToolMessage's parseToolName / displayNames cannot find the friendly label,
-    // and the headline will degrade to the raw tool name.
-    name: getToolName(getLocalFileToolServerName(), 'delegate_external_agent'),
+    name: getToolName(getLocalFileToolServerName(), 'terminal_command'),
     arguments: {
       kind: 'complete',
       value: {
-        provider: message.provider,
-        prompt: message.title,
+        command: message.title,
+        background: true,
+        stderr: message.stderr ?? '',
+        stdout: message.stdout ?? '',
       },
     },
   }
@@ -57,8 +51,6 @@ function buildSynthResponse(
 ): ToolCallResponse {
   const stdout = message.stdout ?? ''
   const stderr = message.stderr ?? ''
-  // ExternalAgentToolCard in the fallback path only reads response.data.text,
-  // so prepend stderr as progress context before stdout, separated by ---.
   const combined =
     stderr && stdout ? `${stderr}\n---\n${stdout}` : stderr || stdout
 

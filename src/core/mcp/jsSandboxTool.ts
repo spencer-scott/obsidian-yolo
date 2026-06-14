@@ -83,7 +83,6 @@ export type JsSandboxProxyHandlers = {
     method: 'search' | 'find' | 'get',
     params: Record<string, unknown>,
   ) => Promise<unknown>
-  externalScript?: (url: string) => Promise<string>
 }
 
 type JsSandboxCaps = {
@@ -160,6 +159,7 @@ type JsSandboxToolCallResult =
 
 const JS_SANDBOX_WORKER_SCRIPT = String.raw`
 const CHANNEL = 'yolo-js-sandbox-v1'
+const HTML_PARSE_MAX_INPUT_BYTES = 2 * 1024 * 1024
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 
 function deepFreeze(value) {
@@ -315,7 +315,41 @@ function matrixMultiply(a, b, options) {
   )
 }
 
-function createSandboxUtils() {
+function getStringByteLength(value) {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(value).length
+  }
+  return value.length
+}
+
+function normalizeHtmlInput(markup) {
+  const html = String(markup ?? '')
+  const byteLength = getStringByteLength(html)
+  if (byteLength > HTML_PARSE_MAX_INPUT_BYTES) {
+    throw new Error(
+      '$utils.html input exceeds ' + HTML_PARSE_MAX_INPUT_BYTES +
+      ' bytes. Pass a smaller HTML fragment or narrow the fetched response first.'
+    )
+  }
+  return html
+}
+
+function createSandboxHtmlUtils() {
+  return {
+    extract(markup, options) {
+      return proxyCall('html_extract', { html: normalizeHtmlInput(markup), options })
+    },
+    select(markup, selector, options) {
+      return proxyCall('html_select', {
+        html: normalizeHtmlInput(markup),
+        selector,
+        options
+      })
+    }
+  }
+}
+
+function createSandboxUtils(options) {
   const json = {
     flatten(value) {
       return flattenJson(value, '', [])
@@ -459,15 +493,30 @@ function createSandboxUtils() {
     }
   }
 
-  return deepFreeze({ json, text, stats, matrix, date })
+  const utils = { json, text, stats, matrix, date }
+  if (options && options.includeHtml) {
+    // HTML parsing is coupled to network/fetch mode: it is mainly for fetched
+    // web pages, and keeping it conditional avoids advertising extra surface
+    // to agents that cannot retrieve remote HTML in the first place.
+    utils.html = createSandboxHtmlUtils()
+  }
+
+  return deepFreeze(utils)
 }
 
-const SANDBOX_UTILS = createSandboxUtils()
+const SANDBOX_UTILS = createSandboxUtils({ includeHtml: false })
+const SANDBOX_UTILS_WITH_HTML = createSandboxUtils({ includeHtml: true })
 
 function disableAmbientCapabilities(allowScripts, allowFetch) {
   // allowScripts is the "full power" switch: once the model can pull in and
   // execute arbitrary remote code, any extra restriction we keep is theatre.
-  // Skip the lockdown entirely so imported scripts can use standard idioms.
+  // Skip the lockdown entirely — every ambient capability stays unlocked
+  // (fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon,
+  // importScripts, Worker, SharedWorker, indexedDB, caches), because real
+  // libraries depend on them. This pairs with skipping
+  // freezeBuiltinPrototypes() below: external-script mode is the explicit
+  // high-risk compatibility tradeoff, not partial isolation. The host
+  // already forces approval for any agent that enables this flag.
   if (allowScripts) {
     return
   }
@@ -591,16 +640,13 @@ function buildScope(rawVars) {
     } : null,
     $links: Array.isArray(rawVars && rawVars.$links) ? rawVars.$links : [],
     $tags: Array.isArray(rawVars && rawVars.$tags) ? rawVars.$tags : [],
-    $utils: SANDBOX_UTILS,
+    $utils: hostFetchAllowed ? SANDBOX_UTILS_WITH_HTML : SANDBOX_UTILS,
     $db: caps.allowDbQuery ? {
       search: (query, limit) => proxyCall('db_query', { method: 'search', query, limit }),
       find: (keyword, limit) => proxyCall('db_query', { method: 'find', keyword, limit }),
       get: (path) => proxyCall('db_query', { method: 'get', path })
     } : undefined,
-    $fetch: hostFetchAllowed ? hostFetch : undefined,
-    $loadScript: caps.allowExternalScripts
-      ? (url) => proxyCall('external_script', { url })
-      : undefined
+    $fetch: hostFetchAllowed ? hostFetch : undefined
   }
   // Network fetch: when network or external scripts are allowed, do NOT
   // shadow the global so user code resolves to browser-native fetch. When
@@ -822,6 +868,9 @@ function errorPayload(error) {
 // (e.g. Object.prototype.toJSON = () => 'fake') cannot corrupt serializeResult
 // or fool the host/LLM with falsified output. Only built-in prototypes are
 // frozen — user-defined classes and own properties remain fully mutable.
+// External script mode deliberately skips this: many UMD/browser libraries
+// patch prototypes during startup, and enabling that mode is already the
+// explicit high-risk compatibility tradeoff.
 function freezeBuiltinPrototypes() {
   const protos = [
     Object.prototype,
@@ -866,11 +915,25 @@ self.addEventListener('message', async (event) => {
 
   const caps = (data.vars && data.vars._caps) || {}
   if (!lockdownApplied) {
+    const allowExternalScripts = Boolean(caps.allowExternalScripts)
     disableAmbientCapabilities(
-      Boolean(caps.allowExternalScripts),
+      allowExternalScripts,
       Boolean(caps.allowFetch),
     )
-    freezeBuiltinPrototypes()
+    if (!allowExternalScripts) {
+      freezeBuiltinPrototypes()
+    } else {
+      // UMD/browser bundles probe typeof window !== "undefined" to decide
+      // where to attach exports. In a classic Worker, window is absent, so
+      // the probe fails and the bundle silently drops its exports — caller
+      // code then sees a ReferenceError when reaching for e.g. Algebrite.
+      // Aliasing window to self lets the probe succeed without exposing
+      // any new capability (self.fetch / self.document etc. are unchanged).
+      // Libraries that actually touch DOM still fail, but with a precise
+      // TypeError on window.document.* instead of an opaque importScripts
+      // load error.
+      self.window = self
+    }
     lockdownApplied = true
   }
 
@@ -901,6 +964,7 @@ self.addEventListener('message', async (event) => {
 const JS_SANDBOX_IFRAME_SCRIPT = String.raw`
 const CHANNEL = 'yolo-js-sandbox-v1'
 const WORKER_SCRIPT = ${JSON.stringify(JS_SANDBOX_WORKER_SCRIPT)}
+const HTML_PARSE_MAX_INPUT_BYTES = 2 * 1024 * 1024
 const workers = new Map()
 
 function postToParent(payload) {
@@ -916,6 +980,255 @@ function cleanupWorker(reqId) {
   } catch {
     // ignore
   }
+}
+
+function clampInteger(value, fallback, min, max) {
+  const number = typeof value === 'number' && Number.isFinite(value)
+    ? Math.floor(value)
+    : fallback
+  return Math.min(max, Math.max(min, number))
+}
+
+function normalizeWhitespace(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function truncateString(value, maxChars) {
+  const text = String(value || '')
+  const limit = Math.max(0, Math.floor(Number(maxChars) || 0))
+  if (text.length <= limit) return text
+  if (limit === 0) return ''
+  if (limit <= 3) return '.'.repeat(limit)
+  return Array.from(text).slice(0, limit - 3).join('') + '...'
+}
+
+function resolveHtmlUrl(value, baseUrl) {
+  const raw = String(value || '').trim()
+  if (!raw) return raw
+  if (typeof baseUrl !== 'string' || baseUrl.trim() === '') return raw
+  try {
+    return new URL(raw, baseUrl).href
+  } catch {
+    return raw
+  }
+}
+
+function getStringByteLength(value) {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(value).length
+  }
+  return value.length
+}
+
+function getPayloadOptions(payload) {
+  return payload && payload.options && typeof payload.options === 'object'
+    ? payload.options
+    : {}
+}
+
+function parseHtmlDocument(payload) {
+  if (typeof DOMParser !== 'function') {
+    throw new Error('DOMParser is not available in this JavaScript sandbox.')
+  }
+  const html = String(payload.html || '')
+  if (getStringByteLength(html) > HTML_PARSE_MAX_INPUT_BYTES) {
+    throw new Error(
+      '$utils.html input exceeds ' + HTML_PARSE_MAX_INPUT_BYTES +
+      ' bytes. Pass a smaller HTML fragment or narrow the fetched response first.'
+    )
+  }
+  return new DOMParser().parseFromString(html, 'text/html')
+}
+
+function collectElementAttrs(element, baseUrl) {
+  const attrs = Object.create(null)
+  for (const attr of Array.from(element.attributes || [])) {
+    attrs[attr.name] = truncateString(attr.value, 1000)
+  }
+  if (attrs.href) attrs.href = resolveHtmlUrl(attrs.href, baseUrl)
+  if (attrs.src) attrs.src = resolveHtmlUrl(attrs.src, baseUrl)
+  return attrs
+}
+
+function elementToSummary(element, options) {
+  const baseUrl = typeof options.baseUrl === 'string' ? options.baseUrl : ''
+  const textMaxChars = clampInteger(options.textMaxChars, 4000, 200, 20000)
+  const result = {
+    tag: element.tagName.toLowerCase(),
+    text: truncateString(normalizeWhitespace(element.textContent), textMaxChars),
+    attrs: collectElementAttrs(element, baseUrl)
+  }
+  if (options.includeHtml === true) {
+    result.html = truncateString(
+      element.outerHTML || '',
+      clampInteger(options.htmlMaxChars, 8000, 500, 50000)
+    )
+  }
+  return result
+}
+
+function getDocumentBaseUrl(document, options) {
+  const fallback = typeof options.baseUrl === 'string' ? options.baseUrl.trim() : ''
+  const base = document.querySelector('base[href]')
+  const baseHref = base ? String(base.getAttribute('href') || '').trim() : ''
+  if (!baseHref) return fallback
+  if (fallback) {
+    try {
+      return new URL(baseHref, fallback).href
+    } catch {
+      return fallback
+    }
+  }
+  try {
+    return new URL(baseHref).href
+  } catch {
+    return ''
+  }
+}
+
+function extractPageText(document, maxChars) {
+  const source = document.body || document.documentElement
+  if (!source) return ''
+  // Scripts/styles never execute through DOMParser, but removing noisy nodes
+  // gives models the page text they usually wanted from an HTML scrape. The
+  // parsed document is single-use, so mutate it instead of cloning the body.
+  source
+    .querySelectorAll('script,style,noscript,svg,canvas,template')
+    .forEach((node) => node.remove())
+  return truncateString(normalizeWhitespace(source.textContent), maxChars)
+}
+
+function collectItems(document, selector, limit, mapElement) {
+  const results = []
+  for (const element of document.querySelectorAll(selector)) {
+    const item = mapElement(element)
+    if (item) {
+      results.push(item)
+      if (results.length >= limit) break
+    }
+  }
+  return results
+}
+
+function extractHtmlPage(payload) {
+  const options = getPayloadOptions(payload)
+  const document = parseHtmlDocument(payload)
+  const baseUrl = getDocumentBaseUrl(document, options)
+  const maxItems = clampInteger(options.maxItems, 100, 1, 500)
+  const maxTextChars = clampInteger(options.maxTextChars, 20000, 1000, 100000)
+  const meta = Object.create(null)
+
+  for (const node of Array.from(
+    document.querySelectorAll('meta[name],meta[property]')
+  )) {
+    const key = node.getAttribute('name') || node.getAttribute('property')
+    const content = node.getAttribute('content')
+    if (key && content && meta[key] === undefined) {
+      meta[key] = truncateString(content, 2000)
+    }
+  }
+
+  const headings = collectItems(
+    document,
+    'h1,h2,h3,h4,h5,h6',
+    maxItems,
+    (node) => {
+      const text = truncateString(normalizeWhitespace(node.textContent), 1000)
+      return text
+        ? {
+            level: Number(node.tagName.slice(1)),
+            text
+          }
+        : null
+    }
+  )
+
+  const links = collectItems(document, 'a[href]', maxItems, (node) => {
+    const href = resolveHtmlUrl(node.getAttribute('href') || '', baseUrl)
+    return href
+      ? {
+          text: truncateString(normalizeWhitespace(node.textContent), 1000),
+          href
+        }
+      : null
+  })
+
+  const images = collectItems(document, 'img[src]', maxItems, (node) => {
+    const src = resolveHtmlUrl(node.getAttribute('src') || '', baseUrl)
+    return src
+      ? {
+          alt: truncateString(node.getAttribute('alt') || '', 1000),
+          src
+        }
+      : null
+  })
+
+  return {
+    title: normalizeWhitespace(document.querySelector('title')?.textContent),
+    lang: document.documentElement?.getAttribute('lang') || null,
+    text: extractPageText(document, maxTextChars),
+    meta,
+    headings,
+    links,
+    images
+  }
+}
+
+function selectHtmlElements(payload) {
+  const options = getPayloadOptions(payload)
+  const selector = typeof payload.selector === 'string' ? payload.selector : ''
+  if (!selector.trim()) {
+    throw new Error('selector must be a non-empty CSS selector.')
+  }
+  const document = parseHtmlDocument(payload)
+  const baseUrl = getDocumentBaseUrl(document, options)
+  const limit = clampInteger(options.limit, 50, 1, 200)
+  const results = []
+  for (const element of document.querySelectorAll(selector)) {
+    results.push(elementToSummary(element, { ...options, baseUrl }))
+    if (results.length >= limit) break
+  }
+  return results
+}
+
+function sendWorkerProxyResponse(entry, proxyId, value, error) {
+  entry.worker.postMessage({
+    channel: CHANNEL,
+    type: 'proxy_res',
+    proxyId,
+    value,
+    error
+  })
+}
+
+function handleLocalProxyRequest(entry, payload) {
+  if (payload.cap !== 'html_extract' && payload.cap !== 'html_select') {
+    return false
+  }
+  if (!entry.allowHtml) {
+    sendWorkerProxyResponse(
+      entry,
+      payload.proxyId,
+      undefined,
+      '$utils.html is not enabled'
+    )
+    return true
+  }
+  try {
+    const value =
+      payload.cap === 'html_extract'
+        ? extractHtmlPage(payload.payload || {})
+        : selectHtmlElements(payload.payload || {})
+    sendWorkerProxyResponse(entry, payload.proxyId, value)
+  } catch (error) {
+    sendWorkerProxyResponse(
+      entry,
+      payload.proxyId,
+      undefined,
+      error && error.message ? String(error.message) : String(error)
+    )
+  }
+  return true
 }
 
 function startRun(data) {
@@ -945,7 +1258,12 @@ function startRun(data) {
     return
   }
 
-  workers.set(data.reqId, { worker, token })
+  const caps = (data.vars && data.vars._caps) || {}
+  workers.set(data.reqId, {
+    worker,
+    token,
+    allowHtml: Boolean(caps.allowFetch || caps.allowExternalScripts)
+  })
 
   worker.onmessage = (event) => {
     const payload = event.data
@@ -960,6 +1278,9 @@ function startRun(data) {
     }
     // Proxy request from Worker → forward to parent host, keep worker alive.
     if (payload.type === 'proxy_req') {
+      if (handleLocalProxyRequest(entry, payload)) {
+        return
+      }
       postToParent({
         type: 'proxy_req',
         reqId: data.reqId,
@@ -1671,22 +1992,6 @@ class JsSandboxRunner {
         const method = payload.method as 'search' | 'find' | 'get'
         const result = await handlers.dbQuery(method, payload)
         this.sendProxyResponse(reqId, proxyId, result)
-        return
-      }
-
-      if (cap === 'external_script') {
-        if (!handlers?.externalScript) {
-          this.sendProxyResponse(
-            reqId,
-            proxyId,
-            undefined,
-            'external scripts are not enabled',
-          )
-          return
-        }
-        const url = typeof payload.url === 'string' ? payload.url : ''
-        const scriptText = await handlers.externalScript(url)
-        this.sendProxyResponse(reqId, proxyId, scriptText)
         return
       }
 

@@ -97,40 +97,22 @@ describe('collectToolCallPaths', () => {
     ).toEqual(['a.md', 'b.md'])
   })
 
-  it('extracts paths from batch items[] for fs_create_file', () => {
+  it('extracts path for fs_write', () => {
     expect(
-      collectToolCallPaths('fs_create_file', {
-        items: [
-          { path: 'a.md', content: '' },
-          { path: 'b.md', content: '' },
-        ],
-      }),
-    ).toEqual(['a.md', 'b.md'])
+      collectToolCallPaths('fs_write', { path: 'a.md', content: '' }),
+    ).toEqual(['a.md'])
   })
 
-  it('extracts oldPath + newPath from batch items[] for fs_move', () => {
+  it('extracts path for fs_delete', () => {
     expect(
-      collectToolCallPaths('fs_move', {
-        items: [
-          { oldPath: 'a.md', newPath: 'b.md' },
-          { oldPath: 'c.md', newPath: 'd.md' },
-        ],
-      }),
-    ).toEqual(['a.md', 'b.md', 'c.md', 'd.md'])
+      collectToolCallPaths('fs_delete', { path: 'a.md', recursive: true }),
+    ).toEqual(['a.md'])
   })
 
   it('ignores empty strings and non-string values', () => {
     expect(collectToolCallPaths('fs_list', { path: '  ' })).toEqual([])
     expect(
       collectToolCallPaths('fs_read', { paths: ['a.md', 42, null] }),
-    ).toEqual(['a.md'])
-  })
-
-  it('skips non-object items in batch', () => {
-    expect(
-      collectToolCallPaths('fs_delete_file', {
-        items: [null, 'string', { path: 'a.md' }],
-      }),
     ).toEqual(['a.md'])
   })
 })
@@ -166,42 +148,64 @@ describe('findPathOutsideScope', () => {
     ).toBe('secret/a.md')
   })
 
-  it('catches out-of-scope batch items for fs_delete_file', () => {
+  it('catches out-of-scope path for fs_delete', () => {
     expect(
       findPathOutsideScope(
-        'fs_delete_file',
-        { items: [{ path: 'allowed/a.md' }, { path: 'secret/b.md' }] },
+        'fs_delete',
+        { path: 'secret/b.md' },
         scope({ include: ['allowed'] }),
       ),
     ).toBe('secret/b.md')
-  })
-
-  it('catches out-of-scope batch fs_move items', () => {
-    expect(
-      findPathOutsideScope(
-        'fs_move',
-        {
-          items: [
-            { oldPath: 'allowed/a.md', newPath: 'allowed/b.md' },
-            { oldPath: 'allowed/c.md', newPath: 'secret/c.md' },
-          ],
-        },
-        scope({ include: ['allowed'] }),
-      ),
-    ).toBe('secret/c.md')
   })
 
   it('returns null when all paths are allowed', () => {
     expect(
       findPathOutsideScope(
         'fs_move',
-        {
-          items: [
-            { oldPath: 'allowed/a.md', newPath: 'allowed/b.md' },
-            { oldPath: 'allowed/c.md', newPath: 'allowed/d.md' },
-          ],
-        },
+        { oldPath: 'allowed/a.md', newPath: 'allowed/b.md' },
         scope({ include: ['allowed'] }),
+      ),
+    ).toBeNull()
+  })
+
+  it('exempts listed skill paths from workspace scope', () => {
+    const exemptPaths = new Set(['YOLO/skills/demo/SKILL.md'])
+    expect(
+      findPathOutsideScope(
+        'fs_read',
+        { paths: ['YOLO/skills/demo/SKILL.md'] },
+        scope({ include: ['Notes'] }),
+        { exemptPaths },
+      ),
+    ).toBeNull()
+    expect(
+      findPathOutsideScope(
+        'fs_read',
+        { paths: ['YOLO/skills/other/SKILL.md'] },
+        scope({ include: ['Notes'] }),
+        { exemptPaths },
+      ),
+    ).toBe('YOLO/skills/other/SKILL.md')
+  })
+
+  it('exempts builtin skill paths from workspace scope', () => {
+    const exemptPaths = new Set(['builtin://skills/skill-creator.md'])
+    expect(
+      findPathOutsideScope(
+        'fs_read',
+        { paths: ['builtin://skills/skill-creator.md'] },
+        scope({ include: ['Notes'] }),
+        { exemptPaths },
+      ),
+    ).toBeNull()
+  })
+
+  it('exempts browser:// paths from workspace scope', () => {
+    expect(
+      findPathOutsideScope(
+        'fs_read',
+        { paths: ['browser://page_ab12cd34_ef56gh78'] },
+        scope({ include: ['Notes'] }),
       ),
     ).toBeNull()
   })

@@ -1,4 +1,4 @@
-import { App, Notice, normalizePath } from 'obsidian'
+import { App, Notice, Platform, normalizePath } from 'obsidian'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -13,10 +13,6 @@ import { useSettings } from '../../../contexts/settings-context'
 import { ensureJsonDbRootDir } from '../../../core/paths/yoloManagedData'
 import { ChatManager } from '../../../database/json/chat/ChatManager'
 import { clearAllEditReviewSnapshotStores } from '../../../database/json/chat/editReviewSnapshotStore'
-import {
-  EXTERNAL_AGENT_PROGRESS_DIR,
-  clearAllExternalAgentProgressStores,
-} from '../../../database/json/chat/externalAgentProgressStore'
 import { clearImageCache } from '../../../database/json/chat/imageCacheStore'
 import { clearPdfTextCache } from '../../../database/json/chat/pdfTextCacheStore'
 import { clearAllPromptSnapshotStores } from '../../../database/json/chat/promptSnapshotStore'
@@ -53,8 +49,21 @@ const TIMELINE_HEIGHT_CACHE_DIR = 'timeline_height_cache'
 const IMAGE_CACHE_DIR = 'image_cache'
 const PDF_CACHE_DIR = 'pdf_cache'
 const DEBUG_LOGS_DIR = 'YOLO/logs'
-// re-exported from store so EtcSection doesn't hardcode the dir name
-const AGENT_PROGRESS_DIR = EXTERNAL_AGENT_PROGRESS_DIR
+/** Legacy cache dir from removed delegate_external_agent tool. */
+const LEGACY_EXTERNAL_AGENT_PROGRESS_DIR = 'external_agent_progress'
+
+const clearLegacyExternalAgentProgressDir = async (
+  app: App,
+  settings: Parameters<typeof ensureJsonDbRootDir>[1],
+): Promise<void> => {
+  const rootDir = await ensureJsonDbRootDir(app, settings)
+  const path = normalizePath(
+    `${rootDir}/${CHAT_DIR}/${LEGACY_EXTERNAL_AGENT_PROGRESS_DIR}`,
+  )
+  if (await app.vault.adapter.exists(path)) {
+    await app.vault.adapter.rmdir(path, true)
+  }
+}
 
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) {
@@ -122,7 +131,10 @@ const loadStorageUsage = async (
     getPathSize(app, normalizePath(`${chatDir}/${TIMELINE_HEIGHT_CACHE_DIR}`)),
     getPathSize(app, normalizePath(`${chatDir}/${IMAGE_CACHE_DIR}`)),
     getPathSize(app, normalizePath(`${chatDir}/${PDF_CACHE_DIR}`)),
-    getPathSize(app, normalizePath(`${chatDir}/${AGENT_PROGRESS_DIR}`)),
+    getPathSize(
+      app,
+      normalizePath(`${chatDir}/${LEGACY_EXTERNAL_AGENT_PROGRESS_DIR}`),
+    ),
   ])
 
   const snapshotAndCacheBytes =
@@ -152,6 +164,7 @@ const StorageBadge = ({ value }: { value: number | null }) => {
 export function EtcSection({ app, plugin, className }: EtcSectionProps) {
   const { settings, setSettings } = useSettings()
   const { t } = useLanguage()
+  const canSelfUpdate = plugin.canSelfUpdatePlugin()
   const yoloBaseDir = settings.yolo?.baseDir ?? 'YOLO'
   const [storageUsage, setStorageUsage] = useState<StorageUsage>({
     chatHistoryBytes: null,
@@ -240,6 +253,19 @@ export function EtcSection({ app, plugin, className }: EtcSectionProps) {
     )
   }
 
+  const handlePluginAutoUpdateChange = (value: boolean) => {
+    void (async () => {
+      try {
+        await setSettings({
+          ...settings,
+          pluginUpdateAutoDownloadEnabled: value,
+        })
+      } catch (error: unknown) {
+        console.error('Failed to update plugin auto-update setting', error)
+      }
+    })()
+  }
+
   const handleCaptureRawRequestDebugChange = (value: boolean) => {
     const shouldPromptExcludeLogs =
       value && !isDebugLogsExcludedFromKnowledgeBase()
@@ -312,6 +338,8 @@ export function EtcSection({ app, plugin, className }: EtcSectionProps) {
           for (const meta of list) {
             await manager.deleteChat(meta.id)
           }
+          // Drop all frozen system prompts so no snapshot outlives its conversation.
+          plugin.getAgentService().clearSystemPromptSnapshots()
           const nextUsage = await loadStorageUsage(app, settings)
           setStorageUsage(nextUsage)
           // Notify UI hooks (useChatHistory) to refresh chat list immediately
@@ -371,7 +399,7 @@ export function EtcSection({ app, plugin, className }: EtcSectionProps) {
           await clearAllTimelineHeightCacheStores(app, settings)
           await clearImageCache(app, settings)
           await clearPdfTextCache(app, settings)
-          await clearAllExternalAgentProgressStores(app, settings)
+          await clearLegacyExternalAgentProgressDir(app, settings)
           const nextUsage = await loadStorageUsage(app, settings)
           setStorageUsage(nextUsage)
           new Notice(t('settings.etc.clearChatSnapshotsSuccess'))
@@ -419,6 +447,28 @@ export function EtcSection({ app, plugin, className }: EtcSectionProps) {
         </div>
 
         <div className="yolo-settings-block-content">
+          <ObsidianSetting
+            name={t('settings.etc.pluginAutoUpdate', 'Auto-download updates')}
+            desc={
+              Platform.isDesktop && canSelfUpdate
+                ? t(
+                    'settings.etc.pluginAutoUpdateDesc',
+                    'When enabled, new versions are downloaded in the background as soon as they are detected.',
+                  )
+                : t(
+                    'settings.etc.pluginAutoUpdateDescUnavailable',
+                    'One-click install is only available on desktop with a writable plugin directory; on this device, update manually via community plugins or GitHub.',
+                  )
+            }
+            className="yolo-settings-card"
+          >
+            <ObsidianToggle
+              value={settings.pluginUpdateAutoDownloadEnabled ?? true}
+              onChange={handlePluginAutoUpdateChange}
+              disabled={!Platform.isDesktop || !canSelfUpdate}
+            />
+          </ObsidianSetting>
+
           <ObsidianSetting
             name={t('settings.etc.exportConfig', 'Export Config')}
             desc={t(
