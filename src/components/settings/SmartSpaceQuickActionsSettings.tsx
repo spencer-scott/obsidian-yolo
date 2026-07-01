@@ -148,7 +148,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Add summary',
     instructionKey:
       'chat.customContinueSections.writing.items.summarize.instruction',
-    instructionFallback: 'Please write a concise summary of the current content.',
+    instructionFallback:
+      'Please write a concise summary of the current content.',
   },
   {
     id: 'todo',
@@ -158,7 +159,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Add to-do list',
     instructionKey:
       'chat.customContinueSections.writing.items.todo.instruction',
-    instructionFallback: 'Please organize an actionable to-do list based on the current content.',
+    instructionFallback:
+      'Please organize an actionable to-do list based on the current content.',
   },
   {
     id: 'flowchart',
@@ -168,7 +170,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Create flowchart',
     instructionKey:
       'chat.customContinueSections.writing.items.flowchart.instruction',
-    instructionFallback: 'Please organize the current key points into a flowchart or step-by-step explanation.',
+    instructionFallback:
+      'Please organize the current key points into a flowchart or step-by-step explanation.',
   },
   {
     id: 'table',
@@ -178,7 +181,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Create table',
     instructionKey:
       'chat.customContinueSections.writing.items.table.instruction',
-    instructionFallback: 'Please organize the current information into a table with appropriate column headers.',
+    instructionFallback:
+      'Please organize the current information into a table with appropriate column headers.',
   },
   {
     id: 'freewrite',
@@ -188,7 +192,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Free writing',
     instructionKey:
       'chat.customContinueSections.writing.items.freewrite.instruction',
-    instructionFallback: 'Please freely continue writing new paragraphs based on the context.',
+    instructionFallback:
+      'Please freely continue writing new paragraphs based on the context.',
   },
   {
     id: 'brainstorm',
@@ -208,7 +213,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Analyze key points',
     instructionKey:
       'chat.customContinueSections.thinking.items.analyze.instruction',
-    instructionFallback: 'Please briefly analyze the key points, risks, or opportunities in the current content.',
+    instructionFallback:
+      'Please briefly analyze the key points, risks, or opportunities in the current content.',
   },
   {
     id: 'dialogue',
@@ -218,7 +224,8 @@ const DEFAULT_ACTION_CONFIGS: DefaultActionConfig[] = [
     labelFallback: 'Follow-up questions',
     instructionKey:
       'chat.customContinueSections.thinking.items.dialogue.instruction',
-    instructionFallback: 'Please provide some follow-up questions for deeper discussion.',
+    instructionFallback:
+      'Please provide some follow-up questions for deeper discussion.',
   },
 ]
 
@@ -280,7 +287,10 @@ export function SmartSpaceQuickActionsSettings({
         <div className="yolo-smart-space-settings-row">
           <div className="yolo-settings-desc">{actionsCountLabel}</div>
           <ObsidianButton
-            text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
+            text={t(
+              'settings.smartSpace.configureActions',
+              'Configure quick actions',
+            )}
             onClick={handleOpenModal}
           />
         </div>
@@ -303,7 +313,10 @@ export function SmartSpaceQuickActionsSettings({
       >
         <div className="yolo-settings-desc">{actionsCountLabel}</div>
         <ObsidianButton
-          text={t('settings.smartSpace.configureActions', 'Configure quick actions')}
+          text={t(
+            'settings.smartSpace.configureActions',
+            'Configure quick actions',
+          )}
           onClick={handleOpenModal}
         />
       </ObsidianSetting>
@@ -317,7 +330,10 @@ export function SmartSpaceQuickActionsSettingsContent() {
   const { t } = useLanguage()
   const categoryOptions = useMemo(
     () => ({
-      suggestions: t('settings.smartSpace.categories.suggestions', 'Suggestions'),
+      suggestions: t(
+        'settings.smartSpace.categories.suggestions',
+        'Suggestions',
+      ),
       writing: t('settings.smartSpace.categories.writing', 'Writing'),
       thinking: t(
         'settings.smartSpace.categories.thinking',
@@ -618,7 +634,10 @@ export function SmartSpaceQuickActionsSettingsContent() {
 
           <ObsidianSetting
             name={t('settings.smartSpace.actionCategory', 'Category')}
-            desc={t('settings.smartSpace.actionCategoryDesc', 'Category this action belongs to')}
+            desc={t(
+              'settings.smartSpace.actionCategoryDesc',
+              'Category this action belongs to',
+            )}
           >
             <ObsidianDropdown
               value={editingAction.category || 'custom'}
@@ -775,7 +794,10 @@ function QuickActionItem({
         <div className="yolo-quick-action-drag-handle">
           <span
             className={`yolo-drag-handle ${isDragging ? 'yolo-drag-handle--active' : ''}`}
-            aria-label={t('settings.smartSpace.dragHandleAria', 'Drag to reorder')}
+            aria-label={t(
+              'settings.smartSpace.dragHandleAria',
+              'Drag to reorder',
+            )}
             {...listeners}
           >
             <GripVertical size={16} />
@@ -799,7 +821,9 @@ function QuickActionItem({
             }}
             icon={isEditing ? 'x' : 'pencil'}
             tooltip={
-              isEditing ? t('common.cancel', 'Cancel') : t('common.edit', 'Edit')
+              isEditing
+                ? t('common.cancel', 'Cancel')
+                : t('common.edit', 'Edit')
             }
           />
           <ObsidianButton
@@ -865,7 +889,10 @@ function QuickActionItem({
 
           <ObsidianSetting
             name={t('settings.smartSpace.actionCategory', 'Category')}
-            desc={t('settings.smartSpace.actionCategoryDesc', 'Category this action belongs to')}
+            desc={t(
+              'settings.smartSpace.actionCategoryDesc',
+              'Category this action belongs to',
+            )}
           >
             <ObsidianDropdown
               value={currentEditing.category || 'custom'}

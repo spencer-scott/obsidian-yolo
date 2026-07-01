@@ -441,7 +441,9 @@ function ConnectivityTestPanel({
           <Activity size={16} />
         </span>
         <div className="yolo-connectivity-header-text">
-          <h3>{t('settings.models.connectivityTest.title', 'Connectivity test')}</h3>
+          <h3>
+            {t('settings.models.connectivityTest.title', 'Connectivity test')}
+          </h3>
           <p className="yolo-connectivity-header-sub">
             {provider.id}
             {baseUrl ? ` · ${baseUrl}` : ''}

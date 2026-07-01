@@ -139,6 +139,8 @@ export type TranslationKeys = {
       name: string
       desc: string
       buyMeACoffee: string
+      reportBug: string
+      featureRequest: string
     }
     defaults: {
       title: string
@@ -208,6 +210,8 @@ export type TranslationKeys = {
       tools?: string
       toolsCount?: string
       toolsCountWithEnabled?: string
+      mcpLoadingStatus?: string
+      mcpErrorStatus?: string
       skills?: string
       skillsCount?: string
       skillsCountWithEnabled?: string
@@ -387,8 +391,10 @@ export type TranslationKeys = {
       toolApproval?: string
       toolApprovalFullAccess?: string
       toolApprovalRequire?: string
-      toolApprovalForced?: string
+      toolDisclosureAuto?: string
+      toolDisclosureAutoSelect?: string
       toolDisclosureAlways?: string
+      toolDisclosureMixed?: string
       toolDisclosureOnDemand?: string
       editorEnabled?: string
       editorDisabled?: string
@@ -457,6 +463,12 @@ export type TranslationKeys = {
       jsSandboxAllowVaultRead?: string
       jsSandboxAllowVaultReadDesc?: string
       jsSandboxAllowVaultReadConfirm?: string
+      jsSandboxAllowBrowserRead?: string
+      jsSandboxAllowBrowserReadDesc?: string
+      jsSandboxAllowBrowserReadRisk?: string
+      jsSandboxAllowBrowserReadConfirm?: string
+      jsSandboxBrowserReadMaxKb?: string
+      jsSandboxBrowserReadMaxKbDesc?: string
       jsSandboxAllowDbQuery?: string
       jsSandboxAllowDbQueryDesc?: string
       jsSandboxAllowDbQueryConfirm?: string
@@ -465,7 +477,6 @@ export type TranslationKeys = {
       jsSandboxAllowExternalScriptsRisk?: string
       jsSandboxAllowExternalScriptsConfirm?: string
       jsSandboxConfirmEnableTitle?: string
-      jsExecApprovalForced?: string
       jsSandboxTimeoutMs?: string
       jsSandboxTimeoutMsDesc?: string
       jsSandboxOutputMaxKb?: string
@@ -608,6 +619,7 @@ export type TranslationKeys = {
       baseUrl: string
       baseUrlDesc: string
       baseUrlPlaceholder: string
+      apiUrlPreviewLabel: string
       noStainlessHeaders: string
       noStainlessHeadersDesc: string
       useObsidianRequestUrl: string
@@ -618,6 +630,11 @@ export type TranslationKeys = {
       requestTransportModeBrowser: string
       requestTransportModeObsidian: string
       requestTransportModeNode: string
+      responseStreamingMode: string
+      responseStreamingModeDesc: string
+      responseStreamingModeAuto: string
+      responseStreamingModeStreaming: string
+      responseStreamingModeNonStreaming: string
       promptCaching: string
       promptCachingDesc: string
       customHeaders: string
@@ -1345,10 +1362,13 @@ export type TranslationKeys = {
     selectModel: string
     uploadImage: string
     uploadFile?: string
+    dropFilesHint?: string
     imageUnsupportedByModel?: string
     unsupportedFileType?: string
     processImagesFailed?: string
     readPdfFailed?: string
+    readOfficeFailed?: string
+    readTextAttachmentFailed?: string
     addContext: string
     applyChanges: string
     copyMessage: string
@@ -1488,6 +1508,20 @@ export type TranslationKeys = {
     }
     errorCard?: {
       title?: string
+      responseFormat?: {
+        responseNotObject?: string
+        missingChoices?: string
+        invalidChoices?: string
+        stage?: string
+        expected?: string
+        expectedChoicesArray?: string
+        responseFields?: string
+        upstreamError?: string
+        errorType?: string
+        errorCode?: string
+        upstreamMessage?: string
+        responsePreview?: string
+      }
     }
     showMore?: string
     showLess?: string
@@ -1582,6 +1616,15 @@ export type TranslationKeys = {
       statusFailed?: string
       toolUseCount?: string
       tokenCount?: string
+      approval?: {
+        heading?: string
+        headingMulti?: string
+        approve?: string
+        reject?: string
+        approveAll?: string
+        rejectAll?: string
+        viewDetails?: string
+      }
     }
     // conversation settings popover
     conversationSettings?: {
@@ -1746,6 +1789,8 @@ export type TranslationKeys = {
     agentDesc?: string
     agentFull?: string
     agentFullDesc?: string
+    yolo?: string
+    yoloDesc?: string
     warning?: {
       title?: string
       description?: string
@@ -1798,6 +1843,8 @@ export type TranslationKeys = {
       selectNone: string
       sensitive: string
       redactedOption: string
+      confirmUnredactedTitle: string
+      confirmUnredacted: string
       submit: string
       cancel: string
       noticeAtLeastOne: string
@@ -1837,7 +1884,6 @@ export type TranslationKeys = {
       errorInvalidFormatVersion: string
       errorInvalidSettingsVersion: string
       errorFileFromNewerVersion: string
-      errorFileFromOlderVersion: string
       errorEmptyKeys: string
       errorMissingData: string
       errorTampered: string
@@ -1845,7 +1891,6 @@ export type TranslationKeys = {
       errorVaultParseFailed: string
       errorVaultMissingVersion: string
       errorVaultFromNewerVersion: string
-      errorVaultFromOlderVersion: string
       errorVaultEmpty: string
       errorApplyVersionMismatch: string
       errorApplySchema: string
@@ -1883,8 +1928,8 @@ export type TranslationKeys = {
     dismiss: string
     languageEnglish: string
     languageChinese: string
-    muteThisVersion: string
     viewHistory?: string
+    skipVersion?: string
     historyTitle?: string
     historyLoading?: string
     historyError?: string
@@ -1894,7 +1939,11 @@ export type TranslationKeys = {
     historyNext?: string
     installationIncompleteTitle: string
     installationIncompleteMeta: string
+    installationIncompleteSuspects: string
     installationIncompleteNotes: string
+    tryRepair: string
+    repairing: string
+    repairAndReload: string
     downloadUpdate: string
     downloading: string
     installAndReload: string

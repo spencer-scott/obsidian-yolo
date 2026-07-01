@@ -543,7 +543,10 @@ function SmartSpacePanelBody({
       const sections: Section[] = []
 
       const categoryTitles: Record<string, string> = {
-        suggestions: t('chat.customContinueSections.suggestions.title', 'Suggestions'),
+        suggestions: t(
+          'chat.customContinueSections.suggestions.title',
+          'Suggestions',
+        ),
         writing: t('chat.customContinueSections.writing.title', 'Writing'),
         thinking: t(
           'chat.customContinueSections.thinking.title',
@@ -810,7 +813,10 @@ function SmartSpacePanelBody({
         setError(
           err instanceof Error
             ? err.message
-            : t('chat.customContinueError', 'Smart continuation failed, please try again'),
+            : t(
+                'chat.customContinueError',
+                'Smart continuation failed, please try again',
+              ),
         )
       } finally {
         setIsSubmitting(false)
@@ -1037,7 +1043,10 @@ function SmartSpacePanelBody({
                   isSubmitConfirmPending) && (
                   <div className="yolo-smart-space-input-hint">
                     {isSubmitConfirmPending
-                      ? t('chat.customContinueConfirmHint', 'Press Enter again to confirm')
+                      ? t(
+                          'chat.customContinueConfirmHint',
+                          'Press Enter again to confirm',
+                        )
                       : t('chat.customContinueHint', 'Press Enter to submit')}
                   </div>
                 )}

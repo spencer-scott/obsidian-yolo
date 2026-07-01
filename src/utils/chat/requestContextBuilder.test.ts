@@ -464,7 +464,9 @@ describe('RequestContextBuilder compileUserMessagePrompt', () => {
 
     const textContent = getTextContent(result.promptContent)
 
-    expect(textContent).toContain('    - `title`: `Tool Context Management Explained`')
+    expect(textContent).toContain(
+      '    - `title`: `Tool Context Management Explained`',
+    )
     expect(textContent).toContain(
       '    - `exported_at`: `2026-04-09T12:10:14.480Z`',
     )
@@ -1148,7 +1150,8 @@ describe('RequestContextBuilder generateRequestMessages', () => {
         {
           role: 'assistant',
           id: 'assistant-after-compact',
-          content: 'Context compaction is complete. Now we can continue working.',
+          content:
+            'Context compaction is complete. Now we can continue working.',
         },
         {
           role: 'user',
@@ -1934,6 +1937,38 @@ describe('RequestContextBuilder system prompt freezing', () => {
 
   afterAll(() => {
     memMock.mockResolvedValue({ global: null, assistant: null })
+  })
+
+  it('refreshes the frozen prompt when on-demand tool availability changes', async () => {
+    const store = new SystemPromptSnapshotStore()
+    const builder = new RequestContextBuilder(makeApp(), baseSettings, {
+      includeSkills: false,
+      systemPromptSnapshotStore: store,
+    })
+
+    memMock.mockResolvedValue({ global: null, assistant: null })
+
+    const withoutOnDemand = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-on-demand',
+      hasTools: true,
+      hasOnDemandTools: false,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(withoutOnDemand)).not.toContain('ON-DEMAND')
+
+    const withOnDemand = await builder.generateRequestMessages({
+      messages: userMessages,
+      model,
+      conversationId: 'conv-on-demand',
+      hasTools: true,
+      hasOnDemandTools: true,
+      systemPromptSnapshotMode: 'create',
+    })
+    expect(getSystemContent(withOnDemand)).toContain(
+      'Some tools are ON-DEMAND stubs',
+    )
   })
 
   it('freezes memory in the system prompt for the conversation lifetime (create mode)', async () => {

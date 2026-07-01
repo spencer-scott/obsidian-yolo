@@ -133,8 +133,12 @@ describe('memoryManager', () => {
 
     const fileContent = readByPath(first.filePath)
     expect(fileContent).not.toContain('Profile_1')
-    expect(fileContent).toContain('- Profile_2: User is working on the YOLO plugin')
-    expect(fileContent).toContain('- Profile_3: User habitually codes late at night')
+    expect(fileContent).toContain(
+      '- Profile_2: User is working on the YOLO plugin',
+    )
+    expect(fileContent).toContain(
+      '- Profile_3: User habitually codes late at night',
+    )
   })
 
   it('reads global and assistant prompt context', async () => {
@@ -180,7 +184,9 @@ describe('memoryManager', () => {
     })
 
     expect(context.global).toContain('Preference_1')
-    expect(context.assistant).toContain('Memory_1: Currently implementing the YOLO memory mechanism')
+    expect(context.assistant).toContain(
+      'Memory_1: Currently implementing the YOLO memory mechanism',
+    )
   })
 
   it('parses section heading aliases and preserves custom text', async () => {

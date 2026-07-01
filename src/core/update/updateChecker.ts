@@ -1,13 +1,26 @@
 import { requestUrl } from 'obsidian'
 
-const GITHUB_RELEASE_URL =
-  'https://api.github.com/repos/Lapis0x0/obsidian-yolo/releases/latest'
-
 const GITHUB_RELEASES_URL =
   'https://api.github.com/repos/Lapis0x0/obsidian-yolo/releases'
 
+const GITHUB_RELEASE_DOWNLOAD_BASE =
+  'https://github.com/Lapis0x0/obsidian-yolo/releases/download'
+
+const GITHUB_RELEASE_PAGE_BASE =
+  'https://github.com/Lapis0x0/obsidian-yolo/releases/tag'
+
+const GITHUB_VERSIONS_URL =
+  'https://raw.githubusercontent.com/Lapis0x0/obsidian-yolo/main/versions.json'
+
+const GITHUB_LATEST_RELEASE_NOTE_URL =
+  'https://raw.githubusercontent.com/Lapis0x0/obsidian-yolo/main/latest-release-note.md'
+
 function releaseTagUrl(version: string): string {
   return `${GITHUB_RELEASES_URL}/tags/${encodeURIComponent(version)}`
+}
+
+function releasePageUrl(version: string): string {
+  return `${GITHUB_RELEASE_PAGE_BASE}/${encodeURIComponent(version)}`
 }
 
 /** Matches the UI page size and GitHub `per_page` for on-demand loading. */
@@ -30,23 +43,32 @@ export type ReleaseHistoryPageResult = {
   hasNext: boolean
 }
 
-export type ReleaseAssetUrls = {
-  mainJs: string
-  manifestJson: string
-  stylesCss: string
+export type ReleaseAssetMeta = {
+  url: string
+  size: number
 }
+
+export type ReleaseAssets = {
+  mainJs: ReleaseAssetMeta
+  manifestJson: ReleaseAssetMeta
+  stylesCss: ReleaseAssetMeta
+}
+
+/** @deprecated Use ReleaseAssets */
+export type ReleaseAssetUrls = ReleaseAssets
 
 export type UpdateCheckResult = {
   hasUpdate: boolean
   latestVersion: string
   releaseNotes: ReleaseNotesByLanguage
   releaseUrl: string
-  assets: ReleaseAssetUrls | null
+  assets: ReleaseAssets | null
 }
 
 type GitHubReleaseAsset = {
   name?: string
   browser_download_url?: string
+  size?: number
 }
 
 type GitHubReleaseResponse = {
@@ -139,6 +161,87 @@ export function compareVersions(current: string, latest: string): boolean {
     if (bv < av) return false
   }
   return false
+}
+
+function isPluginVersion(version: string): boolean {
+  return /^v?\d+(?:\.\d+)*$/i.test(version.trim())
+}
+
+export function parseLatestVersionFromVersionsJson(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null
+    }
+
+    let latestVersion: string | null = null
+    for (const version of Object.keys(parsed)) {
+      if (!isPluginVersion(version)) {
+        continue
+      }
+      const normalized = normalizePluginVersion(version)
+      if (!latestVersion || compareVersions(latestVersion, normalized)) {
+        latestVersion = normalized
+      }
+    }
+    return latestVersion
+  } catch {
+    return null
+  }
+}
+
+export function parseReleaseNoteVersion(markdown: string): string | null {
+  for (const raw of markdown.split('\n')) {
+    const line = raw.trim()
+    if (!line.startsWith('#')) {
+      continue
+    }
+    const match = line.match(/^#{1,6}\s+(v?\d+(?:\.\d+)*)\b/i)
+    return match ? normalizePluginVersion(match[1]) : null
+  }
+  return null
+}
+
+async function fetchLatestReleaseNotes(
+  latestVersion: string,
+): Promise<ReleaseNotesByLanguage> {
+  const empty = { en: null, zh: null }
+
+  try {
+    const response = await requestUrl({
+      url: GITHUB_LATEST_RELEASE_NOTE_URL,
+      method: 'GET',
+    })
+
+    if (response.status < 200 || response.status >= 300) {
+      console.warn(
+        `[YOLO] Plugin update release note fetch failed: latest-release-note.md returned HTTP ${response.status}.`,
+      )
+      return empty
+    }
+
+    const body = response.text.trim()
+    if (!body) {
+      console.warn(
+        '[YOLO] Plugin update release note fetch failed: latest-release-note.md is empty.',
+      )
+      return empty
+    }
+
+    const noteVersion = parseReleaseNoteVersion(body)
+    if (noteVersion !== normalizePluginVersion(latestVersion)) {
+      console.warn(
+        `[YOLO] Plugin update release note ignored: latest-release-note.md version ${noteVersion ?? 'unknown'} does not match ${latestVersion}.`,
+      )
+      return empty
+    }
+
+    return splitReleaseNotesByLanguage(body)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[YOLO] Plugin update release note fetch failed: ${message}`)
+    return empty
+  }
 }
 
 /**
@@ -310,32 +413,75 @@ const RELEASE_ASSET_NAMES = {
   stylesCss: 'styles.css',
 } as const
 
-/**
- * Extracts download URLs for the three release artifacts from a GitHub release
- * payload. Returns null when any required asset is missing.
- */
-export function parseReleaseAssetUrls(
+function releaseAssetDownloadUrl(version: string, fileName: string): string {
+  return `${GITHUB_RELEASE_DOWNLOAD_BASE}/${encodeURIComponent(version)}/${encodeURIComponent(fileName)}`
+}
+
+export function buildReleaseAssets(version: string): ReleaseAssets | null {
+  const normalized = normalizePluginVersion(version)
+  if (!normalized) {
+    return null
+  }
+
+  return {
+    mainJs: {
+      url: releaseAssetDownloadUrl(normalized, RELEASE_ASSET_NAMES.mainJs),
+      size: 0,
+    },
+    manifestJson: {
+      url: releaseAssetDownloadUrl(
+        normalized,
+        RELEASE_ASSET_NAMES.manifestJson,
+      ),
+      size: 0,
+    },
+    stylesCss: {
+      url: releaseAssetDownloadUrl(normalized, RELEASE_ASSET_NAMES.stylesCss),
+      size: 0,
+    },
+  }
+}
+
+function parseReleaseAssetMeta(
   assets: GitHubReleaseAsset[] | undefined,
-): ReleaseAssetUrls | null {
+  fileName: string,
+): ReleaseAssetMeta | null {
   if (!Array.isArray(assets)) {
     return null
   }
 
-  const byName = new Map<string, string>()
   for (const asset of assets) {
     const name = typeof asset.name === 'string' ? asset.name : ''
+    if (name !== fileName) {
+      continue
+    }
     const url =
       typeof asset.browser_download_url === 'string'
         ? asset.browser_download_url
         : ''
-    if (name && url) {
-      byName.set(name, url)
+    if (!url) {
+      return null
     }
+    const size = typeof asset.size === 'number' ? asset.size : 0
+    return { url, size }
   }
 
-  const mainJs = byName.get(RELEASE_ASSET_NAMES.mainJs)
-  const manifestJson = byName.get(RELEASE_ASSET_NAMES.manifestJson)
-  const stylesCss = byName.get(RELEASE_ASSET_NAMES.stylesCss)
+  return null
+}
+
+/**
+ * Extracts download URLs and sizes for the three release artifacts from a
+ * GitHub release payload. Returns null when any required asset is missing.
+ */
+export function parseReleaseAssets(
+  assets: GitHubReleaseAsset[] | undefined,
+): ReleaseAssets | null {
+  const mainJs = parseReleaseAssetMeta(assets, RELEASE_ASSET_NAMES.mainJs)
+  const manifestJson = parseReleaseAssetMeta(
+    assets,
+    RELEASE_ASSET_NAMES.manifestJson,
+  )
+  const stylesCss = parseReleaseAssetMeta(assets, RELEASE_ASSET_NAMES.stylesCss)
   if (!mainJs || !manifestJson || !stylesCss) {
     return null
   }
@@ -343,15 +489,20 @@ export function parseReleaseAssetUrls(
   return { mainJs, manifestJson, stylesCss }
 }
 
+/** @deprecated Use parseReleaseAssets */
+export function parseReleaseAssetUrls(
+  assets: GitHubReleaseAsset[] | undefined,
+): ReleaseAssets | null {
+  return parseReleaseAssets(assets)
+}
+
 /**
  * Fetches a specific GitHub release by tag/version. Returns null on failure.
  */
-export async function fetchReleaseByVersion(
-  version: string,
-): Promise<{
+export async function fetchReleaseByVersion(version: string): Promise<{
   version: string
   releaseUrl: string
-  assets: ReleaseAssetUrls | null
+  assets: ReleaseAssets | null
 } | null> {
   const normalized = normalizePluginVersion(version)
   if (!normalized) {
@@ -381,7 +532,7 @@ export async function fetchReleaseByVersion(
     return {
       version: releaseVersion,
       releaseUrl: typeof data.html_url === 'string' ? data.html_url : '',
-      assets: parseReleaseAssetUrls(data.assets),
+      assets: parseReleaseAssets(data.assets),
     }
   } catch {
     return null
@@ -389,47 +540,49 @@ export async function fetchReleaseByVersion(
 }
 
 /**
- * Fetches latest GitHub release and compares to `currentVersion`.
- * Returns null on network/parse failure (caller should stay silent).
+ * Fetches the latest published version from the repo's static Obsidian
+ * `versions.json` file and compares it to `currentVersion`.
+ * Returns null on network/parse failure.
  */
 export async function checkForUpdate(
   currentVersion: string,
 ): Promise<UpdateCheckResult | null> {
   try {
     const response = await requestUrl({
-      url: GITHUB_RELEASE_URL,
+      url: GITHUB_VERSIONS_URL,
       method: 'GET',
-      headers: {
-        Accept: 'application/vnd.github+json',
-      },
     })
 
     if (response.status < 200 || response.status >= 300) {
+      console.warn(
+        `[YOLO] Plugin update check failed: versions.json returned HTTP ${response.status}.`,
+      )
       return null
     }
 
-    const data = JSON.parse(response.text) as GitHubReleaseResponse
-    const tag = typeof data.tag_name === 'string' ? data.tag_name : ''
-    const latestVersion = stripVersionPrefix(tag)
+    const latestVersion = parseLatestVersionFromVersionsJson(response.text)
     if (!latestVersion) {
+      console.warn(
+        '[YOLO] Plugin update check failed: versions.json does not contain a valid version.',
+      )
       return null
     }
 
     const hasUpdate = compareVersions(currentVersion, latestVersion)
-    const releaseNotes =
-      typeof data.body === 'string'
-        ? splitReleaseNotesByLanguage(data.body)
-        : { en: null, zh: null }
-    const releaseUrl = typeof data.html_url === 'string' ? data.html_url : ''
+    const releaseNotes = hasUpdate
+      ? await fetchLatestReleaseNotes(latestVersion)
+      : { en: null, zh: null }
 
     return {
       hasUpdate,
       latestVersion,
       releaseNotes,
-      releaseUrl,
-      assets: parseReleaseAssetUrls(data.assets),
+      releaseUrl: releasePageUrl(latestVersion),
+      assets: buildReleaseAssets(latestVersion),
     }
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[YOLO] Plugin update check failed: ${message}`)
     return null
   }
 }

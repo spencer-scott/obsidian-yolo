@@ -97,7 +97,10 @@ export function resolveSelectionChatActions(
     {
       id: 'translate-to-chinese',
       label: t('selection.actions.translateToChinese', 'Translate to Chinese'),
-      instruction: t('selection.actions.translateToChinese', 'Translate to Chinese'),
+      instruction: t(
+        'selection.actions.translateToChinese',
+        'Translate to Chinese',
+      ),
       mode: 'ask',
     },
   ]

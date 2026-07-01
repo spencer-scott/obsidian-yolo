@@ -4,7 +4,10 @@ import {
   YoloSettings,
   yoloSettingsSchema,
 } from '../../settings/schema/setting.types'
-import { normalizeYoloSettingsReferences } from '../../settings/schema/settings'
+import {
+  migrateYoloSettingsData,
+  normalizeYoloSettingsReferences,
+} from '../../settings/schema/settings'
 
 import { EXCLUDED_KEYS, EXPORTABLE_CONFIG_KEYS } from './config-keys'
 import { computeChecksum } from './export-config'
@@ -57,27 +60,21 @@ export async function validateExportFile(
     )
   }
 
-  if (typeof obj.settingsVersion !== 'number' || obj.settingsVersion < 0) {
+  if (
+    typeof obj.settingsVersion !== 'number' ||
+    !Number.isInteger(obj.settingsVersion) ||
+    obj.settingsVersion < 0
+  ) {
     return failure(
       'errorInvalidSettingsVersion',
       'Settings version number in the configuration file is invalid. The file may be corrupted.',
     )
   }
 
-  if (obj.settingsVersion !== SETTINGS_SCHEMA_VERSION) {
-    if (obj.settingsVersion > SETTINGS_SCHEMA_VERSION) {
-      return failure(
-        'errorFileFromNewerVersion',
-        `Configuration file is from a newer plugin version (version ${obj.settingsVersion}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the plugin before importing.`,
-        {
-          fileVersion: obj.settingsVersion,
-          currentVersion: SETTINGS_SCHEMA_VERSION,
-        },
-      )
-    }
+  if (obj.settingsVersion > SETTINGS_SCHEMA_VERSION) {
     return failure(
-      'errorFileFromOlderVersion',
-      `Configuration file is from an older plugin version (version ${obj.settingsVersion}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the YOLO plugin on the source and re-export.`,
+      'errorFileFromNewerVersion',
+      `Configuration file is from a newer plugin version (version ${obj.settingsVersion}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the plugin before importing.`,
       {
         fileVersion: obj.settingsVersion,
         currentVersion: SETTINGS_SCHEMA_VERSION,
@@ -86,11 +83,17 @@ export async function validateExportFile(
   }
 
   if (!Array.isArray(obj.keys) || obj.keys.length === 0) {
-    return failure('errorEmptyKeys', 'The configuration file does not contain any configuration items.')
+    return failure(
+      'errorEmptyKeys',
+      'The configuration file does not contain any configuration items.',
+    )
   }
 
   if (!obj.data || typeof obj.data !== 'object') {
-    return failure('errorMissingData', 'The data field in the configuration file is missing or invalid.')
+    return failure(
+      'errorMissingData',
+      'The data field in the configuration file is missing or invalid.',
+    )
   }
 
   // Validate consistency between keys and data
@@ -129,41 +132,47 @@ export function parseVaultData(
   pluginVersion?: string,
 ): ValidationResult {
   if (!raw || typeof raw !== 'object') {
-    return failure('errorVaultParseFailed', 'Unable to parse configuration data from the target vault')
+    return failure(
+      'errorVaultParseFailed',
+      'Unable to parse configuration data from the target vault',
+    )
   }
 
   const obj = raw as Record<string, unknown>
 
-  if (typeof obj.version !== 'number') {
+  if (
+    typeof obj.version !== 'number' ||
+    !Number.isInteger(obj.version) ||
+    obj.version < 0
+  ) {
     return failure(
       'errorVaultMissingVersion',
       'The target vault configuration data is missing the version field. Cannot determine version compatibility.',
     )
   }
 
-  if (obj.version !== SETTINGS_SCHEMA_VERSION) {
-    if (obj.version > SETTINGS_SCHEMA_VERSION) {
-      return failure(
-        'errorVaultFromNewerVersion',
-        `The target vault uses a newer plugin version (version ${obj.version}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the plugin before importing.`,
-        { vaultVersion: obj.version, currentVersion: SETTINGS_SCHEMA_VERSION },
-      )
-    }
+  if (obj.version > SETTINGS_SCHEMA_VERSION) {
     return failure(
-      'errorVaultFromOlderVersion',
-      `The target vault uses an older plugin version (version ${obj.version}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the YOLO plugin in the target vault before importing.`,
+      'errorVaultFromNewerVersion',
+      `The target vault uses a newer plugin version (version ${obj.version}). Current plugin version is ${SETTINGS_SCHEMA_VERSION}. Please upgrade the plugin before importing.`,
       { vaultVersion: obj.version, currentVersion: SETTINGS_SCHEMA_VERSION },
     )
   }
 
-  // Under the strict same-version policy, top-level fields not declared in
-  // EXPORTABLE_CONFIG_KEYS should not enter the candidate list. Otherwise, users
-  // could select these fields, but yoloSettingsSchema would strip them out,
-  // resulting in a misleading "import successful" with no actual effect.
+  // Vault-sourced data contains the full data.json, so it should be migrated
+  // in that full context first, then have importable fields extracted. This
+  // preserves cross-field migration info (e.g. the assistants migration
+  // depends on mcp).
+  const migrated = migrateYoloSettingsData(obj)
+
+  // Top-level fields not declared in EXPORTABLE_CONFIG_KEYS should not enter
+  // the candidate list. Otherwise, users could select these fields, but
+  // yoloSettingsSchema would strip them out, resulting in a misleading
+  // "import successful" with no actual effect.
   const exportableKeySet = new Set(EXPORTABLE_CONFIG_KEYS.map((k) => k.key))
   const data: Record<string, unknown> = {}
   const keys: string[] = []
-  for (const [key, value] of Object.entries(obj)) {
+  for (const [key, value] of Object.entries(migrated)) {
     if (EXCLUDED_KEYS.has(key)) continue
     if (!exportableKeySet.has(key)) continue
     data[key] = value
@@ -171,13 +180,16 @@ export function parseVaultData(
   }
 
   if (keys.length === 0) {
-    return failure('errorVaultEmpty', 'The target vault configuration data is empty')
+    return failure(
+      'errorVaultEmpty',
+      'The target vault configuration data is empty',
+    )
   }
 
   const exportFile: ConfigExportFile = {
     $schema: 'yolo-config-export',
     formatVersion: 1,
-    settingsVersion: obj.version,
+    settingsVersion: SETTINGS_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     pluginVersion: pluginVersion ?? 'unknown',
     redacted: false,
@@ -190,7 +202,7 @@ export function parseVaultData(
 }
 
 export type ImportOptions = {
-  /** Validated import data (version matches current) */
+  /** Validated import data (version not higher than current) */
   importData: ConfigExportFile
   /** List of keys the user selected to import */
   selectedKeys: string[]
@@ -248,25 +260,23 @@ export class ImportValidationError extends Error {
 /**
  * Execute configuration import and return the merged full settings.
  *
- * Precondition: importData.settingsVersion must equal SETTINGS_SCHEMA_VERSION
- * (guaranteed by validateExportFile / parseVaultData). This function does not
- * handle cross-version migration.
- *
  * Flow:
- * 1. Merge importData.data into currentSettings according to the merge strategy
+ * 1. Older partial export files get migration context filled in from the
+ *    current config; after migration, only the exported fields are extracted
+ * 2. Merge the import data into currentSettings according to the merge strategy
  *    (for redacted exports, clear all sensitive fields first to avoid writing fake credentials)
- * 2. Explicitly validate via yoloSettingsSchema; on failure, throw ImportValidationError.
+ * 3. Explicitly validate via yoloSettingsSchema; on failure, throw ImportValidationError.
  *    The caller is responsible for notifying the user and preserving the original config
  *    (no silent fallback to defaults)
- * 3. Normalize references and ensure default assistant on the valid result
+ * 4. Normalize references and ensure default assistant on the valid result
  */
 export function applyImport(options: ImportOptions): YoloSettings {
   const { importData, selectedKeys, currentSettings, mergeStrategy } = options
 
-  if (importData.settingsVersion !== SETTINGS_SCHEMA_VERSION) {
+  if (importData.settingsVersion > SETTINGS_SCHEMA_VERSION) {
     throw new ImportValidationError(
       'errorApplyVersionMismatch',
-      `Import data version (${importData.settingsVersion}) does not match the current plugin version (${SETTINGS_SCHEMA_VERSION}). Cannot import.`,
+      `Import data version (${importData.settingsVersion}) is higher than the current plugin version (${SETTINGS_SCHEMA_VERSION}). Cannot import.`,
       [],
       {
         importVersion: importData.settingsVersion,
@@ -275,15 +285,37 @@ export function applyImport(options: ImportOptions): YoloSettings {
     )
   }
 
-  // 1. Merge into current config according to the merge strategy. For redacted exports,
-  //    all sensitive fields (apiKey/password/headers/env/customHeaders.value) are random
-  //    strings. Clear them before import to avoid writing fake credentials back to
-  //    providers/webSearch/mcp.
-  const incomingData = importData.redacted
+  let incomingData = importData.redacted
     ? (clearSensitive(importData.data) as Record<string, unknown>)
     : importData.data
 
   const currentRaw = currentSettings as unknown as Record<string, unknown>
+
+  if (importData.settingsVersion < SETTINGS_SCHEMA_VERSION) {
+    // A partial export is missing other fields the migration depends on. Fill
+    // in context from the current config, letting exported values take
+    // priority; after migration, only the fields declared in the file are
+    // still extracted, so unexported config stays untouched.
+    const incomingKeys = Object.keys(incomingData)
+    const migrationContext = JSON.parse(
+      JSON.stringify({
+        ...currentRaw,
+        ...incomingData,
+        version: importData.settingsVersion,
+      }),
+    ) as Record<string, unknown>
+    const migrated = migrateYoloSettingsData(migrationContext)
+    incomingData = Object.fromEntries(
+      incomingKeys.flatMap((key) =>
+        key in migrated ? [[key, migrated[key]]] : [],
+      ),
+    )
+  }
+
+  // 2. Merge into current config according to the merge strategy. For redacted
+  //    exports, all sensitive fields (apiKey/password/headers/env/
+  //    customHeaders.value) are already random strings, cleared before import
+  //    to avoid being written back as real credentials to providers/webSearch/mcp.
   const merged: Record<string, unknown> = { ...currentRaw }
 
   for (const key of selectedKeys) {
@@ -316,7 +348,7 @@ export function applyImport(options: ImportOptions): YoloSettings {
 
   merged.version = SETTINGS_SCHEMA_VERSION
 
-  // 2. Explicit schema validation; throw on failure (do not fall back to parseYoloSettings defaults)
+  // 3. Explicit schema validation; throw on failure (do not fall back to parseYoloSettings defaults)
   const parsed = yoloSettingsSchema.safeParse(merged)
   if (!parsed.success) {
     const issues = parsed.error.issues.map((issue) => {
@@ -330,7 +362,7 @@ export function applyImport(options: ImportOptions): YoloSettings {
     )
   }
 
-  // 3. Normalize references + ensure default assistant fallback
+  // 4. Normalize references + ensure default assistant fallback
   const normalized = normalizeYoloSettingsReferences(parsed.data)
   return ensureDefaultAssistantInSettings({
     ...normalized,

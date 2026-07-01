@@ -1,13 +1,20 @@
-import { Stat, type DataAdapter } from 'obsidian'
+import { type DataAdapter, Stat } from 'obsidian'
 
+import { RELEASE_FILE_NAMES } from './installationIntegrity'
 import {
+  applyRepairFiles,
   applyStagedUpdate,
   clearStagingRoot,
+  getRepairMetaPath,
+  getRepairStagingStatus,
   getStagingDir,
   getStagingRoot,
   getStagingStatus,
   meetsMinAppVersion,
 } from './pluginUpdater'
+
+// eslint-disable-next-line obsidianmd/hardcoded-config-path -- mock Vault#configDir for adapter paths
+const MOCK_PLUGIN_DIR = 'vault/.obsidian/plugins/yolo'
 
 class MockAdapter {
   private readonly files = new Map<string, string | ArrayBuffer>()
@@ -113,7 +120,7 @@ describe('meetsMinAppVersion', () => {
 describe('getStagingStatus', () => {
   it('returns ready when all staged files exist and manifest version matches', async () => {
     const adapter = new MockAdapter()
-    const pluginDir = 'vault/.obsidian/plugins/yolo'
+    const pluginDir = MOCK_PLUGIN_DIR
     const stagingDir = getStagingDir(pluginDir, '1.5.12.2')
 
     await adapter.writeBinary(`${stagingDir}/main.js`, new ArrayBuffer(8))
@@ -137,7 +144,7 @@ describe('getStagingStatus', () => {
 
   it('returns not ready when manifest version mismatches expected version', async () => {
     const adapter = new MockAdapter()
-    const pluginDir = 'vault/.obsidian/plugins/yolo'
+    const pluginDir = MOCK_PLUGIN_DIR
     const stagingDir = getStagingDir(pluginDir, '1.5.12.2')
 
     await adapter.writeBinary(`${stagingDir}/main.js`, new ArrayBuffer(8))
@@ -157,7 +164,7 @@ describe('getStagingStatus', () => {
 
   it('returns not ready when a staged file is missing', async () => {
     const adapter = new MockAdapter()
-    const stagingDir = getStagingDir('vault/.obsidian/plugins/yolo', '1.5.12.2')
+    const stagingDir = getStagingDir(MOCK_PLUGIN_DIR, '1.5.12.2')
 
     await adapter.write(
       `${stagingDir}/manifest.json`,
@@ -176,7 +183,7 @@ describe('getStagingStatus', () => {
 describe('clearStagingRoot', () => {
   it('removes all staged version directories', async () => {
     const adapter = new MockAdapter()
-    const pluginDir = 'vault/.obsidian/plugins/yolo'
+    const pluginDir = MOCK_PLUGIN_DIR
     const oldDir = getStagingDir(pluginDir, '1.5.12.1')
     const newerDir = getStagingDir(pluginDir, '1.5.12.2')
 
@@ -214,7 +221,7 @@ describe('applyStagedUpdate', () => {
 
   it('writes main.js before manifest.json and reloads the app', async () => {
     const adapter = new MockAdapter()
-    const pluginDir = 'vault/.obsidian/plugins/yolo'
+    const pluginDir = MOCK_PLUGIN_DIR
     const stagingDir = getStagingDir(pluginDir, '1.5.12.2')
 
     await adapter.writeBinary(`${stagingDir}/main.js`, new ArrayBuffer(4))
@@ -249,7 +256,7 @@ describe('applyStagedUpdate', () => {
 
   it('rejects install when minAppVersion is not met', async () => {
     const adapter = new MockAdapter()
-    const pluginDir = 'vault/.obsidian/plugins/yolo'
+    const pluginDir = MOCK_PLUGIN_DIR
     const stagingDir = getStagingDir(pluginDir, '2.0.0')
 
     await adapter.writeBinary(`${stagingDir}/main.js`, new ArrayBuffer(4))
@@ -274,5 +281,94 @@ describe('applyStagedUpdate', () => {
     const result = await applyStagedUpdate(app, plugin, '2.0.0')
     expect(result).toEqual({ ok: false, reason: 'min_app_version' })
     expect(reloadSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('getRepairStagingStatus', () => {
+  it('returns ready when repair meta and requested files exist', async () => {
+    const adapter = new MockAdapter()
+    const pluginDir = MOCK_PLUGIN_DIR
+    const stagingDir = getStagingDir(pluginDir, '1.5.12.2')
+
+    await adapter.write(
+      `${stagingDir}/styles.css`,
+      '/* @yolo-version: 1.5.12.2 */\nbody {}',
+    )
+    await adapter.write(
+      getRepairMetaPath(stagingDir),
+      JSON.stringify({
+        version: '1.5.12.2',
+        files: [RELEASE_FILE_NAMES.stylesCss],
+      }),
+    )
+
+    const status = await getRepairStagingStatus(
+      adapter as unknown as DataAdapter,
+      stagingDir,
+      '1.5.12.2',
+    )
+    expect(status).toEqual({
+      ready: true,
+      version: '1.5.12.2',
+      files: [RELEASE_FILE_NAMES.stylesCss],
+      minAppVersion: '',
+    })
+  })
+})
+
+describe('applyRepairFiles', () => {
+  let reloadSpy: jest.Mock
+  let previousWindow: typeof globalThis.window | undefined
+
+  beforeEach(() => {
+    reloadSpy = jest.fn()
+    previousWindow = globalThis.window
+    globalThis.window = {
+      location: { reload: reloadSpy },
+    } as unknown as Window & typeof globalThis
+  })
+
+  afterEach(() => {
+    if (previousWindow === undefined) {
+      // @ts-expect-error restore node test environment without window
+      delete globalThis.window
+    } else {
+      globalThis.window = previousWindow
+    }
+  })
+
+  it('writes only staged repair files and reloads the app', async () => {
+    const adapter = new MockAdapter()
+    const pluginDir = MOCK_PLUGIN_DIR
+    const stagingDir = getStagingDir(pluginDir, '1.5.12.2')
+
+    await adapter.write(
+      `${stagingDir}/styles.css`,
+      '/* @yolo-version: 1.5.12.2 */\nbody { color: red; }',
+    )
+    await adapter.write(
+      getRepairMetaPath(stagingDir),
+      JSON.stringify({
+        version: '1.5.12.2',
+        files: [RELEASE_FILE_NAMES.stylesCss],
+      }),
+    )
+
+    const plugin = {
+      manifest: {
+        id: 'yolo',
+        dir: pluginDir,
+        version: '1.5.12.2',
+      },
+    } as Parameters<typeof applyRepairFiles>[1]
+
+    const app = {
+      vault: { adapter: adapter as unknown as DataAdapter },
+    } as unknown as Parameters<typeof applyRepairFiles>[0]
+
+    const result = await applyRepairFiles(app, plugin, '1.5.12.2')
+    expect(result).toEqual({ ok: true })
+    expect(reloadSpy).toHaveBeenCalled()
+    expect(adapter.getWriteOrder()).toContain(`${pluginDir}/styles.css`)
   })
 })

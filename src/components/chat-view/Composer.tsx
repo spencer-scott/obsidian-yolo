@@ -432,7 +432,10 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <section className="yolo-composer-section">
                 <header className="yolo-composer-heading">
                   <div className="yolo-composer-heading-title">
-                    {t('settings.smartSpace.quickActionsTitle', 'Quick actions')}
+                    {t(
+                      'settings.smartSpace.quickActionsTitle',
+                      'Quick actions',
+                    )}
                   </div>
                   <div className="yolo-composer-heading-desc">
                     {t(
@@ -461,7 +464,10 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <div className="yolo-composer-option">
                 <div className="yolo-composer-option-info">
                   <div className="yolo-composer-option-title">
-                    {t('settings.rag.openKnowledgeSettings', 'Open knowledge base settings')}
+                    {t(
+                      'settings.rag.openKnowledgeSettings',
+                      'Open knowledge base settings',
+                    )}
                   </div>
                   <div className="yolo-composer-option-desc">
                     {t(
@@ -537,7 +543,10 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   <div className="yolo-composer-option">
                     <div className="yolo-composer-option-info">
                       <div className="yolo-composer-option-title">
-                        {t('settings.continuation.quickAskTrigger', 'Trigger character')}
+                        {t(
+                          'settings.continuation.quickAskTrigger',
+                          'Trigger character',
+                        )}
                       </div>
                       <div className="yolo-composer-option-desc">
                         {t(
@@ -752,7 +761,10 @@ const Composer: React.FC<ComposerProps> = (_props) => {
               <div className="yolo-composer-option">
                 <div className="yolo-composer-option-info">
                   <div className="yolo-composer-option-title">
-                    {t('settings.continuation.tabCompletion', 'Enable Tab completion')}
+                    {t(
+                      'settings.continuation.tabCompletion',
+                      'Enable Tab completion',
+                    )}
                   </div>
                   <div className="yolo-composer-option-desc">
                     {t(
@@ -1318,7 +1330,10 @@ const Composer: React.FC<ComposerProps> = (_props) => {
                   }}
                 >
                   <span className="yolo-settings-advanced-toggle-icon">▶</span>
-                  {t('settings.continuation.tabCompletionAdvanced', 'Advanced settings')}
+                  {t(
+                    'settings.continuation.tabCompletionAdvanced',
+                    'Advanced settings',
+                  )}
                 </div>
 
                 {showTabAdvanced && (

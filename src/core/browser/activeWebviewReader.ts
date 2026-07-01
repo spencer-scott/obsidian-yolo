@@ -48,10 +48,18 @@ export type BrowserReadResult = {
   redactions: BrowserReadRedaction[]
 }
 
+export type BrowserReadHtmlResult = {
+  url: string
+  title: string
+  html: string
+  byteLength: number
+}
+
 export type BrowserReadError =
   | 'page_not_ready'
   | 'extraction_failed'
   | 'extraction_timeout'
+  | 'content_too_large'
 
 export class BrowserReadFailure extends Error {
   constructor(
@@ -94,6 +102,22 @@ type RawKeyVisibleInfoExtractionResult = {
 type RawExtractionResult =
   | RawReadableExtractionResult
   | RawKeyVisibleInfoExtractionResult
+
+type RawHtmlExtractionResult =
+  | {
+      kind: 'html'
+      url: string
+      title: string
+      html: string
+      byteLength: number
+    }
+  | {
+      kind: 'html_too_large'
+      url: string
+      title: string
+      byteLength: number
+      maxBytes: number
+    }
 
 const isRawExtractionResult = (
   value: unknown,
@@ -316,6 +340,58 @@ const EXTRACTION_SCRIPT = `((format) => {
 const buildExtractionScript = (format: BrowserReadFormat): string =>
   `(${EXTRACTION_SCRIPT})(${JSON.stringify(format)})`
 
+const HTML_EXTRACTION_SCRIPT = `((maxBytes) => {
+  const doc = document;
+  const html = doc.documentElement
+    ? doc.documentElement.outerHTML
+    : (doc.body ? doc.body.outerHTML : '');
+  const byteLength = typeof TextEncoder !== 'undefined'
+    ? new TextEncoder().encode(html).length
+    : html.length;
+  const base = {
+    url: location.href,
+    title: doc.title || '',
+    byteLength,
+  };
+  if (Number.isFinite(maxBytes) && maxBytes > 0 && byteLength > maxBytes) {
+    return {
+      kind: 'html_too_large',
+      ...base,
+      maxBytes,
+    };
+  }
+  return {
+    kind: 'html',
+    ...base,
+    html,
+  };
+})`
+
+const buildHtmlExtractionScript = (maxBytes?: number): string =>
+  `(${HTML_EXTRACTION_SCRIPT})(${JSON.stringify(maxBytes ?? null)})`
+
+const isRawHtmlExtractionResult = (
+  value: unknown,
+): value is RawHtmlExtractionResult => {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (
+    typeof v.kind !== 'string' ||
+    typeof v.url !== 'string' ||
+    typeof v.title !== 'string' ||
+    typeof v.byteLength !== 'number'
+  ) {
+    return false
+  }
+  if (v.kind === 'html') {
+    return typeof v.html === 'string'
+  }
+  if (v.kind === 'html_too_large') {
+    return typeof v.maxBytes === 'number'
+  }
+  return false
+}
+
 const withTimeout = <T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -488,5 +564,69 @@ export async function readActiveWebviewPage(
     headings: raw.headings,
     links: raw.links,
     text: htmlToMarkdown(raw.html),
+  }
+}
+
+/**
+ * Read the full rendered DOM HTML from an already-open supported webview.
+ * This intentionally returns `document.documentElement.outerHTML` without the
+ * readable-mode redactions above; callers expose it only behind high-risk
+ * capability gates for workflows that need exact page markup.
+ */
+export async function readActiveWebviewHtml(
+  handle: ActiveWebviewHandle,
+  options?: {
+    signal?: AbortSignal
+    executionTimeoutMs?: number
+    maxBytes?: number
+  },
+): Promise<BrowserReadHtmlResult | null> {
+  const loading = isWebviewLoading(handle.webview)
+  let raw: unknown
+  try {
+    raw = await withTimeout(
+      handle.webview.executeJavaScript(
+        buildHtmlExtractionScript(options?.maxBytes),
+      ),
+      options?.executionTimeoutMs ??
+        (loading
+          ? LOADING_EXTRACTION_TIMEOUT_MS
+          : DEFAULT_EXTRACTION_TIMEOUT_MS),
+      options?.signal,
+    )
+  } catch (error) {
+    if (error instanceof BrowserReadFailure) throw error
+    throw new BrowserReadFailure(
+      'extraction_failed',
+      `Failed to extract page HTML: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      error,
+    )
+  }
+
+  if (!isRawHtmlExtractionResult(raw)) {
+    throw new BrowserReadFailure(
+      'extraction_failed',
+      'HTML extraction script returned an unexpected payload',
+    )
+  }
+
+  if (raw.kind === 'html_too_large') {
+    throw new BrowserReadFailure(
+      'content_too_large',
+      `Browser page HTML is ${raw.byteLength} bytes, above the ${raw.maxBytes} byte cap.`,
+    )
+  }
+
+  if ((!raw.url || raw.url === 'about:blank') && raw.html.trim().length === 0) {
+    return null
+  }
+
+  return {
+    url: raw.url,
+    title: raw.title,
+    html: raw.html,
+    byteLength: raw.byteLength,
   }
 }

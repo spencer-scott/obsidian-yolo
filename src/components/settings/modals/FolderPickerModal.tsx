@@ -31,7 +31,9 @@ export class FolderPickerModal extends ReactModal<FolderPickerModalProps> {
       app,
       Component: FolderPickerModalComponent,
       props: { vault, existing, onPick, allowFiles },
-      options: { title: allowFiles ? 'Select files or folders' : 'Select folder' },
+      options: {
+        title: allowFiles ? 'Select files or folders' : 'Select folder',
+      },
     })
   }
 }

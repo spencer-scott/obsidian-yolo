@@ -28,7 +28,10 @@ export class SnippetsManagerModal extends ReactModal<SnippetsManagerModalProps> 
       Component: SnippetsManagerModalWrapper,
       props: { app, plugin },
       options: {
-        title: plugin.t('settings.editor.snippets.modalTitle', 'Manage Snippets'),
+        title: plugin.t(
+          'settings.editor.snippets.modalTitle',
+          'Manage Snippets',
+        ),
       },
       plugin,
     })

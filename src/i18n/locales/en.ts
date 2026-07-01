@@ -153,6 +153,8 @@ export const en: TranslationKeys = {
       name: 'Support the project',
       desc: 'If you find this plugin valuable, consider supporting its development!',
       buyMeACoffee: 'Buy me a coffee',
+      reportBug: 'Report Bug',
+      featureRequest: 'Feature Request',
     },
     defaults: {
       title: 'Default model policies & prompts',
@@ -313,6 +315,8 @@ export const en: TranslationKeys = {
       tools: 'Tools',
       toolsCount: '{count} tools',
       toolsCountWithEnabled: '{count} tools (enabled {enabled})',
+      mcpLoadingStatus: 'Loading {count} MCP…',
+      mcpErrorStatus: '{count} MCP failed to connect',
       skills: 'Skills',
       skillsCount: '{count} skills',
       skillsCountWithEnabled: '{count} skills (enabled {enabled})',
@@ -526,8 +530,10 @@ export const en: TranslationKeys = {
       toolApproval: 'Approval',
       toolApprovalFullAccess: 'Full access',
       toolApprovalRequire: 'Require approval',
-      toolApprovalForced: 'Approval required',
+      toolDisclosureAuto: 'Auto',
+      toolDisclosureAutoSelect: 'Auto select',
       toolDisclosureAlways: 'In context',
+      toolDisclosureMixed: 'Mixed',
       toolDisclosureOnDemand: 'On demand',
       editorEnabled: 'Enabled',
       editorDisabled: 'Disabled',
@@ -602,14 +608,24 @@ export const en: TranslationKeys = {
         'Enabling network requests lets scripts contact browser-accessible addresses and use a separate YOLO host request helper when browser cross-origin limits block a response. Only enable this for an agent you trust. Continue?',
       jsSandboxAllowVaultRead: 'Allow Vault Read',
       jsSandboxAllowVaultReadDesc:
-        'Let scripts read any vault file by path. This capability is not constrained by the agent directory scope. Risk: scripts could pass note contents to external services.',
+        'Let scripts list vault paths and read any vault file by path. This capability is not constrained by the agent directory scope. Risk: scripts could pass note contents to external services.',
       jsSandboxAllowVaultReadConfirm:
-        "Enabling vault read lets AI-generated scripts read any file in the vault by path. This data passes through the LLM context. Only enable if you trust this agent's scripts. Continue?",
+        "Enabling vault read lets AI-generated scripts list vault paths and read any file in the vault by path. This data passes through the LLM context. Only enable if you trust this agent's scripts. Continue?",
+      jsSandboxAllowBrowserRead: 'Allow Open Web Page Read',
+      jsSandboxAllowBrowserReadDesc:
+        'Let scripts read the full HTML of web pages already open in Obsidian by page ID. This can include logged-in or private page content.',
+      jsSandboxAllowBrowserReadRisk:
+        'Risk: scripts can read the full page DOM from pages you have opened in Obsidian, including hidden fields, embedded state, and private or logged-in content. Only enable for agents you fully trust.',
+      jsSandboxAllowBrowserReadConfirm:
+        'Enabling open web page read lets AI-generated scripts read full HTML from web pages already open in Obsidian by page ID. This content passes through the LLM context. Continue?',
+      jsSandboxBrowserReadMaxKb: 'Max page HTML size (KB)',
+      jsSandboxBrowserReadMaxKbDesc:
+        'Per-call full HTML limit. Larger pages are refused instead of shortened. Range 1–1048576 KB. Leave blank to use the default.',
       jsSandboxAllowDbQuery: 'Allow Knowledge Base Query',
       jsSandboxAllowDbQueryDesc:
-        'Let scripts query the vector database (semantic search, keyword search, path lookup). This capability is not constrained by the agent directory scope.',
+        'Let scripts query indexed vault content with semantic search and read Markdown/text content by known path. This capability is not constrained by the agent directory scope.',
       jsSandboxAllowDbQueryConfirm:
-        'Enabling knowledge base query lets AI-generated scripts search your vault index and retrieve file contents. Continue?',
+        'Enabling knowledge base query lets AI-generated scripts search indexed content and read Markdown/text content by known path. Continue?',
       jsSandboxAllowExternalScripts: 'Allow External Scripts',
       jsSandboxAllowExternalScriptsDesc:
         'Allow scripts to load and run remote JavaScript, and open the broader browser capabilities needed by those scripts.',
@@ -618,7 +634,6 @@ export const en: TranslationKeys = {
       jsSandboxAllowExternalScriptsConfirm:
         'Enabling external scripts lets the agent load and run remote JavaScript inside Obsidian. This is powerful and risky: only continue if you fully trust this agent and the code source.',
       jsSandboxConfirmEnableTitle: 'Enable extension capability',
-      jsExecApprovalForced: 'Forced approval when enabled',
       jsSandboxTimeoutMs: 'Execution timeout (ms)',
       jsSandboxTimeoutMsDesc:
         'Maximum runtime for a single script call. Range {min}–{max}.',
@@ -628,9 +643,9 @@ export const en: TranslationKeys = {
       jsSandboxVaultReadMaxKb: 'Max read size (KB)',
       jsSandboxVaultReadMaxKbDesc:
         'Per-call read limit. Larger text is shortened with a notice; larger binary files are refused. Range {min}–{max} KB.',
-      jsSandboxDbMaxLimit: 'Max rows per query',
+      jsSandboxDbMaxLimit: 'Max semantic rows',
       jsSandboxDbMaxLimitDesc:
-        'Upper bound on knowledge base results returned per query. Range 1–100.',
+        'Upper bound on semantic search results. Path reads are not affected. Range 1–100.',
     },
     jsSandbox: {
       openSettings: 'Configure JavaScript execution',
@@ -795,6 +810,7 @@ export const en: TranslationKeys = {
       baseUrlDesc:
         'API endpoint for third-party services, e.g.: https://api.example.com/v1 or https://your-proxy.com/openai (Leave empty to use default)',
       baseUrlPlaceholder: 'https://api.example.com/v1',
+      apiUrlPreviewLabel: 'Preview:',
       noStainlessHeaders: 'No stainless headers',
       noStainlessHeadersDesc:
         'Enable this if you encounter cross-origin errors related to stainless headers.',
@@ -808,6 +824,12 @@ export const en: TranslationKeys = {
       requestTransportModeBrowser: 'Browser request',
       requestTransportModeObsidian: 'Obsidian built-in request',
       requestTransportModeNode: 'Desktop direct connection (recommended)',
+      responseStreamingMode: 'Response streaming mode',
+      responseStreamingModeDesc:
+        'Control whether this provider uses streaming or non-streaming responses.',
+      responseStreamingModeAuto: 'Auto (default)',
+      responseStreamingModeStreaming: 'Streaming',
+      responseStreamingModeNonStreaming: 'Non-streaming',
       promptCaching: 'Prompt caching',
       promptCachingDesc:
         'Enable Anthropic ephemeral prompt caching. Reuses system prompt, tools, and conversation history across turns to cut input tokens. Cache writes carry a 25% premium; reads cost ~10% of normal input. Available whenever the provider API type is Anthropic; upstream must actually honor the cache_control field.',
@@ -1577,11 +1599,14 @@ export const en: TranslationKeys = {
     selectModel: 'Select model',
     uploadImage: 'Upload image',
     uploadFile: 'Add file',
+    dropFilesHint: 'Drop to add files',
     imageUnsupportedByModel:
       'This model has not declared image support. Enable the "Vision" input modality in the model settings to attach images.',
     unsupportedFileType: 'Unsupported file type: {names}',
     processImagesFailed: 'Failed to process uploaded images',
     readPdfFailed: 'Failed to read PDF "{name}": {error}',
+    readOfficeFailed: 'Failed to read Office document "{name}": {error}',
+    readTextAttachmentFailed: 'Failed to read text file "{name}": {error}',
     addContext: 'Add context',
     applyChanges: 'Apply changes',
     copyMessage: 'Copy message',
@@ -1767,6 +1792,23 @@ export const en: TranslationKeys = {
     },
     errorCard: {
       title: 'This response failed to generate',
+      responseFormat: {
+        responseNotObject:
+          'The model service returned a response that is not an object (actual: {{actual}}).',
+        missingChoices:
+          'The model service returned a response that cannot be parsed: missing choices array.',
+        invalidChoices:
+          'The model service returned a response that cannot be parsed: choices is not an array (actual: {{actual}}).',
+        stage: 'Stage: {{stage}}',
+        expected: 'Expected field: {{field}}',
+        expectedChoicesArray: 'choices array',
+        responseFields: 'Response fields: {{fields}}',
+        upstreamError: 'Upstream error: {{message}}',
+        errorType: 'Error type: {{type}}',
+        errorCode: 'Error code: {{code}}',
+        upstreamMessage: 'Upstream message: {{message}}',
+        responsePreview: 'Response preview: {{preview}}',
+      },
     },
     customRewritePromptPlaceholder:
       'Describe how to rewrite the selected text, for example: "make it concise and active voice; keep markdown structure"; press Shift+Enter to confirm, Enter for a new line, and Escape to close.',
@@ -1859,6 +1901,15 @@ export const en: TranslationKeys = {
       statusFailed: 'Failed',
       toolUseCount: '{count} tools',
       tokenCount: '{count} tokens',
+      approval: {
+        heading: 'Awaiting approval',
+        headingMulti: 'Awaiting approval · {count}',
+        approve: 'Approve',
+        reject: 'Reject',
+        approveAll: 'Approve all',
+        rejectAll: 'Reject all',
+        viewDetails: 'View parameters',
+      },
     },
     conversationSettings: {
       openAria: 'Conversation settings',
@@ -2032,6 +2083,8 @@ export const en: TranslationKeys = {
     agentDesc: 'Tools for complex tasks',
     agentFull: 'Agent (YOLO)',
     agentFullDesc: 'Auto-approve tool calls for complex tasks',
+    yolo: 'YOLO',
+    yoloDesc: 'Auto-approve tool calls for complex tasks',
     warning: {
       title: 'Please confirm before enabling Agent mode',
       description:
@@ -2085,17 +2138,21 @@ export const en: TranslationKeys = {
   configTransfer: {
     export: {
       title: 'Export settings',
-      description: 'Select the settings to export',
+      description:
+        'Select the settings to export. The file will be saved to {path}',
       selectAll: 'Select all',
       selectNone: 'Select none',
       sensitive: 'Contains credentials',
       redactedOption:
         'Redact credentials (replace API keys / passwords / headers / env vars with random strings)',
+      confirmUnredactedTitle: 'Confirm export',
+      confirmUnredacted:
+        'This unredacted export will save API keys / passwords / headers / env vars and other sensitive data to a file in the current vault. Continue?',
       submit: 'Export',
       cancel: 'Cancel',
       noticeAtLeastOne: 'Please select at least one item',
       noticeReadFailed: 'Failed to read current settings',
-      noticeSuccess: 'Settings exported as {fileName}',
+      noticeSuccess: 'Settings exported to {path}',
       noticeFailed: 'Failed to export settings — check console for details',
     },
     import: {
@@ -2139,8 +2196,6 @@ export const en: TranslationKeys = {
         'Invalid settings version in the export file — it may be corrupted.',
       errorFileFromNewerVersion:
         'This file was exported by a newer plugin version ({fileVersion}); current plugin schema is {currentVersion}. Please upgrade this plugin before importing.',
-      errorFileFromOlderVersion:
-        'This file was exported by an older plugin version ({fileVersion}); current plugin schema is {currentVersion}. Please upgrade YOLO on the source vault and re-export.',
       errorEmptyKeys: 'The export file contains no settings to import.',
       errorMissingData:
         'The data field is missing or invalid in the export file.',
@@ -2154,11 +2209,9 @@ export const en: TranslationKeys = {
         'Target vault settings are missing the version field — cannot check compatibility.',
       errorVaultFromNewerVersion:
         'Target vault uses a newer plugin version ({vaultVersion}); current is {currentVersion}. Please upgrade this plugin before importing.',
-      errorVaultFromOlderVersion:
-        'Target vault uses an older plugin version ({vaultVersion}); current is {currentVersion}. Please upgrade YOLO in the target vault before importing.',
       errorVaultEmpty: 'Target vault contains no exportable settings.',
       errorApplyVersionMismatch:
-        'Import data version ({importVersion}) does not match current plugin schema ({currentVersion}).',
+        'Import data version ({importVersion}) is newer than the current plugin schema ({currentVersion}).',
       errorApplySchema:
         'The imported settings failed validation — fields may be missing or malformed.',
     },
@@ -2194,8 +2247,8 @@ export const en: TranslationKeys = {
     dismiss: 'Dismiss',
     languageEnglish: 'EN',
     languageChinese: '中文',
-    muteThisVersion: "Don't notify for this version",
     viewHistory: 'View update history',
+    skipVersion: "Don't remind me for this version",
     historyTitle: 'Release history',
     historyLoading: 'Loading release history...',
     historyError: 'Failed to load release history. Please try again later.',
@@ -2205,9 +2258,13 @@ export const en: TranslationKeys = {
     historyNext: 'Next',
     installationIncompleteTitle: 'Plugin installation incomplete',
     installationIncompleteMeta:
-      'main.js {bakedVersion} · manifest {manifestVersion}',
+      'main.js {mainVersion} · manifest {manifestVersion} · styles {stylesVersion}',
+    installationIncompleteSuspects: 'Files to repair: {files}',
     installationIncompleteNotes:
-      'This usually means main.js did not finish downloading during an update. Back up data.json, remove the plugin, and reinstall.',
+      'Plugin files may not have downloaded completely. A repair download will start automatically; you can also retry below.',
+    tryRepair: 'Try repair',
+    repairing: 'Repairing {{progress}}%',
+    repairAndReload: 'Repair and reload',
     downloadUpdate: 'Download update',
     downloading: 'Downloading {{progress}}%',
     installAndReload: 'Install and reload',

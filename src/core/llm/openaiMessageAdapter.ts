@@ -27,6 +27,8 @@ import {
 import { getToolCallArgumentsText } from '../../types/tool-call.types'
 import { filterEmptyAssistantMessages } from '../../utils/chat/tool-boundary'
 
+import { requireResponseChoicesArray } from './responseFormatError'
+
 /**
  * Normalize OpenAI-compatible `annotations` (returned by OpenAI's hosted web
  * search and OpenRouter's `openrouter:web_search` server tool) into our
@@ -372,6 +374,8 @@ function extractLegacyFunctionCallDelta(
 }
 
 export class OpenAIMessageAdapter {
+  protected readonly adapterName: string = 'OpenAI-compatible'
+
   async generateResponse(
     client: OpenAI,
     request: LLMRequestNonStreaming,
@@ -627,9 +631,16 @@ export class OpenAIMessageAdapter {
   protected parseNonStreamingResponse(
     response: ChatCompletion,
   ): LLMResponseNonStreaming {
+    const choices = requireResponseChoicesArray<
+      ChatCompletion['choices'][number]
+    >(response, {
+      adapter: this.adapterName,
+      stage: 'non-streaming response',
+    })
+
     return {
       id: response.id,
-      choices: response.choices.map((choice) => ({
+      choices: choices.map((choice) => ({
         ...(() => {
           const toolCallsFromStandardField = normalizeToolCalls(
             choice.message.tool_calls,
@@ -672,9 +683,16 @@ export class OpenAIMessageAdapter {
   protected parseStreamingResponseChunk(
     chunk: ChatCompletionChunk,
   ): LLMResponseStreaming {
+    const choices = requireResponseChoicesArray<
+      ChatCompletionChunk['choices'][number]
+    >(chunk, {
+      adapter: this.adapterName,
+      stage: 'streaming response chunk',
+    })
+
     return {
       id: chunk.id,
-      choices: chunk.choices.map((choice) => ({
+      choices: choices.map((choice) => ({
         ...(() => {
           const toolCallsFromStandardField = normalizeToolCallDeltas(
             choice.delta.tool_calls,

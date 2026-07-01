@@ -240,7 +240,10 @@ export function SelectionChatActionsSettings({
         <div className="yolo-smart-space-settings-row">
           <div className="yolo-settings-desc">{actionsCountLabel}</div>
           <ObsidianButton
-            text={t('settings.selectionChat.configureActions', 'Configure quick commands')}
+            text={t(
+              'settings.selectionChat.configureActions',
+              'Configure quick commands',
+            )}
             onClick={handleOpenModal}
           />
         </div>
@@ -263,7 +266,10 @@ export function SelectionChatActionsSettings({
       >
         <div className="yolo-settings-desc">{actionsCountLabel}</div>
         <ObsidianButton
-          text={t('settings.selectionChat.configureActions', 'Configure quick commands')}
+          text={t(
+            'settings.selectionChat.configureActions',
+            'Configure quick commands',
+          )}
           onClick={handleOpenModal}
         />
       </ObsidianSetting>
@@ -381,7 +387,10 @@ export function SelectionChatActionsSettingsContent() {
           'settings.selectionChat.actionInstructionRewriteDesc',
           'Rewrite instruction (required only for “Preset instruction” type)',
         )
-      : t('settings.selectionChat.actionInstructionDesc', 'Instruction sent to the AI')
+      : t(
+          'settings.selectionChat.actionInstructionDesc',
+          'Instruction sent to the AI',
+        )
 
   const getInstructionPlaceholder = (mode: SelectionChatActionMode) =>
     mode === 'rewrite'
@@ -673,7 +682,10 @@ export function SelectionChatActionsSettingsContent() {
 
           {(editingAction.mode ?? 'ask') === 'rewrite' && (
             <ObsidianSetting
-              name={t('settings.selectionChat.actionRewriteType', 'Rewrite type')}
+              name={t(
+                'settings.selectionChat.actionRewriteType',
+                'Rewrite type',
+              )}
               desc={t(
                 'settings.selectionChat.actionRewriteTypeDesc',
                 'Choose whether the rewrite requires an input instruction',
@@ -890,7 +902,10 @@ function QuickActionItem({
         <div className="yolo-quick-action-drag-handle">
           <span
             className={`yolo-drag-handle ${isDragging ? 'yolo-drag-handle--active' : ''}`}
-            aria-label={t('settings.selectionChat.dragHandleAria', 'Drag to reorder')}
+            aria-label={t(
+              'settings.selectionChat.dragHandleAria',
+              'Drag to reorder',
+            )}
             {...listeners}
           >
             <GripVertical size={16} />
@@ -1013,7 +1028,10 @@ function QuickActionItem({
 
           {(currentEditing.mode ?? 'ask') === 'rewrite' && (
             <ObsidianSetting
-              name={t('settings.selectionChat.actionRewriteType', 'Rewrite type')}
+              name={t(
+                'settings.selectionChat.actionRewriteType',
+                'Rewrite type',
+              )}
               desc={t(
                 'settings.selectionChat.actionRewriteTypeDesc',
                 'Choose whether the rewrite requires an input instruction',

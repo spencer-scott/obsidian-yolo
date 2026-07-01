@@ -66,18 +66,26 @@ import {
 } from './core/rag/ragIndexService'
 import { migrateVaultSkillFrontmatter } from './core/skills/liteSkills'
 import {
+  type InstallationIncompleteDetail,
+  type ReleaseFileName,
+  checkInstallationIntegrityLayer1And2,
+} from './core/update/installationIntegrity'
+import {
+  type PluginUpdateState,
+  applyRepairFiles,
   applyStagedUpdate,
   canSelfUpdate,
   downloadReleaseToStaging,
+  downloadRepairFilesToStaging,
+  getRepairStagingStatus,
   getStagingDir,
   getStagingStatus,
-  type PluginUpdateState,
 } from './core/update/pluginUpdater'
 import {
-  type ReleaseAssetUrls,
+  type ReleaseAssets,
   type UpdateCheckResult,
+  buildReleaseAssets,
   checkForUpdate,
-  fetchReleaseByVersion,
   normalizePluginVersion,
 } from './core/update/updateChecker'
 import { DatabaseManager } from './database/DatabaseManager'
@@ -167,12 +175,10 @@ export default class YoloPlugin extends Plugin {
   private pluginUpdateListeners: (() => void)[] = []
   private pluginUpdateDownloadPromise: Promise<void> | null = null
   private updateToastCleanup: (() => void) | null = null
-  installationIncompleteDetail: {
-    bakedVersion: string
-    manifestVersion: string
-  } | null = null
+  installationIncompleteDetail: InstallationIncompleteDetail | null = null
   private installationIncompleteBannerDismissed = false
   private installationIncompleteListeners: (() => void)[] = []
+  private installationIntegrityCheckStarted = false
   mcpManager: McpManager | null = null
   dbManager: DatabaseManager | null = null
   private dbManagerInitPromise: Promise<DatabaseManager> | null = null
@@ -872,19 +878,36 @@ export default class YoloPlugin extends Plugin {
   }
 
   private warnIfInstallationIncomplete() {
-    const baked = BAKED_PLUGIN_VERSION
-    const runtime = this.manifest.version
-    if (baked && runtime && baked !== runtime) {
-      console.error(
-        `[YOLO] Version mismatch: main.js=${baked}, manifest=${runtime}. ` +
-          `Likely an incomplete update download.`,
-      )
-      this.installationIncompleteDetail = {
-        bakedVersion: baked,
-        manifestVersion: runtime,
-      }
-      this.notifyInstallationIncompleteListeners()
+    this.checkAndHandleInstallationIntegrity()
+  }
+
+  private checkAndHandleInstallationIntegrity(): void {
+    if (this.installationIntegrityCheckStarted) {
+      return
     }
+    this.installationIntegrityCheckStarted = true
+
+    void (async () => {
+      const detail = await checkInstallationIntegrityLayer1And2(
+        this,
+        BAKED_PLUGIN_VERSION || null,
+      )
+
+      if (!detail) {
+        return
+      }
+
+      console.error(
+        `[YOLO] Installation integrity issue: target=${detail.targetVersion}, ` +
+          `suspects=${detail.suspectFiles.join(', ')}`,
+      )
+      this.installationIncompleteDetail = detail
+      this.notifyInstallationIncompleteListeners()
+
+      if (canSelfUpdate(this)) {
+        void this.autoRepairInstallation()
+      }
+    })()
   }
 
   isInstallationIncompleteBannerDismissed(): boolean {
@@ -1220,16 +1243,19 @@ export default class YoloPlugin extends Plugin {
           )
             .replace('{count}', String(agentActivities.length))
             .replace('{approvalCount}', String(waitingApprovalCount))
-        : this.t(
-            'statusBar.agentRunning',
-            '{count} agent(s) running',
-          ).replace('{count}', String(agentActivities.length))
+        : this.t('statusBar.agentRunning', '{count} agent(s) running').replace(
+            '{count}',
+            String(agentActivities.length),
+          )
     }
 
     if (runningActivities.length === 1 && failedActivities.length === 0) {
       const [activity] = runningActivities
       if (activity.kind === 'rag-index') {
-        return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base updating in background')
+        return this.t(
+          'statusBar.ragAutoUpdateRunning',
+          'Knowledge base updating in background',
+        )
       }
     }
 
@@ -2008,7 +2034,10 @@ export default class YoloPlugin extends Plugin {
         } catch (error) {
           if (error instanceof RagIndexBusyError) {
             notice.setMessage(
-              this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base indexing is running'),
+              this.t(
+                'statusBar.ragAutoUpdateRunning',
+                'Knowledge base indexing is running',
+              ),
             )
           } else {
             console.error(error)
@@ -2055,7 +2084,10 @@ export default class YoloPlugin extends Plugin {
         } catch (error) {
           if (error instanceof RagIndexBusyError) {
             notice.setMessage(
-              this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base indexing is running'),
+              this.t(
+                'statusBar.ragAutoUpdateRunning',
+                'Knowledge base indexing is running',
+              ),
             )
           } else {
             console.error(error)
@@ -2596,7 +2628,22 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
 
     if (yoloBaseDirChanged) {
       if (this.dbManager) {
-        await this.dbManager.save()
+        // Snapshot the in-memory DB to the OLD location before relocating.
+        // If this fails (#408 OOM, disk full, etc.), the move would carry a
+        // stale snapshot to the new location and silently lose embeddings —
+        // abort the relocation and keep the user on the previous root.
+        try {
+          await this.dbManager.save()
+        } catch (error) {
+          console.error(
+            '[YOLO] Failed to snapshot vector database before base-dir change; aborting move.',
+            error,
+          )
+          new Notice(
+            'Failed to snapshot YOLO vector database. Keeping previous YOLO root folder.',
+          )
+          return
+        }
       }
       const migrated = await relocateYoloManagedData({
         app: this.app,
@@ -2716,9 +2763,21 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     return this.downloadPluginRelease(result.latestVersion, result.assets)
   }
 
+  private repairFilesMatch(
+    left: ReleaseFileName[] | undefined,
+    right: ReleaseFileName[],
+  ): boolean {
+    if (!left || left.length !== right.length) {
+      return false
+    }
+    const sortedLeft = [...left].sort()
+    const sortedRight = [...right].sort()
+    return sortedLeft.every((file, index) => file === sortedRight[index])
+  }
+
   private async downloadPluginRelease(
     version: string,
-    assets: ReleaseAssetUrls,
+    assets: ReleaseAssets,
   ): Promise<void> {
     if (!canSelfUpdate(this) || !this.manifest.dir) {
       return
@@ -2774,12 +2833,98 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
         })
         this.setPluginUpdateState({ status: 'ready', version: normalized })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error)
+        const message = error instanceof Error ? error.message : String(error)
         this.setPluginUpdateState({
           status: 'error',
           version: normalized,
           message,
+        })
+      } finally {
+        this.pluginUpdateDownloadPromise = null
+      }
+    })()
+
+    return this.pluginUpdateDownloadPromise
+  }
+
+  private async downloadPluginRepair(
+    version: string,
+    assets: ReleaseAssets,
+    files: ReleaseFileName[],
+  ): Promise<void> {
+    if (!canSelfUpdate(this) || !this.manifest.dir || files.length === 0) {
+      return
+    }
+
+    if (this.pluginUpdateDownloadPromise) {
+      return this.pluginUpdateDownloadPromise
+    }
+
+    const normalized = normalizePluginVersion(version)
+    const uniqueFiles = [...new Set(files)]
+    if (
+      this.pluginUpdateState.status === 'ready' &&
+      this.pluginUpdateState.version === normalized &&
+      this.repairFilesMatch(this.pluginUpdateState.repairFiles, uniqueFiles)
+    ) {
+      return
+    }
+
+    if (this.pluginUpdateState.status === 'downloading') {
+      return
+    }
+
+    const stagingDir = getStagingDir(this.manifest.dir, normalized)
+    const existing = await getRepairStagingStatus(
+      this.app.vault.adapter,
+      stagingDir,
+      normalized,
+    )
+    if (existing.ready && this.repairFilesMatch(existing.files, uniqueFiles)) {
+      this.setPluginUpdateState({
+        status: 'ready',
+        version: normalized,
+        repairFiles: uniqueFiles,
+      })
+      return
+    }
+
+    this.setPluginUpdateState({
+      status: 'downloading',
+      version: normalized,
+      progress: 0,
+      repairFiles: uniqueFiles,
+    })
+
+    this.pluginUpdateDownloadPromise = (async () => {
+      try {
+        await downloadRepairFilesToStaging({
+          adapter: this.app.vault.adapter,
+          pluginDir: this.manifest.dir!,
+          version: normalized,
+          assets,
+          files: uniqueFiles,
+          onProgress: (progress) => {
+            this.setPluginUpdateState({
+              status: 'downloading',
+              version: normalized,
+              progress,
+              repairFiles: uniqueFiles,
+            })
+          },
+        })
+        this.setPluginUpdateState({
+          status: 'ready',
+          version: normalized,
+          repairFiles: uniqueFiles,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.setPluginUpdateState({
+          status: 'error',
+          version: normalized,
+          message,
+          repairFiles: uniqueFiles,
         })
       } finally {
         this.pluginUpdateDownloadPromise = null
@@ -2795,10 +2940,17 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     }
 
     const version = this.pluginUpdateState.version
+    const repairFiles = this.pluginUpdateState.repairFiles
 
-    this.setPluginUpdateState({ status: 'applying', version })
+    this.setPluginUpdateState({
+      status: 'applying',
+      version,
+      repairFiles,
+    })
 
-    const applyResult = await applyStagedUpdate(this.app, this, version)
+    const applyResult = repairFiles?.length
+      ? await applyRepairFiles(this.app, this, version)
+      : await applyStagedUpdate(this.app, this, version)
     if (!applyResult.ok) {
       if (applyResult.reason === 'min_app_version') {
         new InstallerUpdateRequiredModal(this.app).open()
@@ -2807,6 +2959,7 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
         status: 'error',
         version,
         message: applyResult.reason,
+        repairFiles,
       })
       return
     }
@@ -2816,52 +2969,87 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     this.notifyUpdateCheckListeners()
   }
 
+  private async autoRepairInstallation(): Promise<void> {
+    const detail = this.installationIncompleteDetail
+    if (!detail || !canSelfUpdate(this) || detail.suspectFiles.length === 0) {
+      return
+    }
+
+    const version = normalizePluginVersion(detail.targetVersion)
+    const files = [...new Set(detail.suspectFiles)]
+    if (
+      this.pluginUpdateState.status === 'ready' &&
+      this.pluginUpdateState.version === version &&
+      this.repairFilesMatch(this.pluginUpdateState.repairFiles, files)
+    ) {
+      return
+    }
+
+    const assets = buildReleaseAssets(version)
+    if (!assets) {
+      return
+    }
+
+    await this.downloadPluginRepair(version, assets, files)
+  }
+
   async repairIncompleteInstallation(): Promise<void> {
     const detail = this.installationIncompleteDetail
     if (!detail || !canSelfUpdate(this)) {
       return
     }
 
-    const version = normalizePluginVersion(detail.manifestVersion)
+    const version = normalizePluginVersion(detail.targetVersion)
+    const files = [...new Set(detail.suspectFiles)]
     if (
       this.pluginUpdateState.status === 'ready' &&
-      this.pluginUpdateState.version === version
+      this.pluginUpdateState.version === version &&
+      this.repairFilesMatch(this.pluginUpdateState.repairFiles, files)
     ) {
       await this.applyPluginUpdate()
       return
     }
 
-    const release = await fetchReleaseByVersion(version)
-    if (!release?.assets) {
-      window.open('https://github.com/Lapis0x0/obsidian-yolo/releases')
+    const assets = buildReleaseAssets(version)
+    if (!assets) {
       return
     }
 
-    await this.downloadPluginRelease(version, release.assets)
-  }
-
-  isUpdateVersionMuted(version: string): boolean {
-    return this.settings.mutedUpdateVersion === version
+    await this.downloadPluginRepair(version, assets, files)
   }
 
   isUpdateVersionSoftDismissed(version: string): boolean {
     return this.settings.softDismissedUpdateVersion === version
   }
 
+  isUpdateVersionMuted(version: string): boolean {
+    const muted = normalizePluginVersion(this.settings.mutedUpdateVersion)
+    if (!muted) {
+      return false
+    }
+    return muted === normalizePluginVersion(version)
+  }
+
+  async muteUpdateVersion(version: string): Promise<void> {
+    const normalized = normalizePluginVersion(version)
+    await this.setSettings({
+      ...this.settings,
+      mutedUpdateVersion: normalized,
+    })
+    if (this.isUpdateVersionMuted(normalized)) {
+      this.updateCheckResult = null
+      this.notifyUpdateCheckListeners()
+    }
+  }
+
   async dismissUpdateVersion(version: string): Promise<void> {
-    const shouldMute = this.isUpdateVersionSoftDismissed(version)
     await this.setSettings({
       ...this.settings,
       softDismissedUpdateVersion: version,
-      mutedUpdateVersion: shouldMute
-        ? version
-        : this.settings.mutedUpdateVersion,
     })
     // setSettings can no-op (e.g. external settings conflict). Only hide the
     // toast when the dismissal state actually persisted, so the user can retry.
-    const persisted = shouldMute
-      ? this.isUpdateVersionMuted(version)
-      : this.isUpdateVersionSoftDismissed(version)
+    const persisted = this.isUpdateVersionSoftDismissed(version)
     if (persisted) {
       this.updateCheckResult = null
       this.notifyUpdateCheckListeners()
@@ -2875,10 +3063,10 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     this.hasCheckedForUpdate = true
     void (async () => {
       const fetched = await checkForUpdate(this.manifest.version)
-      if (
-        fetched?.hasUpdate &&
-        !this.isUpdateVersionMuted(fetched.latestVersion)
-      ) {
+      if (fetched?.hasUpdate) {
+        if (this.isUpdateVersionMuted(fetched.latestVersion)) {
+          return
+        }
         this.updateCheckResult = fetched
         this.notifyUpdateCheckListeners()
         await this.refreshPluginUpdateStaging(fetched.latestVersion)

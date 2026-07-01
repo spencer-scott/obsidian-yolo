@@ -152,7 +152,10 @@ export function NotificationSettingsSection() {
             <ObsidianDropdown
               value={settings.notificationOptions.timing ?? 'when-unfocused'}
               options={{
-                always: t('settings.etc.notificationTimingAlways', 'Always notify'),
+                always: t(
+                  'settings.etc.notificationTimingAlways',
+                  'Always notify',
+                ),
                 'when-unfocused': t(
                   'settings.etc.notificationTimingWhenUnfocused',
                   'Only when unfocused',
@@ -180,7 +183,10 @@ export function NotificationSettingsSection() {
             />
           </ObsidianSetting>
           <ObsidianSetting
-            name={t('settings.etc.notificationTaskCompleted', 'Notify when task completed')}
+            name={t(
+              'settings.etc.notificationTaskCompleted',
+              'Notify when task completed',
+            )}
             desc={t(
               'settings.etc.notificationTaskCompletedDesc',
               'Notify when the current Agent task ends and is no longer waiting for approval.',

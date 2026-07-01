@@ -1,6 +1,7 @@
 import type { ActiveWebviewHandle, WebviewLike } from './activeWebviewProbe'
 import {
   BrowserReadFailure,
+  readActiveWebviewHtml,
   readActiveWebviewPage,
 } from './activeWebviewReader'
 
@@ -206,5 +207,76 @@ describe('readActiveWebviewPage', () => {
         format: 'readable',
       }),
     ).rejects.toMatchObject({ code: 'extraction_failed' })
+  })
+})
+
+describe('readActiveWebviewHtml', () => {
+  it('returns full rendered DOM HTML with basic page metadata', async () => {
+    const executeJavaScript = jest.fn(() =>
+      Promise.resolve({
+        kind: 'html',
+        url: 'https://example.com/article',
+        title: 'Article',
+        html: '<html><body><main>Body</main></body></html>',
+        byteLength: 42,
+      }),
+    )
+    const handle = buildHandle({ executeJavaScript })
+
+    const result = await readActiveWebviewHtml(handle, { maxBytes: 1024 })
+
+    expect(executeJavaScript).toHaveBeenCalledWith(
+      expect.stringContaining('1024'),
+    )
+    expect(result).toEqual(
+      expect.objectContaining({
+        url: 'https://example.com/article',
+        title: 'Article',
+        html: '<html><body><main>Body</main></body></html>',
+        byteLength: 42,
+      }),
+    )
+  })
+
+  it('returns null for an empty about:blank page', async () => {
+    const handle = buildHandle({
+      executeJavaScript: () =>
+        Promise.resolve({
+          kind: 'html',
+          url: 'about:blank',
+          title: '',
+          html: '',
+          byteLength: 0,
+        }),
+    })
+
+    await expect(readActiveWebviewHtml(handle)).resolves.toBeNull()
+  })
+
+  it('refuses oversized HTML reported by the webview script', async () => {
+    const handle = buildHandle({
+      executeJavaScript: () =>
+        Promise.resolve({
+          kind: 'html_too_large',
+          url: 'https://example.com/article',
+          title: 'Article',
+          byteLength: 2048,
+          maxBytes: 1024,
+        }),
+    })
+
+    await expect(
+      readActiveWebviewHtml(handle, { maxBytes: 1024 }),
+    ).rejects.toMatchObject({ code: 'content_too_large' })
+  })
+
+  it('rejects malformed HTML extraction payloads', async () => {
+    const handle = buildHandle({
+      executeJavaScript: () => Promise.resolve({ kind: 'html', html: 1 }),
+    })
+
+    await expect(readActiveWebviewHtml(handle)).rejects.toMatchObject({
+      code: 'extraction_failed',
+    })
   })
 })

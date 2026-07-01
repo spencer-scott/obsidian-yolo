@@ -1,12 +1,12 @@
 {
   "name": "obsidian-yolo",
-  "version": "1.5.12.2",
+  "version": "1.5.12.11",
   "description": "AI chat with note context, smart writing assistance, and one-click edits for your vault.",
   "main": "main.js",
   "scripts": {
     "dev": "concurrently -n app,styles -c blue,magenta \"npm:dev:app\" \"npm:styles:watch\"",
     "dev:app": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build": "tsc -noEmit -skipLibCheck && npm run styles:build && node esbuild.config.mjs production",
     "styles:build": "postcss src/styles/index.css -o styles.css",
     "styles:watch": "postcss src/styles/index.css -o styles.css -w",
     "seed:long-chat": "node generate-long-chat.mjs",
@@ -20,6 +20,7 @@
     "test": "jest --maxWorkers=50%",
     "test:watch": "jest --watch",
     "test:changed": "jest -o",
+    "models:update:openrouter": "node scripts/update-openrouter-model-capabilities.mjs",
     "migrate:compile": "node compile-migration.js"
   },
   "keywords": [],
@@ -98,6 +99,7 @@
     "fuzzysort": "^3.1.0",
     "gpt-tokenizer": "^3.4.0",
     "groq-sdk": "^0.7.0",
+    "jszip": "^3.10.1",
     "langchain": "^0.3.2",
     "lexical": "^0.17.1",
     "lodash.debounce": "^4.0.8",

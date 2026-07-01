@@ -2,6 +2,7 @@ import {
   App,
   FileSystemAdapter,
   Platform,
+  type TAbstractFile,
   TFile,
   TFolder,
   normalizePath,
@@ -20,6 +21,7 @@ import { McpTool } from '../../types/mcp.types'
 import {
   ToolCallResponseStatus,
   type ToolEditSummary,
+  type ToolFsReadOperationSummary,
 } from '../../types/tool-call.types'
 import { uint8ArrayToBase64 } from '../../utils/base64'
 import {
@@ -34,6 +36,10 @@ import {
   chatModelSupportsPdf,
   chatModelSupportsVision,
 } from '../../utils/llm/model-modalities'
+import {
+  type OfficeDocumentKind,
+  parseOfficeDocument,
+} from '../../utils/office'
 import {
   PDF_INDEX_MAX_BYTES,
   PDF_INDEX_MAX_PAGES,
@@ -61,6 +67,7 @@ import {
 import {
   BrowserReadFailure,
   type BrowserReadFormat,
+  readActiveWebviewHtml,
   readActiveWebviewPage,
 } from '../browser/activeWebviewReader'
 import {
@@ -99,6 +106,12 @@ import {
   getJsSandboxSettings,
 } from './jsSandboxSettings'
 import {
+  JS_SANDBOX_BROWSER_READ_DEFAULT_MAX_KB,
+  JS_SANDBOX_BROWSER_READ_HARD_MAX_KB,
+  JS_SANDBOX_BROWSER_READ_MIN_KB,
+  JS_SANDBOX_DB_QUERY_DEFAULT_MAX_LIMIT,
+  JS_SANDBOX_DB_QUERY_DEFAULT_REQUEST_LIMIT,
+  JS_SANDBOX_DB_QUERY_HARD_MAX_LIMIT,
   JS_SANDBOX_FETCH_DEFAULT_MAX_CONCURRENT,
   JS_SANDBOX_FETCH_DEFAULT_MAX_RESPONSE_KB,
   JS_SANDBOX_FETCH_HARD_MAX_CONCURRENT,
@@ -106,10 +119,13 @@ import {
   JS_SANDBOX_FETCH_MIN_CONCURRENT,
   JS_SANDBOX_FETCH_MIN_RESPONSE_KB,
   JS_SANDBOX_TOOL_NAME,
+  JS_SANDBOX_VAULT_LIST_MAX_ENTRIES,
   JS_SANDBOX_VAULT_READ_DEFAULT_MAX_KB,
   JS_SANDBOX_VAULT_READ_HARD_MAX_KB,
   JS_SANDBOX_VAULT_READ_MIN_KB,
-  JsSandboxProxyHandlers,
+  type JsSandboxBrowserReadHtmlResult,
+  type JsSandboxProxyHandlers,
+  type JsSandboxVaultListEntry,
   callJsSandboxTool,
   getJsSandboxTool,
 } from './jsSandboxTool'
@@ -120,6 +136,7 @@ export { recoverLikelyEscapedBackslashSequences }
 const LOCAL_FILE_TOOL_SERVER = 'yolo_local'
 export const TERMINAL_COMMAND_TOOL_NAME = 'terminal_command'
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024
+const OFFICE_READ_MAX_BYTES = 10 * 1024 * 1024
 // Absolute memory-defense cap for fs_edit reading the full file for replace.
 // MAX_FILE_SIZE_BYTES is the "snapshot threshold" (above it we skip the
 // undo/review snapshot); this constant is the "hard refusal cap" (above it
@@ -132,6 +149,8 @@ const MAX_READ_MAX_LINES = 2000
 const MAX_READ_LINE_INDEX = 1_000_000
 const MAX_RAG_SNIPPET_CHARS = 500
 const RAG_FETCH_LIMIT_MAX = 300
+const BROWSER_READ_PATH_USAGE =
+  'browser:// paths only read open Obsidian web pages by page_id copied exactly from <browser_context> (browser://page_<8 lowercase base36>_<8 lowercase base36>). Do not append URL paths to a page_id and do not use browser:// to open or fetch internet URLs. For internet access, use web_search or web_scrape when available; if those tools are unavailable, tell the user.'
 
 const getContextPrunableToolCallIds = (
   messages: ChatMessage[] | undefined,
@@ -235,8 +254,19 @@ type FsReadOperation =
 type ContextPruneMode = 'selected' | 'all'
 type FsFileOpAction = 'write' | 'delete' | 'create_dir' | 'move'
 
+function getOfficeDocumentKindFromExtension(
+  extension: string | undefined,
+): OfficeDocumentKind | null {
+  const normalized = extension?.toLowerCase()
+  if (normalized === 'docx' || normalized === 'pptx' || normalized === 'xlsx') {
+    return normalized
+  }
+  return null
+}
+
 type LocalToolCallResultMetadata = {
   editSummary?: ToolEditSummary
+  fsReadOperation?: ToolFsReadOperationSummary
   appliedAt?: number
   truncated?: { totalBytes: number; omittedBytes: number }
 }
@@ -485,11 +515,20 @@ export const parseBrowserReadPageId = (path: string): string => {
   }
   const pageId = trimmed.slice(BROWSER_READ_PATH_PREFIX.length).trim()
   if (!BROWSER_PAGE_ID_PATTERN.test(pageId)) {
-    throw new Error(
-      'browser:// path must use a page_id copied from <browser_context> (page_<8 lowercase base36>_<8 lowercase base36>).',
-    )
+    throw new Error(BROWSER_READ_PATH_USAGE)
   }
   return pageId
+}
+
+const normalizeBrowserReadPageId = (value: string): string => {
+  const trimmed = value.trim()
+  if (trimmed.startsWith(BROWSER_READ_PATH_PREFIX)) {
+    return parseBrowserReadPageId(trimmed)
+  }
+  if (!BROWSER_PAGE_ID_PATTERN.test(trimmed)) {
+    throw new Error(BROWSER_READ_PATH_USAGE)
+  }
+  return trimmed
 }
 
 type FsReadLineSliceResult = {
@@ -721,7 +760,7 @@ export function getLocalFileTools(options?: {
     {
       name: 'fs_read',
       description:
-        'Read vault files, skill instructions, or open Obsidian web pages. Lines are 1-based. For PDFs, output is <page N> tags; lines mode uses page numbers. Prefer lines for targeted reads. Skill paths from <available_skills> may use builtin:// prefixes. Open web pages use browser://<page_id> copied from <browser_context>. Do not call browser:// paths when <browser_context> is absent.',
+        'Read vault files, skill instructions, or open Obsidian web pages. Lines are 1-based. For PDFs, output is <page N> tags; lines mode uses page numbers. Office files (.docx/.pptx/.xlsx) are parsed to markdown text. Prefer lines for targeted reads. Skill paths from <available_skills> may use builtin:// prefixes. Open web pages use browser://<page_id> copied exactly from <browser_context>. browser:// does not open URLs or fetch internet content; use web_search or web_scrape when available, and tell the user if those tools are unavailable. Do not call browser:// paths when <browser_context> is absent.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -730,12 +769,12 @@ export function getLocalFileTools(options?: {
             items: {
               type: 'string',
             },
-            description: `Vault-relative file paths, skill paths (builtin://), or browser://<page_id> from <browser_context>. Max ${MAX_BATCH_READ_FILES} items.`,
+            description: `Vault-relative file paths, skill paths (builtin://), or browser://<page_id> copied exactly from <browser_context>. Max ${MAX_BATCH_READ_FILES} items. Do not pass browser://https://... or browser://domain/path.`,
           },
           operation: {
             type: 'object',
             description:
-              'Read strategy. full: whole file/page. lines: targeted range (PDFs use page numbers). format applies only to browser:// paths.',
+              'Read strategy. Omit for full. full: whole file/page. lines: targeted range (PDFs use page numbers). format applies only to browser:// paths.',
             properties: {
               type: {
                 type: 'string',
@@ -766,7 +805,7 @@ export function getLocalFileTools(options?: {
             required: ['type'],
           },
         },
-        required: ['paths', 'operation'],
+        required: ['paths'],
       },
     },
     {
@@ -818,7 +857,7 @@ export function getLocalFileTools(options?: {
     {
       name: 'fs_edit',
       description:
-        'Apply a single targeted text edit within an existing file. Prefer this tool when modifying content in an existing file. Two ways to locate the edit, choose exactly one: for an exact-text edit, provide oldText (the text to find, which must match the file exactly once) and newText; for a line-range edit, provide startLine and endLine (1-based inclusive) and newText. Do not provide both oldText and startLine/endLine. To make several edits in the same file, emit multiple fs_edit calls — the system automatically merges edits targeting the same file into one atomic review and write, so earlier edits cannot invalidate later ones.',
+        'Apply one targeted text edit to an existing file. You must provide path, newText, and exactly one locator: oldText for exact-text replacement, or startLine+endLine for line-range replacement. Do not call fs_edit with only path and newText. Do not provide both oldText and startLine/endLine. Use fs_write to create a new file, fill an empty file, or overwrite full file content. To make several edits in the same file, emit multiple fs_edit calls — the system automatically merges edits targeting the same file into one atomic review and write, so earlier edits cannot invalidate later ones.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -826,14 +865,15 @@ export function getLocalFileTools(options?: {
             type: 'string',
             description: 'Vault-relative file path.',
           },
+          newText: {
+            type: 'string',
+            description:
+              'Replacement text. This is not a standalone write request; it is only valid together with oldText or startLine+endLine.',
+          },
           oldText: {
             type: 'string',
             description:
               'Exact-text mode: the existing text to find and replace. Must match the file exactly once. Do not combine with startLine/endLine.',
-          },
-          newText: {
-            type: 'string',
-            description: 'Replacement text. Required in both modes.',
           },
           startLine: {
             type: 'integer',
@@ -1066,9 +1106,11 @@ export function getLocalFileTools(options?: {
       description:
         'Run a command in the local OS shell. Desktop-only. ' +
         'Uses PowerShell on Windows and a POSIX shell on macOS/Linux. ' +
-        'Use for terminal-style inspection or local commands. ' +
-        'Arguments: command starts a command; background=true returns a session_id ' +
-        'when the command keeps running; session_id polls or continues an existing ' +
+        'Use for terminal-style inspection or local CLI commands. ' +
+        'By default, command runs as a one-shot process and completes when that process exits; ' +
+        'it does not keep shell state between calls. ' +
+        'Use background=true to create a persistent session for long-running or interactive commands; ' +
+        'session_id polls or continues an existing ' +
         'session; input sends stdin to that session; kill=true terminates it. ' +
         'Results separate stdout and stderr. ' +
         'Use tail_lines or tail_bytes when polling verbose sessions to inspect recent logs only. ' +
@@ -1404,6 +1446,95 @@ const resolveFolderByPath = (
   }
 
   return { folder: abstractFile, normalizedPath }
+}
+
+type CollectedVaultListEntry =
+  | {
+      kind: 'file'
+      node: TFile
+      path: string
+    }
+  | {
+      kind: 'dir'
+      node: TFolder
+      path: string
+    }
+
+const getAbstractFileName = (file: TAbstractFile): string => {
+  if (file.name) {
+    return file.name
+  }
+  return file.path.split('/').pop() ?? file.path
+}
+
+// Breadth-first walk collecting child dirs and files. Output order is not
+// significant here: the only caller re-sorts by path, and exceeding maxResults
+// is a hard error (the partial collection is discarded), so no intermediate
+// sort is needed.
+const collectVaultChildEntries = ({
+  folder,
+  depth,
+  maxResults,
+}: {
+  folder: TFolder
+  depth: number
+  maxResults: number
+}): CollectedVaultListEntry[] => {
+  const entries: CollectedVaultListEntry[] = []
+  const queue: Array<{ folder: TFolder; level: number }> = [
+    { folder, level: 1 },
+  ]
+  let queueIndex = 0
+
+  while (queueIndex < queue.length && entries.length < maxResults) {
+    const current = queue[queueIndex]
+    queueIndex++
+    const { folder: currentFolder, level } = current
+
+    for (const child of currentFolder.children) {
+      if (entries.length >= maxResults) break
+
+      if (child instanceof TFolder) {
+        entries.push({ kind: 'dir', node: child, path: child.path })
+        if (level < depth) {
+          queue.push({ folder: child, level: level + 1 })
+        }
+        continue
+      }
+
+      if (child instanceof TFile) {
+        entries.push({ kind: 'file', node: child, path: child.path })
+      }
+    }
+  }
+
+  return entries
+}
+
+const toJsSandboxVaultListEntry = (
+  entry: CollectedVaultListEntry,
+): JsSandboxVaultListEntry => {
+  if (entry.kind === 'dir') {
+    return {
+      kind: 'dir',
+      path: entry.path,
+      name: getAbstractFileName(entry.node),
+    }
+  }
+
+  const stat = entry.node.stat as
+    | {
+        size?: number
+        mtime?: number
+      }
+    | undefined
+  return {
+    kind: 'file',
+    path: entry.path,
+    name: getAbstractFileName(entry.node),
+    size: typeof stat?.size === 'number' ? stat.size : 0,
+    mtime: typeof stat?.mtime === 'number' ? stat.mtime : 0,
+  }
 }
 
 /**
@@ -2002,6 +2133,25 @@ const getFsEditPlan = (args: Record<string, unknown>): TextEditPlan => {
 }
 
 const getFsReadOperation = (args: Record<string, unknown>): FsReadOperation => {
+  const topLevelOperationKeys = [
+    'type',
+    'startLine',
+    'endLine',
+    'maxLines',
+    'format',
+    'modality',
+  ]
+  const hasTopLevelOperationKey = topLevelOperationKeys.some(
+    (key) => args[key] !== undefined,
+  )
+
+  if (
+    (args.operation === undefined || args.operation === null) &&
+    !hasTopLevelOperationKey
+  ) {
+    return { type: 'full' }
+  }
+
   const parsedOperation = coerceOperationObject(args.operation)
   const type = asOptionalString(parsedOperation.type).trim().toLowerCase()
 
@@ -3560,12 +3710,61 @@ export async function callLocalFileTool({
               ...(visionDowngraded
                 ? {
                     effectiveModality: 'text' as const,
-                    warning: 'The current model does not support image input; automatically downgraded to text reading',
+                    warning:
+                      'The current model does not support image input; automatically downgraded to text reading',
                   }
                 : pdfDowngraded
                   ? { effectiveModality: 'text' as const }
                   : {}),
             })
+            continue
+          }
+
+          const officeKind = getOfficeDocumentKindFromExtension(file.extension)
+          if (officeKind) {
+            if (file.stat.size > OFFICE_READ_MAX_BYTES) {
+              results.push({
+                path,
+                ok: false,
+                error: `Office document too large (${file.stat.size} bytes).`,
+              })
+              continue
+            }
+
+            try {
+              const rawBuf = await app.vault.readBinary(file)
+              const parsed = await parseOfficeDocument(rawBuf, officeKind)
+              const content = parsed.markdown
+              const lines = content.length === 0 ? [] : content.split('\n')
+              const sliced = sliceLinesForFsReadOperation(lines, operation)
+
+              results.push({
+                path,
+                ok: true,
+                totalLines: sliced.totalLines,
+                returnedRange:
+                  operation.type === 'lines'
+                    ? {
+                        startLine: sliced.returnedStartLine,
+                        endLine: sliced.returnedEndLine,
+                      }
+                    : undefined,
+                hasMoreBelow: sliced.hasMoreBelow,
+                nextStartLine: sliced.nextStartLine,
+                content: sliced.outputContent,
+              })
+            } catch (error) {
+              results.push({
+                path,
+                ok: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : typeof error === 'string'
+                      ? error
+                      : JSON.stringify(error),
+              })
+            }
             continue
           }
 
@@ -3662,10 +3861,37 @@ export async function callLocalFileTool({
             ? perFileAttachmentParts.flatMap((p) => p.parts)
             : undefined
 
+        const firstReadableResult = results[0]?.ok ? results[0] : undefined
+        const isPdf =
+          typeof firstReadableResult?.path === 'string' &&
+          firstReadableResult.path.toLowerCase().endsWith('.pdf')
+        const fsReadOperation: ToolFsReadOperationSummary | undefined = (() => {
+          if (!firstReadableResult) {
+            return undefined
+          }
+          if (operation.type === 'full') {
+            return { type: 'full', isPdf }
+          }
+          const returnedRange = firstReadableResult.returnedRange
+          if (
+            typeof returnedRange?.startLine !== 'number' ||
+            typeof returnedRange.endLine !== 'number'
+          ) {
+            return undefined
+          }
+          return {
+            type: 'lines',
+            startLine: returnedRange.startLine,
+            endLine: returnedRange.endLine,
+            isPdf,
+          }
+        })()
+
         return {
           status: ToolCallResponseStatus.Success,
           text: textResult,
           contentParts,
+          metadata: fsReadOperation ? { fsReadOperation } : undefined,
         }
       }
 
@@ -4691,11 +4917,6 @@ function executeTodoWrite({
   }
 }
 
-const JS_SANDBOX_DB_DEFAULT_MAX_LIMIT = 20
-const JS_SANDBOX_DB_HARD_MAX_LIMIT = 100
-const JS_SANDBOX_DB_FIND_MAX_SCANNED_FILES = 500
-const JS_SANDBOX_DB_FIND_MAX_FILE_BYTES = 256 * 1024
-
 const MIME_TYPES_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -4724,10 +4945,15 @@ const MIME_TYPES_BY_EXT: Record<string, string> = {
   woff2: 'font/woff2',
 }
 
-function guessMimeTypeFromExtension(extension: string | undefined): string {
-  if (!extension) return 'application/octet-stream'
+function inferMimeType(path: string): string {
+  const name = path.split('/').pop() ?? path
+  const dotIndex = name.lastIndexOf('.')
+  if (dotIndex <= 0 || dotIndex === name.length - 1) {
+    return 'application/octet-stream'
+  }
   return (
-    MIME_TYPES_BY_EXT[extension.toLowerCase()] ?? 'application/octet-stream'
+    MIME_TYPES_BY_EXT[name.slice(dotIndex + 1).toLowerCase()] ??
+    'application/octet-stream'
   )
 }
 
@@ -4808,14 +5034,14 @@ function assertJsSandboxFetchAllowed(
   }
 }
 
-function buildJsSandboxProxyHandlers(
+export function buildJsSandboxProxyHandlers(
   app: App,
   config: JsSandboxSettings,
   getRagEngine?: () => Promise<RAGEngine>,
 ): JsSandboxProxyHandlers {
   const handlers: JsSandboxProxyHandlers = {}
 
-  if (config.allowVaultRead) {
+  if (config.allowVaultRead || config.allowDbQuery) {
     const configuredVaultKb =
       typeof config.vaultReadMaxKb === 'number' &&
       Number.isFinite(config.vaultReadMaxKb)
@@ -4826,7 +5052,33 @@ function buildJsSandboxProxyHandlers(
       Math.max(JS_SANDBOX_VAULT_READ_MIN_KB, configuredVaultKb),
     )
     const vaultReadMaxBytes = vaultReadMaxKb * 1024
-    handlers.vaultReadConfig = { maxKb: vaultReadMaxKb }
+
+    if (config.allowVaultRead) {
+      handlers.vaultList = async (
+        path?: string,
+        options?: Record<string, unknown>,
+      ) => {
+        const { folder, normalizedPath } = resolveFolderByPath(app, path)
+        const recursive = options?.recursive === true
+        // The list crosses the sandbox/host boundary as one array. Keep a hard
+        // fuse for pathological vaults while leaving normal large-vault stats
+        // practical inside the JS execution.
+        const entries = collectVaultChildEntries({
+          folder,
+          depth: recursive ? Number.POSITIVE_INFINITY : 1,
+          maxResults: JS_SANDBOX_VAULT_LIST_MAX_ENTRIES + 1,
+        })
+        if (entries.length > JS_SANDBOX_VAULT_LIST_MAX_ENTRIES) {
+          throw new Error(
+            `vault.list refused: more than ${JS_SANDBOX_VAULT_LIST_MAX_ENTRIES} entries under "${normalizedPath || '/'}"; pass a narrower path.`,
+          )
+        }
+        return entries
+          .map(toJsSandboxVaultListEntry)
+          .sort((a, b) => a.path.localeCompare(b.path))
+      }
+    }
+
     handlers.vaultReadText = async (path: string) => {
       const normalized = normalizePath(path)
       const file = app.vault.getAbstractFileByPath(normalized)
@@ -4861,40 +5113,78 @@ function buildJsSandboxProxyHandlers(
       }
     }
 
-    handlers.vaultReadBinary = async (path: string) => {
-      const normalized = normalizePath(path)
-      const file = app.vault.getAbstractFileByPath(normalized)
-      // Same contract as readText: null only for "file does not exist".
-      if (file === null) {
+    if (config.allowVaultRead) {
+      handlers.vaultReadBinary = async (path: string) => {
+        const normalized = normalizePath(path)
+        const file = app.vault.getAbstractFileByPath(normalized)
+        // Same contract as readText: null only for "file does not exist".
+        if (file === null) {
+          return null
+        }
+        if (!(file instanceof TFile)) {
+          throw new Error(`vault.readBinary: "${path}" is a folder, not a file`)
+        }
+        const buffer = await app.vault.readBinary(file).catch((error) => {
+          const reason = error instanceof Error ? error.message : String(error)
+          throw new Error(`vault.readBinary: ${reason}`)
+        })
+        const bytes = new Uint8Array(buffer)
+        if (bytes.length > vaultReadMaxBytes) {
+          // Binary truncation would yield an invalid file; refuse instead so
+          // the model gets a clear signal rather than corrupted base64.
+          throw new Error(
+            `vault.readBinary refused: file is ${bytes.length} bytes, vaultReadMaxKb cap is ${vaultReadMaxKb} KB`,
+          )
+        }
+        // Convert in 32KB chunks to avoid `String.fromCharCode(...arr)` blowing the call-stack on large files.
+        let binary = ''
+        const chunkSize = 0x8000
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+          binary += String.fromCharCode.apply(null, Array.from(chunk))
+        }
+        const base64 = btoa(binary)
+        return {
+          base64,
+          mimeType: inferMimeType(path),
+          byteLength: bytes.length,
+        }
+      }
+    }
+  }
+
+  if (config.allowBrowserRead) {
+    const configuredBrowserKb =
+      typeof config.browserReadMaxKb === 'number' &&
+      Number.isFinite(config.browserReadMaxKb)
+        ? Math.floor(config.browserReadMaxKb)
+        : JS_SANDBOX_BROWSER_READ_DEFAULT_MAX_KB
+    const browserReadMaxKb = Math.min(
+      JS_SANDBOX_BROWSER_READ_HARD_MAX_KB,
+      Math.max(JS_SANDBOX_BROWSER_READ_MIN_KB, configuredBrowserKb),
+    )
+    const browserReadMaxBytes = browserReadMaxKb * 1024
+    handlers.browserReadHtml = async (
+      rawPageId: string,
+    ): Promise<JsSandboxBrowserReadHtmlResult | null> => {
+      if (Platform.isMobile) {
+        throw new Error('browser.readHtml is desktop-only.')
+      }
+      const pageId = normalizeBrowserReadPageId(rawPageId)
+      const handle = findWebviewHandleByPageId(app, pageId)
+      if (!handle) {
         return null
       }
-      if (!(file instanceof TFile)) {
-        throw new Error(`vault.readBinary: "${path}" is a folder, not a file`)
-      }
-      const buffer = await app.vault.readBinary(file).catch((error) => {
+      try {
+        return await readActiveWebviewHtml(handle, {
+          maxBytes: browserReadMaxBytes,
+        })
+      } catch (error) {
+        if (error instanceof BrowserReadFailure) {
+          throw new Error(`browser.readHtml: ${error.message}`)
+        }
         const reason = error instanceof Error ? error.message : String(error)
-        throw new Error(`vault.readBinary: ${reason}`)
-      })
-      const bytes = new Uint8Array(buffer)
-      if (bytes.length > vaultReadMaxBytes) {
-        // Binary truncation would yield an invalid file; refuse instead so
-        // the model gets a clear signal rather than corrupted base64.
-        throw new Error(
-          `vault.readBinary refused: file is ${bytes.length} bytes, vaultReadMaxKb cap is ${vaultReadMaxKb} KB`,
-        )
-      }
-      // Convert in 32KB chunks to avoid `String.fromCharCode(...arr)` blowing the call-stack on large files.
-      let binary = ''
-      const chunkSize = 0x8000
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
-        binary += String.fromCharCode.apply(null, Array.from(chunk))
-      }
-      const base64 = btoa(binary)
-      return {
-        base64,
-        mimeType: guessMimeTypeFromExtension(file.extension),
-        byteLength: bytes.length,
+        throw new Error(`browser.readHtml: ${reason}`)
       }
     }
   }
@@ -4967,20 +5257,23 @@ function buildJsSandboxProxyHandlers(
       Number.isFinite(config.dbQueryMaxLimit) &&
       config.dbQueryMaxLimit > 0
         ? Math.min(
-            JS_SANDBOX_DB_HARD_MAX_LIMIT,
+            JS_SANDBOX_DB_QUERY_HARD_MAX_LIMIT,
             Math.floor(config.dbQueryMaxLimit),
           )
-        : JS_SANDBOX_DB_DEFAULT_MAX_LIMIT
+        : JS_SANDBOX_DB_QUERY_DEFAULT_MAX_LIMIT
 
     const clampLimit = (raw: unknown): number => {
       if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
-        return Math.min(10, configuredLimit)
+        return Math.min(
+          JS_SANDBOX_DB_QUERY_DEFAULT_REQUEST_LIMIT,
+          configuredLimit,
+        )
       }
       return Math.min(configuredLimit, Math.floor(raw))
     }
 
     handlers.dbQuery = async (
-      method: 'search' | 'find' | 'get',
+      method: 'search',
       params: Record<string, unknown>,
     ) => {
       if (method === 'search') {
@@ -4989,68 +5282,6 @@ function buildJsSandboxProxyHandlers(
         const limit = clampLimit(params.limit)
         const results = await engine.processQuery({ query, limit })
         return results
-      }
-
-      if (method === 'find') {
-        const keywordRaw =
-          typeof params.keyword === 'string' ? params.keyword : ''
-        const keyword = keywordRaw.trim()
-        if (!keyword) return []
-        const needle = keyword.toLowerCase()
-        const limit = clampLimit(params.limit)
-
-        const files = app.vault.getMarkdownFiles()
-        const matches: Array<{ path: string; excerpt: string }> = []
-        let scanned = 0
-        for (const file of files) {
-          if (matches.length >= limit) break
-          if (scanned >= JS_SANDBOX_DB_FIND_MAX_SCANNED_FILES) break
-          if (file.stat.size > JS_SANDBOX_DB_FIND_MAX_FILE_BYTES) continue
-          scanned++
-          let text: string
-          try {
-            const vault = app.vault as {
-              cachedRead?: (f: TFile) => Promise<string>
-              read: (f: TFile) => Promise<string>
-            }
-            text = vault.cachedRead
-              ? await vault.cachedRead(file)
-              : await vault.read(file)
-          } catch {
-            continue
-          }
-          const hitIndex = text.toLowerCase().indexOf(needle)
-          if (hitIndex < 0) continue
-          const start = Math.max(0, hitIndex - 60)
-          const end = Math.min(text.length, hitIndex + needle.length + 60)
-          const excerpt =
-            (start > 0 ? '…' : '') +
-            text.slice(start, end).replace(/\s+/g, ' ').trim() +
-            (end < text.length ? '…' : '')
-          matches.push({ path: file.path, excerpt })
-        }
-        return matches
-      }
-
-      if (method === 'get') {
-        const path = typeof params.path === 'string' ? params.path : ''
-        if (!path) return null
-        const file = app.vault.getAbstractFileByPath(normalizePath(path))
-        if (!(file instanceof TFile)) return null
-        try {
-          const vault = app.vault as {
-            cachedRead?: (f: TFile) => Promise<string>
-            read: (f: TFile) => Promise<string>
-          }
-          const content = vault.cachedRead
-            ? await vault.cachedRead(file)
-            : await vault.read(file)
-          const frontmatter =
-            app.metadataCache.getFileCache(file)?.frontmatter ?? {}
-          return { content, frontmatter }
-        } catch {
-          return null
-        }
       }
 
       throw new Error(`unknown db method: ${method}`)

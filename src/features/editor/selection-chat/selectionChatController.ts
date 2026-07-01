@@ -930,7 +930,8 @@ export class SelectionChatController {
     }
 
     const basePrompt =
-      prompt?.trim() || this.t('selection.actions.explain', 'Please explain in depth')
+      prompt?.trim() ||
+      this.t('selection.actions.explain', 'Please explain in depth')
     this.showQuickAskWithAutoSend(editor, editorView, {
       prompt: basePrompt,
       mentionables: [mentionable],

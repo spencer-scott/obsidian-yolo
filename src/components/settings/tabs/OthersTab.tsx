@@ -3,7 +3,9 @@ import { App, Platform } from 'obsidian'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
 import { selectionHighlightController } from '../../../features/editor/selection-highlight/selectionHighlightController'
+import { Language } from '../../../i18n'
 import YoloPlugin from '../../../main'
+import { openExternalLink } from '../../../utils/openExternalLink'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianDropdown } from '../../common/ObsidianDropdown'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
@@ -11,13 +13,38 @@ import { ObsidianToggle } from '../../common/ObsidianToggle'
 import { ChatPreferencesSection } from '../sections/ChatPreferencesSection'
 import { EtcSection } from '../sections/EtcSection'
 
+const YOLO_REPO_URL = 'https://github.com/Lapis0x0/obsidian-yolo'
+
+function detectGithubIssueOs(): 'Windows' | 'macOS' | 'Linux' | 'Other' {
+  if (Platform.isMacOS) return 'macOS'
+  if (Platform.isWin) return 'Windows'
+  if (Platform.isLinux) return 'Linux'
+  return 'Other'
+}
+
+function buildBugReportUrl(pluginVersion: string, language: Language): string {
+  const template = language === 'zh' ? 'bug_report_zh.yml' : 'bug_report.yml'
+  const params = new URLSearchParams({
+    template,
+    'plugin-version': pluginVersion,
+    os: detectGithubIssueOs(),
+  })
+  return `${YOLO_REPO_URL}/issues/new?${params.toString()}`
+}
+
+function buildFeatureRequestUrl(language: Language): string {
+  const template =
+    language === 'zh' ? 'feature_request_zh.yml' : 'feature_request.yml'
+  return `${YOLO_REPO_URL}/issues/new?template=${template}`
+}
+
 type OthersTabProps = {
   app: App
   plugin: YoloPlugin
 }
 
 export function OthersTab({ app, plugin }: OthersTabProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { settings, setSettings } = useSettings()
 
   const handleMentionDisplayModeChange = (value: string) => {
@@ -159,10 +186,20 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
         >
           <ObsidianButton
             text={t('settings.supportYolo.buyMeACoffee')}
-            onClick={() =>
-              window.open('https://afdian.com/a/lapis0x0', '_blank')
-            }
+            onClick={() => openExternalLink('https://afdian.com/a/lapis0x0')}
             cta
+          />
+          <ObsidianButton
+            text={t('settings.supportYolo.reportBug')}
+            onClick={() =>
+              openExternalLink(
+                buildBugReportUrl(plugin.manifest.version, language),
+              )
+            }
+          />
+          <ObsidianButton
+            text={t('settings.supportYolo.featureRequest')}
+            onClick={() => openExternalLink(buildFeatureRequestUrl(language))}
           />
         </ObsidianSetting>
       </div>
@@ -179,7 +216,10 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
 
           <div className="yolo-settings-block-content">
             <ObsidianSetting
-              name={t('settings.etc.ribbonClickAction', 'Ribbon icon click location')}
+              name={t(
+                'settings.etc.ribbonClickAction',
+                'Ribbon icon click location',
+              )}
               desc={t(
                 'settings.etc.ribbonClickActionDesc',
                 'Choose where the Chat view opens when clicking the YOLO icon in the left ribbon. If a Chat view already exists at the selected location, it will be activated and reused; otherwise a new one is created.',
@@ -194,7 +234,10 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                     'Right sidebar',
                   ),
                   tab: t('settings.etc.ribbonClickActionTab', 'New tab'),
-                  split: t('settings.etc.ribbonClickActionSplit', 'Right split'),
+                  split: t(
+                    'settings.etc.ribbonClickActionSplit',
+                    'Right split',
+                  ),
                   ...(Platform.isDesktop
                     ? {
                         window: t(
@@ -203,13 +246,19 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
                         ),
                       }
                     : {}),
-                  last: t('settings.etc.ribbonClickActionLast', 'Last used location'),
+                  last: t(
+                    'settings.etc.ribbonClickActionLast',
+                    'Last used location',
+                  ),
                 }}
                 onChange={handleRibbonClickActionChange}
               />
             </ObsidianSetting>
             <ObsidianSetting
-              name={t('settings.etc.mentionDisplayMode', 'Mention display location')}
+              name={t(
+                'settings.etc.mentionDisplayMode',
+                'Mention display location',
+              )}
               desc={t(
                 'settings.etc.mentionDisplayModeDesc',
                 'Choose whether @ file mentions and / skill selections are displayed inline in the input box or as badges at the top of the input box.',
@@ -219,11 +268,11 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
               <ObsidianDropdown
                 value={settings.chatOptions.mentionDisplayMode ?? 'inline'}
                 options={{
-                  inline: t(
-                    'settings.etc.mentionDisplayModeInline',
-                    'Inline',
+                  inline: t('settings.etc.mentionDisplayModeInline', 'Inline'),
+                  badge: t(
+                    'settings.etc.mentionDisplayModeBadge',
+                    'Top badges',
                   ),
-                  badge: t('settings.etc.mentionDisplayModeBadge', 'Top badges'),
                 }}
                 onChange={handleMentionDisplayModeChange}
               />
@@ -242,7 +291,10 @@ export function OthersTab({ app, plugin }: OthersTabProps) {
               <ObsidianDropdown
                 value={settings.chatOptions.mentionContextMode ?? 'light'}
                 options={{
-                  light: t('settings.etc.mentionContextModeLight', 'Light mode'),
+                  light: t(
+                    'settings.etc.mentionContextModeLight',
+                    'Light mode',
+                  ),
                   full: t('settings.etc.mentionContextModeFull', 'Full mode'),
                 }}
                 onChange={handleMentionContextModeChange}

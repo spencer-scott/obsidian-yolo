@@ -41,6 +41,10 @@ import {
   type SubagentParentContext,
   buildSubagentParentContext,
 } from './subagent/parent-context'
+import {
+  type SubagentRuntimeEntry,
+  subagentRuntimeRegistry,
+} from './subagent/runtime-registry'
 import type { SubagentTaskRecord } from './subagent/types'
 import { SystemPromptSnapshotStore } from './systemPromptSnapshotStore'
 import {
@@ -844,6 +848,31 @@ export class AgentService {
   }
 
   /**
+   * Atomically remove one message while it is still waiting in the mid-run
+   * queue. Returns the removed message, or null when the runtime has already
+   * drained it at an LLM request boundary.
+   */
+  removePendingUserMessage(
+    conversationId: string,
+    messageId: string,
+    branchId?: string,
+  ): ChatUserMessage | null {
+    const runKey = getRunKey(conversationId, branchId ?? DEFAULT_BRANCH_ID)
+    const queue = this.pendingUserMessagesByKey.get(runKey)
+    if (!queue) return null
+
+    const index = queue.findIndex((message) => message.id === messageId)
+    if (index === -1) return null
+
+    const [removed] = queue.splice(index, 1)
+    if (queue.length === 0) {
+      this.pendingUserMessagesByKey.delete(runKey)
+    }
+    this.notifyConversationSubscribers(conversationId)
+    return removed ?? null
+  }
+
+  /**
    * Subscribe to abort events that carry the queued user messages dropped at
    * abort time, so the UI can restore them into the input box.
    */
@@ -1114,6 +1143,18 @@ export class AgentService {
     toolCallId: string
     allowForConversation?: boolean
   }): Promise<boolean> {
+    // If this toolCallId belongs to a running subagent, route the approval
+    // into that subagent's runtime instead of the parent conversation.
+    // See `docs/plans/2026-06-18-subagent-tool-approval-routing.md`.
+    const subagentEntry = subagentRuntimeRegistry.findByToolCallId(toolCallId)
+    if (subagentEntry) {
+      return this.approveSubagentToolCall(
+        subagentEntry,
+        toolCallId,
+        allowForConversation,
+      )
+    }
+
     const located = this.findToolCall(conversationId, toolCallId)
     if (!located) {
       return false
@@ -1420,6 +1461,11 @@ export class AgentService {
     conversationId: string
     toolCallId: string
   }): boolean {
+    const subagentEntry = subagentRuntimeRegistry.findByToolCallId(toolCallId)
+    if (subagentEntry) {
+      return this.rejectSubagentToolCall(subagentEntry, toolCallId)
+    }
+
     return Boolean(
       this.updateToolCallResponse({
         conversationId,
@@ -1427,6 +1473,114 @@ export class AgentService {
         response: { status: ToolCallResponseStatus.Rejected },
       }),
     )
+  }
+
+  /**
+   * Approve a tool call that belongs to a running subagent. Executes the tool
+   * via `mcpManager.callTool` (using the parent conversation as the approval
+   * scope so per-conversation allows persist there), patches the result back
+   * into the subagent's runtime, then resumes the subagent's loop.
+   *
+   * Mirrors the parent-conversation flow in `approveToolCall` but targets the
+   * subagent runtime in `subagentRuntimeRegistry` instead of restarting the
+   * parent run.
+   */
+  private async approveSubagentToolCall(
+    entry: SubagentRuntimeEntry,
+    toolCallId: string,
+    allowForConversation: boolean,
+  ): Promise<boolean> {
+    const located = entry.runtime.findToolCall(toolCallId)
+    if (!located) {
+      return false
+    }
+    if (
+      located.toolCall.response.status !==
+      ToolCallResponseStatus.PendingApproval
+    ) {
+      return false
+    }
+
+    const { request } = located.toolCall
+
+    // Subagents use `DEFAULT_BLOCKED_PREFIXES` (the runtime does not pass a
+    // custom blockedCommandPrefixes through `runner.ts`), so re-check with
+    // the same default here for consistency with the parent path.
+    if (isBlockedTerminalCommandRequest(request, undefined)) {
+      entry.runtime.setToolCallResponse(toolCallId, {
+        status: ToolCallResponseStatus.Error,
+        error:
+          'Terminal command rejected because it matches a blocked command prefix.',
+      })
+      await entry.resumeRun()
+      return true
+    }
+
+    if (allowForConversation) {
+      // Scope the per-conversation allow to the parent conversation so the
+      // user's "allow for this chat" decision applies uniformly to both the
+      // parent and any subagents it dispatches.
+      entry.mcpManager.allowToolForConversation(
+        request.name,
+        entry.parentConversationId,
+        getToolCallArgumentsObject(request.arguments),
+      )
+    }
+
+    entry.runtime.setToolCallResponse(toolCallId, {
+      status: ToolCallResponseStatus.Running,
+    })
+
+    const toolArgs = getToolCallArgumentsObject(request.arguments)
+    let result: ToolCallResponse
+    try {
+      result = await entry.mcpManager.callTool({
+        name: request.name,
+        args: toolArgs,
+        id: request.id,
+        conversationId: entry.parentConversationId,
+        conversationMessages: entry.runtime.getMessages(),
+        roundId: located.toolMessage.id,
+      })
+    } catch (error) {
+      result = {
+        status: ToolCallResponseStatus.Error,
+        error: formatErrorMessageWithCauses(error),
+      }
+    }
+
+    entry.runtime.setToolCallResponse(toolCallId, result)
+    await entry.resumeRun()
+    return true
+  }
+
+  /**
+   * Reject a subagent tool call. Patches the runtime and wakes the subagent
+   * loop — the model will see a `Rejected` tool result on next continuation
+   * and decide how to proceed (retry differently, give up, etc.).
+   */
+  private rejectSubagentToolCall(
+    entry: SubagentRuntimeEntry,
+    toolCallId: string,
+  ): boolean {
+    const located = entry.runtime.findToolCall(toolCallId)
+    if (!located) {
+      return false
+    }
+    if (
+      located.toolCall.response.status !==
+      ToolCallResponseStatus.PendingApproval
+    ) {
+      return false
+    }
+
+    const patched = entry.runtime.setToolCallResponse(toolCallId, {
+      status: ToolCallResponseStatus.Rejected,
+    })
+    if (patched) {
+      void entry.resumeRun()
+    }
+    return patched
   }
 
   abortToolCall({

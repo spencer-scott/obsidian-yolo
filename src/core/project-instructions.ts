@@ -51,7 +51,6 @@ function truncateUtf8ToBytes(text: string, budget: number): string {
   return codePoints.slice(0, lo).join('')
 }
 
-
 /**
  * Whether a vault-relative path is shadowed by any exclude rule in the scope.
  * We deliberately do not reuse `isPathAllowedByScope`: that helper also

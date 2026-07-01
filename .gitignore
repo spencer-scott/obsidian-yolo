@@ -39,3 +39,5 @@ Reference/
 .claude/
 scripts/bench-tool-disclosure/
 .cursorignore
+.yolo-update-staging/
+supabase/

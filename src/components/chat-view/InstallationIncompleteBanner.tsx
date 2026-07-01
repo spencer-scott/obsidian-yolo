@@ -4,33 +4,56 @@ import type { ReactNode } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { usePlugin } from '../../contexts/plugin-context'
-import { normalizePluginVersion } from '../../core/update/updateChecker'
 import { openCommunityPluginsSettings } from '../../core/update/openCommunityPluginsSettings'
+import { normalizePluginVersion } from '../../core/update/updateChecker'
 import { useInstallationIncompleteBanner } from '../../hooks/useInstallationIncompleteBanner'
 import { usePluginUpdate } from '../../hooks/usePluginUpdate'
+
+function repairFilesMatch(
+  left: string[] | undefined,
+  right: string[],
+): boolean {
+  if (!left || left.length !== right.length) {
+    return false
+  }
+  const sortedLeft = [...left].sort()
+  const sortedRight = [...right].sort()
+  return sortedLeft.every((file, index) => file === sortedRight[index])
+}
 
 export function InstallationIncompleteBanner(): ReactNode {
   const { t } = useLanguage()
   const plugin = usePlugin()
   const { app } = plugin
   const { detail, dismissed, dismiss } = useInstallationIncompleteBanner()
-  const { state: updateState, canSelfUpdate, applyUpdate } =
-    usePluginUpdate()
+  const { state: updateState, canSelfUpdate, applyUpdate } = usePluginUpdate()
 
   if (!detail || dismissed) {
     return null
   }
 
-  const { bakedVersion, manifestVersion } = detail
-  const targetVersion = normalizePluginVersion(manifestVersion)
+  const {
+    mainVersion,
+    manifestVersion,
+    stylesVersion,
+    suspectFiles,
+    targetVersion,
+  } = detail
+  const normalizedTarget = normalizePluginVersion(targetVersion)
+  const repairFiles = [...new Set(suspectFiles)]
   const hasSelfUpdate = Platform.isDesktop && canSelfUpdate
   const isReadyForTarget =
-    updateState.status === 'ready' && updateState.version === targetVersion
+    updateState.status === 'ready' &&
+    updateState.version === normalizedTarget &&
+    repairFilesMatch(updateState.repairFiles, repairFiles)
   const isDownloadingTarget =
     updateState.status === 'downloading' &&
-    updateState.version === targetVersion
+    updateState.version === normalizedTarget &&
+    repairFilesMatch(updateState.repairFiles, repairFiles)
   const isApplyingTarget =
-    updateState.status === 'applying' && updateState.version === targetVersion
+    updateState.status === 'applying' &&
+    updateState.version === normalizedTarget &&
+    repairFilesMatch(updateState.repairFiles, repairFiles)
 
   const title = t(
     'update.installationIncompleteTitle',
@@ -38,28 +61,30 @@ export function InstallationIncompleteBanner(): ReactNode {
   )
   const meta = t(
     'update.installationIncompleteMeta',
-    'main.js {bakedVersion} · manifest {manifestVersion}',
+    'main.js {mainVersion} · manifest {manifestVersion} · styles {stylesVersion}',
   )
-    .replace('{bakedVersion}', bakedVersion)
+    .replace('{mainVersion}', mainVersion ?? '—')
     .replace('{manifestVersion}', manifestVersion)
+    .replace('{stylesVersion}', stylesVersion ?? '—')
+  const suspects = t(
+    'update.installationIncompleteSuspects',
+    'Files to repair: {files}',
+  ).replace('{files}', repairFiles.join(', '))
   const notes = t(
     'update.installationIncompleteNotes',
-    'This usually means main.js did not finish downloading during an update. Back up data.json, remove the plugin, and reinstall.',
+    'Plugin files may not have downloaded completely. A repair download will start automatically; you can also retry below.',
   )
   const dismissLabel = t('update.dismiss', 'Dismiss')
 
   const resolveCtaLabel = (): string => {
     if (!hasSelfUpdate) {
-      return t(
-        'update.updateInCommunityPlugins',
-        'Update in community plugins',
-      )
+      return t('update.updateInCommunityPlugins', 'Update in community plugins')
     }
     if (isReadyForTarget) {
-      return t('update.installAndReload', 'Install and reload')
+      return t('update.repairAndReload', 'Repair and reload')
     }
     if (isDownloadingTarget) {
-      return t('update.downloading', 'Downloading {{progress}}%').replace(
+      return t('update.repairing', 'Repairing {{progress}}%').replace(
         '{{progress}}',
         String(Math.round(updateState.progress)),
       )
@@ -67,7 +92,7 @@ export function InstallationIncompleteBanner(): ReactNode {
     if (isApplyingTarget) {
       return t('update.applying', 'Installing…')
     }
-    return t('update.downloadUpdate', 'Download update')
+    return t('update.tryRepair', 'Try repair')
   }
 
   const ctaDisabled = isDownloadingTarget || isApplyingTarget
@@ -86,6 +111,9 @@ export function InstallationIncompleteBanner(): ReactNode {
             {title}
           </div>
           <div className="yolo-installation-incomplete-banner-meta">{meta}</div>
+          <div className="yolo-installation-incomplete-banner-meta">
+            {suspects}
+          </div>
           <div className="yolo-installation-incomplete-banner-notes">
             {notes}
           </div>

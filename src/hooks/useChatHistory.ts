@@ -13,6 +13,7 @@ import { useApp } from '../contexts/app-context'
 import { useLanguage } from '../contexts/language-context'
 import { usePlugin } from '../contexts/plugin-context'
 import { useSettings } from '../contexts/settings-context'
+import { isRequestErrorNonRetryable } from '../core/ai/requestRetry'
 import { executeSingleTurn } from '../core/ai/single-turn'
 import {
   createLLMDebugTrace,
@@ -651,7 +652,7 @@ export function useChatHistory(): UseChatHistory {
                   ],
                   reasoningLevel: 'off',
                 },
-                stream: false,
+                deliveryMode: 'buffered',
                 purpose: 'lightweight',
                 signal: controller.signal,
                 debugTraceId: debugTrace?.id,
@@ -685,7 +686,10 @@ export function useChatHistory(): UseChatHistory {
             return nextTitle || null
           } catch (error) {
             lastGenerationError = error
-            if (retryCount < AUTO_TITLE_MAX_RETRIES) {
+            if (
+              retryCount < AUTO_TITLE_MAX_RETRIES &&
+              !isRequestErrorNonRetryable(error)
+            ) {
               const backoffMs = 300 * (retryCount + 1)
               await new Promise((resolve) => setTimeout(resolve, backoffMs))
               return attemptGenerateTitle(retryCount + 1)

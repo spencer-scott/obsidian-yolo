@@ -111,7 +111,8 @@ export function normalizeYoloSettingsReferences(
   return normalizeSubagentModelOptions(normalized)
 }
 
-function migrateSettings(
+/** 只执行设置迁移链，不做 schema 解析、默认值填充或引用规范化。 */
+export function migrateYoloSettingsData(
   data: Record<string, unknown>,
 ): Record<string, unknown> {
   let currentData = { ...data }
@@ -146,7 +147,9 @@ export function parseYoloSettings(data: unknown): YoloSettings {
       return { ...parsed, version: SETTINGS_SCHEMA_VERSION }
     }
 
-    const migratedData = migrateSettings(data as Record<string, unknown>)
+    const migratedData = migrateYoloSettingsData(
+      data as Record<string, unknown>,
+    )
     const parsed = yoloSettingsSchema.parse(migratedData)
     const normalized = normalizeYoloSettingsReferences(parsed)
     return { ...normalized, version: SETTINGS_SCHEMA_VERSION }

@@ -129,6 +129,8 @@ export const zh: TranslationKeys = {
       name: '支持 YOLO',
       desc: '如果你觉得 YOLO 有价值，请考虑支持它的开发！',
       buyMeACoffee: '爱发电',
+      reportBug: '报 Bug',
+      featureRequest: '提需求',
     },
     defaults: {
       title: '默认模型策略与提示词',
@@ -282,6 +284,8 @@ export const zh: TranslationKeys = {
       tools: '工具',
       toolsCount: '{count} 个工具',
       toolsCountWithEnabled: '{count} 个工具（已启用 {enabled} 个）',
+      mcpLoadingStatus: '正在加载 {count} 个 MCP…',
+      mcpErrorStatus: '{count} 个 MCP 连接失败',
       skills: '技能',
       skillsCount: '{count} 个技能',
       skillsCountWithEnabled: '{count} 个技能（已启用 {enabled} 个）',
@@ -476,8 +480,10 @@ export const zh: TranslationKeys = {
       toolApproval: '审批',
       toolApprovalFullAccess: '完全放行',
       toolApprovalRequire: '需要审批',
-      toolApprovalForced: '强制审批',
+      toolDisclosureAuto: 'Auto',
+      toolDisclosureAutoSelect: '自动选择',
       toolDisclosureAlways: '常驻上下文',
+      toolDisclosureMixed: '混合',
       toolDisclosureOnDemand: '按需披露',
       editorEnabled: '已启用',
       editorDisabled: '已禁用',
@@ -551,14 +557,24 @@ export const zh: TranslationKeys = {
         '开启后，脚本可以请求浏览器允许访问的网络地址；遇到浏览器跨域限制时，也可以使用单独的 YOLO 宿主请求。仅在你信任此 Agent 时继续。是否继续？',
       jsSandboxAllowVaultRead: '允许读取库文件',
       jsSandboxAllowVaultReadDesc:
-        '允许脚本按路径读取任意库文件。此能力不受 Agent 目录限制约束。风险：脚本可能将笔记内容传递给外部服务。',
+        '允许脚本列出库内路径，并按路径读取任意库文件。此能力不受 Agent 目录限制约束。风险：脚本可能将笔记内容传递给外部服务。',
       jsSandboxAllowVaultReadConfirm:
-        '开启后，AI 生成的脚本可按路径读取 vault 中任意文件，内容将进入 LLM 上下文。请确认您信任此 Agent 生成的脚本后再继续。',
+        '开启后，AI 生成的脚本可列出 vault 路径，并按路径读取 vault 中任意文件，内容将进入 LLM 上下文。请确认您信任此 Agent 生成的脚本后再继续。',
+      jsSandboxAllowBrowserRead: '允许读取已打开网页',
+      jsSandboxAllowBrowserReadDesc:
+        '允许脚本按页面 ID 读取 Obsidian 中已打开网页的完整 HTML。网页可能包含登录态或私有内容。',
+      jsSandboxAllowBrowserReadRisk:
+        '风险：脚本可读取你在 Obsidian 中已打开网页的完整 DOM，包括隐藏字段、内嵌状态以及私有或登录态内容。仅在你完全信任此 Agent 时开启。',
+      jsSandboxAllowBrowserReadConfirm:
+        '开启后，AI 生成的脚本可按页面 ID 读取 Obsidian 中已打开网页的完整 HTML，内容将进入 LLM 上下文。是否继续？',
+      jsSandboxBrowserReadMaxKb: '网页 HTML 大小上限（KB）',
+      jsSandboxBrowserReadMaxKbDesc:
+        '单次完整 HTML 读取上限。超过上限的网页会被拒绝，而不是截短。范围 1–1048576 KB。留空使用默认值。',
       jsSandboxAllowDbQuery: '允许知识库查询',
       jsSandboxAllowDbQueryDesc:
-        '允许脚本查询向量数据库（语义搜索、关键词搜索、路径查找）。此能力不受 Agent 目录限制约束。',
+        '允许脚本使用语义搜索查询已索引的库内容，并按已知路径读取 Markdown / 文本内容。此能力不受 Agent 目录限制约束。',
       jsSandboxAllowDbQueryConfirm:
-        '开启后，AI 生成的脚本可搜索 vault 索引并获取文件内容。是否继续？',
+        '开启后，AI 生成的脚本可搜索已索引内容，并按已知路径读取 Markdown / 文本内容。是否继续？',
       jsSandboxAllowExternalScripts: '允许加载外部脚本',
       jsSandboxAllowExternalScriptsDesc:
         '允许脚本加载并运行远程 JavaScript，同时打开这些脚本常用的浏览器能力。',
@@ -567,7 +583,6 @@ export const zh: TranslationKeys = {
       jsSandboxAllowExternalScriptsConfirm:
         '开启后，Agent 可以在 Obsidian 内加载并运行远程 JavaScript。这个能力很强也很危险；仅在你完全信任此 Agent 和代码来源时继续。是否继续？',
       jsSandboxConfirmEnableTitle: '开启扩展能力',
-      jsExecApprovalForced: '启用后强制审批',
       jsSandboxTimeoutMs: '执行超时（毫秒）',
       jsSandboxTimeoutMsDesc: '单次脚本调用的最大运行时间。范围 {min}–{max}。',
       jsSandboxOutputMaxKb: '工具结果大小上限（KB）',
@@ -576,8 +591,9 @@ export const zh: TranslationKeys = {
       jsSandboxVaultReadMaxKb: '读取大小上限（KB）',
       jsSandboxVaultReadMaxKbDesc:
         '单次读取的返回上限。文本超出会被截断并附带提示；较大的二进制文件会直接拒绝。范围 {min}–{max} KB。',
-      jsSandboxDbMaxLimit: '单次查询最大行数',
-      jsSandboxDbMaxLimitDesc: '知识库查询单次返回行数的上限。范围 1–100。',
+      jsSandboxDbMaxLimit: '语义搜索最大行数',
+      jsSandboxDbMaxLimitDesc:
+        '语义搜索的返回行数上限。按路径读取不受此项影响。范围 1–100。',
     },
     jsSandbox: {
       openSettings: '配置 JavaScript 执行',
@@ -733,6 +749,7 @@ export const zh: TranslationKeys = {
       baseUrlDesc:
         '第三方服务的 API 端点地址，例如：https://api.example.com/v1 或 https://your-proxy.com/openai（使用默认值可留空）',
       baseUrlPlaceholder: 'https://api.example.com/v1',
+      apiUrlPreviewLabel: '预览：',
       noStainlessHeaders: '无 Stainless 请求头',
       noStainlessHeadersDesc:
         '如果你遇到与 Stainless 请求头相关的 CORS 错误（x-stainless-os 等），请启用此选项',
@@ -746,6 +763,11 @@ export const zh: TranslationKeys = {
       requestTransportModeBrowser: '浏览器请求',
       requestTransportModeObsidian: 'Obsidian 内置请求',
       requestTransportModeNode: '桌面直连（推荐）',
+      responseStreamingMode: '响应流式模式',
+      responseStreamingModeDesc: '控制此提供商使用流式还是非流式响应。',
+      responseStreamingModeAuto: '自动（默认）',
+      responseStreamingModeStreaming: '流式',
+      responseStreamingModeNonStreaming: '非流式',
       promptCaching: '提示缓存',
       promptCachingDesc:
         '启用 Anthropic 临时提示缓存。在连续对话中复用系统提示、工具列表和历史消息，显著降低输入 token 消耗。写缓存有 25% 溢价，命中读取约为原价 10%。仅当渠道 API 类型为 Anthropic 时生效；是否真正生效取决于上游服务是否支持 cache_control 字段。',
@@ -1474,11 +1496,14 @@ export const zh: TranslationKeys = {
     selectModel: '选择模型',
     uploadImage: '上传图片',
     uploadFile: '添加文件',
+    dropFilesHint: '松开以添加文件',
     imageUnsupportedByModel:
       '当前模型未声明支持图片输入；请在模型设置里开启「图片」模态后再上传。',
     unsupportedFileType: '不支持的文件类型：{names}',
     processImagesFailed: '处理上传图片失败',
     readPdfFailed: '读取 PDF「{name}」失败：{error}',
+    readOfficeFailed: '读取 Office 文档「{name}」失败：{error}',
+    readTextAttachmentFailed: '读取文本文件「{name}」失败：{error}',
     addContext: '添加上下文',
     applyChanges: '应用更改',
     copyMessage: '复制消息',
@@ -1643,6 +1668,21 @@ export const zh: TranslationKeys = {
     },
     errorCard: {
       title: '本次回复生成失败',
+      responseFormat: {
+        responseNotObject: '模型服务返回的响应不是对象（实际为 {{actual}}）。',
+        missingChoices: '模型服务返回了无法解析的响应格式：缺少 choices 数组。',
+        invalidChoices:
+          '模型服务返回了无法解析的响应格式：choices 不是数组（实际为 {{actual}}）。',
+        stage: '阶段：{{stage}}',
+        expected: '期望字段：{{field}}',
+        expectedChoicesArray: 'choices 数组',
+        responseFields: '响应字段：{{fields}}',
+        upstreamError: '上游错误：{{message}}',
+        errorType: '错误类型：{{type}}',
+        errorCode: '错误代码：{{code}}',
+        upstreamMessage: '上游消息：{{message}}',
+        responsePreview: '响应片段：{{preview}}',
+      },
     },
     customRewritePromptPlaceholder:
       '输入你的改写指令，例如：“语气更简洁、采用主动语态，保留 Markdown 结构”。按 Shift+回车 确认，回车换行，Esc 关闭。',
@@ -1735,6 +1775,15 @@ export const zh: TranslationKeys = {
       statusFailed: '失败',
       toolUseCount: '{count} 个工具',
       tokenCount: '{count} tokens',
+      approval: {
+        heading: '等待审批',
+        headingMulti: '等待审批 · {count} 项',
+        approve: '同意',
+        reject: '拒绝',
+        approveAll: '全部同意',
+        rejectAll: '全部拒绝',
+        viewDetails: '查看参数',
+      },
     },
     conversationSettings: {
       openAria: '对话设置',
@@ -1895,6 +1944,8 @@ export const zh: TranslationKeys = {
     agentDesc: '启用工具链，处理多步骤任务',
     agentFull: 'Agent（YOLO）',
     agentFullDesc: '自动放行工具调用，适合复杂任务',
+    yolo: 'YOLO',
+    yoloDesc: '自动放行工具调用，适合复杂任务',
     warning: {
       title: '⚠️ Agent 模式风险提示',
       description:
@@ -1943,17 +1994,20 @@ export const zh: TranslationKeys = {
   configTransfer: {
     export: {
       title: '导出配置',
-      description: '选择要导出的配置项',
+      description: '选择要导出的配置项，文件将保存到 {path}',
       selectAll: '全选',
       selectNone: '全不选',
       sensitive: '含凭证',
       redactedOption:
         '脱敏导出（替换 API Key / 密码 / Header / 环境变量等凭证为随机字符串）',
+      confirmUnredactedTitle: '确认导出',
+      confirmUnredacted:
+        '未脱敏导出会把 API Key / 密码 / Header / 环境变量等敏感信息保存到当前库内文件。确定继续吗？',
       submit: '导出',
       cancel: '取消',
       noticeAtLeastOne: '请至少选择一项配置',
       noticeReadFailed: '无法读取当前配置数据',
-      noticeSuccess: '配置已导出为 {fileName}',
+      noticeSuccess: '配置已导出到 {path}',
       noticeFailed: '配置导出失败，请检查控制台日志',
     },
     import: {
@@ -1993,8 +2047,6 @@ export const zh: TranslationKeys = {
       errorInvalidSettingsVersion: '配置文件中的设置版本号不合法，可能已损坏。',
       errorFileFromNewerVersion:
         '配置文件来自更高版本的插件（版本 {fileVersion}），当前插件版本为 {currentVersion}，请先升级当前插件后再导入。',
-      errorFileFromOlderVersion:
-        '配置文件来自旧版本的插件（版本 {fileVersion}），当前插件版本为 {currentVersion}。请在源端升级 YOLO 插件后重新导出。',
       errorEmptyKeys: '配置文件中没有包含任何配置项。',
       errorMissingData: '配置文件中的数据字段缺失或不合法。',
       errorTampered:
@@ -2005,11 +2057,9 @@ export const zh: TranslationKeys = {
         '目标笔记库的配置数据缺少 version 字段，无法判断版本兼容性。',
       errorVaultFromNewerVersion:
         '目标笔记库使用更高版本的插件（版本 {vaultVersion}），当前插件版本为 {currentVersion}，请先升级当前插件后再导入。',
-      errorVaultFromOlderVersion:
-        '目标笔记库使用旧版本的插件（版本 {vaultVersion}），当前插件版本为 {currentVersion}。请先在目标笔记库升级 YOLO 插件后再导入。',
       errorVaultEmpty: '目标笔记库的配置数据为空',
       errorApplyVersionMismatch:
-        '导入数据版本（{importVersion}）与当前插件版本（{currentVersion}）不一致，无法导入。',
+        '导入数据版本（{importVersion}）高于当前插件版本（{currentVersion}），无法导入。',
       errorApplySchema: '导入的配置未通过校验，可能存在字段缺失或格式错误。',
     },
     keyLabels: {
@@ -2044,8 +2094,8 @@ export const zh: TranslationKeys = {
     dismiss: '关闭',
     languageEnglish: 'EN',
     languageChinese: '中文',
-    muteThisVersion: '当前版本不提示',
     viewHistory: '查看历史更新',
+    skipVersion: '当前版本不提示',
     historyTitle: '历史更新日志',
     historyLoading: '正在加载更新日志…',
     historyError: '加载更新日志失败，请稍后重试。',
@@ -2055,9 +2105,13 @@ export const zh: TranslationKeys = {
     historyNext: '下一页',
     installationIncompleteTitle: '插件安装不完整',
     installationIncompleteMeta:
-      '主程序 {bakedVersion} · manifest {manifestVersion}',
+      '主程序 {mainVersion} · manifest {manifestVersion} · 样式 {stylesVersion}',
+    installationIncompleteSuspects: '待修复：{files}',
     installationIncompleteNotes:
-      '这通常是更新时 main.js 未能完整下载所致。建议备份 data.json 后，删除插件并重新安装。',
+      '插件文件可能未完整下载。将自动尝试修复；你也可以点击下方按钮手动重试。',
+    tryRepair: '尝试修复',
+    repairing: '修复中 {{progress}}%',
+    repairAndReload: '修复并重启',
     downloadUpdate: '下载更新',
     downloading: '下载中 {{progress}}%',
     installAndReload: '安装并重启',

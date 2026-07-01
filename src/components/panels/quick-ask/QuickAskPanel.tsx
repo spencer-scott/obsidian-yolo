@@ -60,6 +60,7 @@ import {
   MentionableBlock,
   SerializedMentionable,
 } from '../../../types/mentionable'
+import type { ToolCallResponse } from '../../../types/tool-call.types'
 import { renderAssistantIcon } from '../../../utils/assistant-icon'
 import type { EditorSnapshotInjection } from '../../../utils/chat/contextual-injections'
 import { generateEditPlan } from '../../../utils/chat/editMode'
@@ -515,7 +516,12 @@ export function QuickAskPanel({
     ({ path }: { path: string }) => {
       const targetFile = app.vault.getAbstractFileByPath(path)
       if (!(targetFile instanceof TFile)) {
-        new Notice(t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'))
+        new Notice(
+          t(
+            'chat.editSummary.fileMissing',
+            'File does not exist or has been moved.',
+          ),
+        )
         return
       }
 
@@ -1136,13 +1142,14 @@ export function QuickAskPanel({
             allowedToolNames: chatModeRuntime.allowedToolNames,
             enableToolDisclosure: settings.mcp.enableToolDisclosure,
             toolPreferences: chatModeRuntime.toolPreferences,
+            toolServerPreferences: chatModeRuntime.toolServerPreferences,
             allowedSkillPaths,
             runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
             contextualInjections: editorSnapshotInjection
               ? [editorSnapshotInjection]
               : [],
             requestParams: {
-              stream: true,
+              deliveryMode: 'incremental',
               primaryRequestTimeoutMs:
                 settings.continuationOptions.primaryRequestTimeoutMs,
               streamFallbackRecoveryEnabled:
@@ -1208,6 +1215,33 @@ export function QuickAskPanel({
         prev.map((message) =>
           message.id === toolMessage.id ? toolMessage : message,
         ),
+      )
+    },
+    [],
+  )
+
+  const handleToolCallResponseUpdate = useCallback(
+    (toolMessageId: string, toolCallId: string, response: ToolCallResponse) => {
+      setChatMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== toolMessageId || message.role !== 'tool') {
+            return message
+          }
+
+          let didChange = false
+          const nextToolCalls = message.toolCalls.map((toolCall) => {
+            if (toolCall.request.id !== toolCallId) {
+              return toolCall
+            }
+            if (toolCall.response === response) {
+              return toolCall
+            }
+            didChange = true
+            return { ...toolCall, response }
+          })
+
+          return didChange ? { ...message, toolCalls: nextToolCalls } : message
+        }),
       )
     },
     [],
@@ -1329,7 +1363,9 @@ export function QuickAskPanel({
         })
 
         if (!plan) {
-          throw new Error('The current content does not contain an applicable edit plan.')
+          throw new Error(
+            'The current content does not contain an applicable edit plan.',
+          )
         }
 
         const materialized = materializeTextEditPlan({
@@ -1345,7 +1381,9 @@ export function QuickAskPanel({
         }
 
         if (materialized.appliedCount === 0) {
-          throw new Error('The edit plan did not match any modifiable content. Please regenerate.')
+          throw new Error(
+            'The edit plan did not match any modifiable content. Please regenerate.',
+          )
         }
 
         await plugin.openApplyReview({
@@ -2085,6 +2123,7 @@ export function QuickAskPanel({
             activeApplyRequestKey={activeApplyRequestKey}
             onApply={handleApply}
             onToolMessageUpdate={handleToolMessageUpdate}
+            onToolCallResponseUpdate={handleToolCallResponseUpdate}
             onEditStart={noop}
             onEditCancel={noop}
             onEditSave={noop}

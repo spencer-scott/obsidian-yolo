@@ -1,8 +1,15 @@
 import { EditorView } from '@codemirror/view'
 import { useMutation } from '@tanstack/react-query'
 import cx from 'clsx'
-import { Download, History, Plus } from 'lucide-react'
-import { MarkdownView, Notice, TFile, TFolder, normalizePath } from 'obsidian'
+import { Download, History, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  MarkdownView,
+  Notice,
+  Platform,
+  TFile,
+  TFolder,
+  normalizePath,
+} from 'obsidian'
 import {
   forwardRef,
   useCallback,
@@ -84,6 +91,10 @@ import {
 } from '../../utils/chat/editSummary'
 import { exportChatConversationToVault } from '../../utils/chat/exportConversation'
 import {
+  buildForegroundAgentVisualTurnPlan,
+  getForegroundAgentFooterForGroup,
+} from '../../utils/chat/foregroundAgentVisualTurns'
+import {
   getBlockContentHash,
   getBlockMentionableCountInfo,
   getMentionableKey,
@@ -92,6 +103,12 @@ import {
 import { groupAssistantAndToolMessages } from '../../utils/chat/message-groups'
 import { RequestContextBuilder } from '../../utils/chat/requestContextBuilder'
 import { buildChatTimelineItems } from '../../utils/chat/timeline'
+import {
+  buildSubagentResultMap,
+  buildTerminalCommandResultMap,
+  collectToolCallIdsFromGroupedMessages,
+  reuseShallowEqualMap,
+} from '../../utils/chat/tool-result-index'
 import { formatTokenCount } from '../../utils/llm/formatTokenCount'
 import { resolveEffectiveMaxContextTokens } from '../../utils/llm/model-capability-registry'
 import { readTFileContent } from '../../utils/obsidian'
@@ -107,6 +124,7 @@ import {
   type ChatMode,
   isAgentChatMode,
   normalizeChatMode,
+  normalizeYoloEnabled,
 } from './chat-input/ChatModeSelect'
 import ChatUserInput from './chat-input/ChatUserInput'
 import type { ChatUserInputRef } from './chat-input/ChatUserInput'
@@ -122,6 +140,7 @@ import {
 } from './chatRetry'
 import Composer from './Composer'
 import { useActiveViewState } from './hooks/useActiveViewState'
+import { getInputOverlayReserveHeight } from './inputOverlayReserve'
 import { syncRenderedLatexSelection } from './latex-copy'
 import MessageNavigator from './MessageNavigator'
 import type { MessageNavigatorAnchor } from './MessageNavigator'
@@ -137,6 +156,153 @@ import ViewToggle from './ViewToggle'
 const WORKSPACE_WIDE_HEADER_MIN_WIDTH = 1200
 const MESSAGE_NAVIGATOR_MIN_ANCHORS = 7
 const MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH = 90
+const MOBILE_KEYBOARD_MIN_INSET_PX = 80
+const MOBILE_CHAT_MIN_VIEWPORT_HEIGHT = 160
+
+const parseCssPixelValue = (value: string): number => {
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function useMobileKeyboardViewportHeight(
+  containerElement: HTMLDivElement | null,
+): number | null {
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (!Platform.isMobile) {
+      setViewportHeight(null)
+      return
+    }
+
+    if (!containerElement) {
+      setViewportHeight(null)
+      return
+    }
+
+    const ownerWindow = containerElement.ownerDocument.defaultView ?? window
+    const visualViewport = ownerWindow.visualViewport
+    if (!visualViewport) {
+      setViewportHeight(null)
+      return
+    }
+
+    let animationFrameId: number | null = null
+
+    const publishHeight = () => {
+      animationFrameId = null
+
+      const rootStyle = ownerWindow.getComputedStyle(
+        containerElement.ownerDocument.documentElement,
+      )
+      const keyboardHeight = parseCssPixelValue(
+        rootStyle.getPropertyValue('--keyboard-height'),
+      )
+      const visualViewportInset = Math.max(
+        0,
+        ownerWindow.innerHeight -
+          visualViewport.height -
+          visualViewport.offsetTop,
+      )
+      const keyboardInset = Math.max(keyboardHeight, visualViewportInset)
+
+      if (keyboardInset < MOBILE_KEYBOARD_MIN_INSET_PX) {
+        setViewportHeight(null)
+        return
+      }
+
+      const viewportBottom = Math.min(
+        visualViewport.offsetTop + visualViewport.height,
+        ownerWindow.innerHeight - keyboardInset,
+      )
+      const nextHeight = Math.floor(
+        viewportBottom - containerElement.getBoundingClientRect().top,
+      )
+
+      if (nextHeight < MOBILE_CHAT_MIN_VIEWPORT_HEIGHT) {
+        setViewportHeight(null)
+        return
+      }
+
+      setViewportHeight((previous) =>
+        previous === nextHeight ? previous : nextHeight,
+      )
+    }
+
+    const schedulePublish = () => {
+      if (animationFrameId !== null) {
+        ownerWindow.cancelAnimationFrame(animationFrameId)
+      }
+      animationFrameId = ownerWindow.requestAnimationFrame(publishHeight)
+    }
+
+    schedulePublish()
+
+    visualViewport.addEventListener('resize', schedulePublish)
+    visualViewport.addEventListener('scroll', schedulePublish)
+    ownerWindow.addEventListener('resize', schedulePublish)
+    ownerWindow.addEventListener('orientationchange', schedulePublish)
+    ownerWindow.addEventListener('focusin', schedulePublish)
+    ownerWindow.addEventListener('focusout', schedulePublish)
+
+    const rootObserver = new MutationObserver(schedulePublish)
+    rootObserver.observe(containerElement.ownerDocument.documentElement, {
+      attributeFilter: ['style'],
+      attributes: true,
+    })
+
+    return () => {
+      rootObserver.disconnect()
+      visualViewport.removeEventListener('resize', schedulePublish)
+      visualViewport.removeEventListener('scroll', schedulePublish)
+      ownerWindow.removeEventListener('resize', schedulePublish)
+      ownerWindow.removeEventListener('orientationchange', schedulePublish)
+      ownerWindow.removeEventListener('focusin', schedulePublish)
+      ownerWindow.removeEventListener('focusout', schedulePublish)
+      if (animationFrameId !== null) {
+        ownerWindow.cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [containerElement])
+
+  return viewportHeight
+}
+
+function useMobileChatViewContentClass(
+  containerElement: HTMLDivElement | null,
+  keyboardManaged: boolean,
+): void {
+  useLayoutEffect(() => {
+    if (!Platform.isMobile) return
+
+    const viewContent = containerElement?.closest('.view-content')
+    if (!(viewContent instanceof HTMLElement)) return
+
+    viewContent.classList.add('yolo-chat-view-content')
+    return () => {
+      viewContent.classList.remove(
+        'yolo-chat-view-content',
+        'yolo-chat-view-content--keyboard-managed',
+      )
+    }
+  }, [containerElement])
+
+  useLayoutEffect(() => {
+    if (!Platform.isMobile) return
+
+    const viewContent = containerElement?.closest('.view-content')
+    if (!(viewContent instanceof HTMLElement)) return
+
+    viewContent.classList.toggle(
+      'yolo-chat-view-content--keyboard-managed',
+      keyboardManaged,
+    )
+
+    return () => {
+      viewContent.classList.remove('yolo-chat-view-content--keyboard-managed')
+    }
+  }, [containerElement, keyboardManaged])
+}
 
 const getPromptContentText = (
   promptContent: ChatUserMessage['promptContent'],
@@ -622,6 +788,7 @@ export type ChatRuntimeSnapshot = {
   conversationModelId: string
   conversationAssistantId: string
   chatMode: ChatMode
+  yoloEnabled: boolean
   reasoningLevel: ReasoningLevel
   conversationOverrides: ConversationOverrideSettings | null
 }
@@ -641,6 +808,7 @@ export type ChatProps = {
   onRuntimeSnapshotChange?: (snapshot: ChatRuntimeSnapshot) => void
   onConversationContextChange?: (context: {
     currentConversationId?: string
+    currentConversationPersisted?: boolean
     currentConversationTitle?: string
     currentModelId?: string
     currentOverrides?: ConversationOverrideSettings
@@ -716,6 +884,18 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const { file: activeFile, viewState: activeViewState } = useActiveViewState()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [containerElement, setContainerElement] =
+    useState<HTMLDivElement | null>(null)
+  const handleContainerRef = useCallback((element: HTMLDivElement | null) => {
+    containerRef.current = element
+    setContainerElement(element)
+  }, [])
+  const mobileKeyboardViewportHeight =
+    useMobileKeyboardViewportHeight(containerElement)
+  useMobileChatViewContentClass(
+    containerElement,
+    mobileKeyboardViewportHeight !== null,
+  )
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [isWorkspaceWideHeader, setIsWorkspaceWideHeader] = useState(false)
   const [workspaceWideHeaderHeight, setWorkspaceWideHeaderHeight] = useState(0)
@@ -733,6 +913,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
     return newMessage
   })
+  const [queuedMessageEditState, setQueuedMessageEditState] = useState<{
+    preservedInputMessage: ChatUserMessage
+    preservedReasoningLevel: ReasoningLevel
+  } | null>(null)
   const inputMessageRef = useRef(inputMessage)
   // Whether the main input is empty - the submit button uses this to toggle
   // between faded/active state. The check mirrors the early return in onSubmit:
@@ -772,9 +956,22 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     string | null
   >(null)
   const [currentConversationId, setCurrentConversationId] = useState<string>(
-    () => seededRuntimeSnapshot?.currentConversationId ?? uuidv4(),
+    () =>
+      seededRuntimeSnapshot?.currentConversationId ??
+      props.initialConversationId ??
+      uuidv4(),
+  )
+  const [isLoadingConversation, setIsLoadingConversation] = useState(() =>
+    Boolean(props.initialConversationId),
   )
   const untitledFallback = t('chat.untitledConversation', 'New chat')
+  const currentConversationPersisted = useMemo(
+    () =>
+      chatList.some(
+        (conversation) => conversation.id === currentConversationId,
+      ),
+    [chatList, currentConversationId],
+  )
   const currentConversationTitle = useMemo(() => {
     const rawTitle = currentConversationId
       ? chatList.find(
@@ -971,12 +1168,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     !isSidebarPlacement && isWorkspaceWideHeader
       ? ' yolo-chat-container--workspace-wide-header'
       : ''
+  }${
+    mobileKeyboardViewportHeight !== null
+      ? ' yolo-chat-container--mobile-keyboard-managed'
+      : ''
   }`
   const fontScale = settings.chatOptions.chatFontScale
   const containerStyle = {
     ...(!isSidebarPlacement && isWorkspaceWideHeader
       ? {
           '--yolo-chat-workspace-header-height': `${workspaceWideHeaderHeight}px`,
+        }
+      : {}),
+    ...(mobileKeyboardViewportHeight !== null
+      ? {
+          '--yolo-chat-mobile-viewport-height': `${mobileKeyboardViewportHeight}px`,
         }
       : {}),
     ...(fontScale != null ? { zoom: fontScale } : {}),
@@ -996,6 +1202,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
     const defaultMode = settings.chatOptions.chatMode ?? 'agent'
     return defaultMode
+  })
+  const [yoloEnabled, setYoloEnabled] = useState<boolean>(() => {
+    if (seededRuntimeSnapshot) {
+      return seededRuntimeSnapshot.yoloEnabled
+    }
+    return settings.chatOptions.agentYoloEnabled ?? false
   })
 
   const selectedAssistant = useMemo(() => {
@@ -1102,6 +1314,27 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         })
       } catch (error: unknown) {
         console.error('Failed to persist preferred chat mode', error)
+      }
+    },
+    [setSettings, settings],
+  )
+
+  const persistPreferredYolo = useCallback(
+    async (enabled: boolean) => {
+      if ((settings.chatOptions.agentYoloEnabled ?? false) === enabled) {
+        return
+      }
+
+      try {
+        await setSettings({
+          ...settings,
+          chatOptions: {
+            ...settings.chatOptions,
+            agentYoloEnabled: enabled,
+          },
+        })
+      } catch (error: unknown) {
+        console.error('Failed to persist preferred YOLO state', error)
       }
     },
     [setSettings, settings],
@@ -1291,6 +1524,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   }, [inputMessage])
 
   useEffect(() => {
+    setQueuedMessageEditState(null)
+  }, [currentConversationId])
+
+  useEffect(() => {
     chatMessagesStateRef.current = chatMessages
   }, [chatMessages])
 
@@ -1463,9 +1700,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   // Measure the overlay above the input box so the timeline can reserve
   // equivalent scrollable space at its bottom — keeps the last assistant
   // message's metadata bar reachable instead of hidden behind the overlay.
-  // The overlay element is always rendered; height collapses to 0 when no
-  // todo/queued content is present. The gap between overlay bottom and the
-  // input top (CSS `bottom: calc(100% + var(--size-2-1))`) is included.
+  // Reserve only while the overlay has renderable children; otherwise a stale
+  // measurement can leave an invisible spacer between the footer and input.
   useLayoutEffect(() => {
     if (!inputOverlayElement) {
       // Element detached (e.g. switched to composer view). Reset budget so
@@ -1474,49 +1710,50 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       return
     }
 
+    const ownerWindow = inputOverlayElement.ownerDocument.defaultView ?? window
     let animationFrameId: number | null = null
 
-    const computeOverlayBudget = (): number => {
-      // offsetHeight already snaps to the integer pixel; 0 when empty.
-      const height = inputOverlayElement.offsetHeight
-      if (height <= 0) {
-        return 0
-      }
-      const gap = parseFloat(
-        getComputedStyle(inputOverlayElement).getPropertyValue('--size-2-1'),
-      )
-      const gapPx = Number.isFinite(gap) && gap > 0 ? gap : 4
-      return Math.ceil(height + gapPx)
-    }
-
     const publishHeight = () => {
-      const nextHeight = computeOverlayBudget()
+      const nextHeight = getInputOverlayReserveHeight(inputOverlayElement)
       setInputOverlayHeight((previous) =>
         previous === nextHeight ? previous : nextHeight,
       )
     }
 
-    publishHeight()
-
-    if (typeof ResizeObserver === 'undefined') {
-      return
-    }
-
-    const observer = new ResizeObserver(() => {
+    const schedulePublishHeight = () => {
       if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId)
+        ownerWindow.cancelAnimationFrame(animationFrameId)
       }
-      animationFrameId = requestAnimationFrame(() => {
+      animationFrameId = ownerWindow.requestAnimationFrame(() => {
         animationFrameId = null
         publishHeight()
       })
+    }
+
+    publishHeight()
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(schedulePublishHeight)
+    resizeObserver?.observe(inputOverlayElement)
+
+    const mutationObserver =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(schedulePublishHeight)
+    mutationObserver?.observe(inputOverlayElement, {
+      attributes: true,
+      attributeFilter: ['class', 'hidden', 'style'],
+      childList: true,
+      subtree: true,
     })
-    observer.observe(inputOverlayElement)
 
     return () => {
-      observer.disconnect()
+      resizeObserver?.disconnect()
+      mutationObserver?.disconnect()
       if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId)
+        ownerWindow.cancelAnimationFrame(animationFrameId)
       }
     }
   }, [inputOverlayElement])
@@ -1530,7 +1767,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       return
     }
     notifyContentFlushed()
-  }, [inputOverlayHeight, isAutoFollowEnabled, notifyContentFlushed])
+  }, [
+    inputOverlayHeight,
+    isAutoFollowEnabled,
+    mobileKeyboardViewportHeight,
+    notifyContentFlushed,
+  ])
 
   const {
     abortConversationRun,
@@ -1548,6 +1790,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationOverrides: conversationOverrides ?? undefined,
     modelId: conversationModelId,
     chatMode,
+    yoloEnabled,
     currentFileOverride,
     currentFileViewState: activeViewState,
     assistantIdOverride: conversationAssistantId,
@@ -1631,29 +1874,40 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     ],
   )
 
+  const windowedToolCallIds = useMemo(
+    () => collectToolCallIdsFromGroupedMessages(windowedGroupedChatMessages),
+    [windowedGroupedChatMessages],
+  )
+  const terminalCommandResultsByToolCallIdRef = useRef<ReadonlyMap<
+    string,
+    ChatTerminalCommandResultMessage
+  > | null>(null)
+  const subagentResultsByToolCallIdRef = useRef<ReadonlyMap<
+    string,
+    ChatSubagentResultMessage
+  > | null>(null)
   const terminalCommandResultsByToolCallId = useMemo(() => {
-    const map = new Map<string, ChatTerminalCommandResultMessage>()
-    for (const message of chatMessages) {
-      if (
-        message.role !== 'terminal_command_result' ||
-        !message.delegateToolCallId
-      ) {
-        continue
-      }
-      map.set(message.delegateToolCallId, message)
-    }
-    return map
-  }, [chatMessages])
+    const next = buildTerminalCommandResultMap(
+      chatMessages,
+      windowedToolCallIds,
+    )
+    const stable = terminalCommandResultsByToolCallIdRef.current
+      ? reuseShallowEqualMap(
+          terminalCommandResultsByToolCallIdRef.current,
+          next,
+        )
+      : next
+    terminalCommandResultsByToolCallIdRef.current = stable
+    return stable
+  }, [chatMessages, windowedToolCallIds])
   const subagentResultsByToolCallId = useMemo(() => {
-    const map = new Map<string, ChatSubagentResultMessage>()
-    for (const message of chatMessages) {
-      if (message.role !== 'subagent_result' || !message.delegateToolCallId) {
-        continue
-      }
-      map.set(message.delegateToolCallId, message)
-    }
-    return map
-  }, [chatMessages])
+    const next = buildSubagentResultMap(chatMessages, windowedToolCallIds)
+    const stable = subagentResultsByToolCallIdRef.current
+      ? reuseShallowEqualMap(subagentResultsByToolCallIdRef.current, next)
+      : next
+    subagentResultsByToolCallIdRef.current = stable
+    return stable
+  }, [chatMessages, windowedToolCallIds])
   useEffect(() => {
     const chatMessagesElement = chatMessagesRef.current
     if (!chatMessagesElement) {
@@ -1915,6 +2169,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         const effectiveOverrides = {
           ...(conversationOverrides ?? {}),
           chatMode,
+          agentYoloEnabled: yoloEnabled,
         }
         await createOrUpdateConversation(
           currentConversationId,
@@ -1942,6 +2197,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     },
     [
       chatMode,
+      yoloEnabled,
       conversationModelId,
       conversationOverrides,
       createOrUpdateConversation,
@@ -1964,6 +2220,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         const effectiveOverrides = {
           ...(conversationOverrides ?? {}),
           chatMode,
+          agentYoloEnabled: yoloEnabled,
         }
         await createOrUpdateConversationImmediately(
           currentConversationId,
@@ -1993,6 +2250,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     },
     [
       chatMode,
+      yoloEnabled,
       conversationModelId,
       conversationOverrides,
       createOrUpdateConversationImmediately,
@@ -2163,7 +2421,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
 
     if (chatMessages.length === 0) {
-      new Notice(t('chat.compaction.empty', 'There is no conversation content to compact yet.'))
+      new Notice(
+        t(
+          'chat.compaction.empty',
+          'There is no conversation content to compact yet.',
+        ),
+      )
       return
     }
 
@@ -2173,7 +2436,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       setPendingCompactionAnchorMessageId(null)
 
       if (!nextCompactionState) {
-        new Notice(t('chat.compaction.empty', 'There is no conversation content to compact yet.'))
+        new Notice(
+          t(
+            'chat.compaction.empty',
+            'There is no conversation content to compact yet.',
+          ),
+        )
         return
       }
 
@@ -2193,6 +2461,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       const effectiveOverrides = {
         ...(conversationOverrides ?? {}),
         chatMode,
+        agentYoloEnabled: yoloEnabled,
       }
       await createOrUpdateConversationImmediately(
         currentConversationId,
@@ -2220,12 +2489,18 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       )
     } catch (error) {
       setPendingCompactionAnchorMessageId(null)
-      new Notice(t('chat.compaction.failed', 'Context compaction failed. Please try again later.'))
+      new Notice(
+        t(
+          'chat.compaction.failed',
+          'Context compaction failed. Please try again later.',
+        ),
+      )
       console.error('Failed to compact conversation context', error)
     }
   }, [
     chatMessages,
     chatMode,
+    yoloEnabled,
     compactConversation,
     conversationModelId,
     conversationOverrides,
@@ -2297,6 +2572,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const handleLoadConversation = useCallback(
     async (conversationId: string) => {
+      setIsLoadingConversation(true)
       try {
         const conversation = await getConversationById(conversationId)
         if (!conversation) {
@@ -2346,6 +2622,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           settings.chatOptions.chatMode ?? 'agent',
         )
         setChatMode(loadedChatMode)
+        setYoloEnabled(
+          normalizeYoloEnabled(
+            conversation.overrides?.chatMode,
+            conversation.overrides?.agentYoloEnabled,
+            settings.chatOptions.agentYoloEnabled ?? false,
+          ),
+        )
         if (conversation.overrides) {
           conversationOverridesRef.current.set(
             conversationId,
@@ -2359,6 +2642,17 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           settings.chatModelId
         setConversationModelId(modelFromRef)
         conversationModelIdRef.current.set(conversationId, modelFromRef)
+        const loadedConversationTitle = getConversationDisplayTitle(
+          chatList.find((chat) => chat.id === conversationId)?.title,
+          untitledFallback,
+        )
+        props.onConversationContextChange?.({
+          currentConversationId: conversationId,
+          currentConversationPersisted: true,
+          currentConversationTitle: loadedConversationTitle,
+          currentModelId: modelFromRef,
+          currentOverrides: conversation.overrides ?? undefined,
+        })
         const storedReasoningLevel = normalizeReasoningLevel(
           conversation.reasoningLevel,
         )
@@ -2417,19 +2711,25 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       } catch (error) {
         new Notice('Failed to load conversation')
         console.error('Failed to load conversation', error)
+      } finally {
+        setIsLoadingConversation(false)
       }
     },
     [
       getConversationById,
+      chatList,
       createOrUpdateConversationImmediately,
       plugin,
       settings.chatModelId,
       settings.currentAssistantId,
       settings.chatOptions.chatMode,
+      settings.chatOptions.agentYoloEnabled,
       settings.assistants,
       getReasoningLevelForModelId,
       normalizeAssistantGroupBoundaryMessageIds,
       normalizeReasoningLevel,
+      props.onConversationContextChange,
+      untitledFallback,
     ],
   )
 
@@ -2442,6 +2742,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   useEffect(() => {
     props.onConversationContextChange?.({
       currentConversationId,
+      currentConversationPersisted,
       currentConversationTitle,
       currentModelId:
         conversationModelId ??
@@ -2458,6 +2759,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     })
   }, [
     currentConversationTitle,
+    currentConversationPersisted,
     conversationModelId,
     conversationOverrides,
     currentConversationId,
@@ -2476,6 +2778,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       conversationModelId,
       conversationAssistantId,
       chatMode,
+      yoloEnabled,
       reasoningLevel,
       conversationOverrides,
     })
@@ -2486,6 +2789,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationModelId,
     conversationAssistantId,
     chatMode,
+    yoloEnabled,
     reasoningLevel,
     conversationOverrides,
   ])
@@ -2525,6 +2829,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     setConversationOverrides(null)
     const defaultChatMode = chatMode
     setChatMode(defaultChatMode)
+    setYoloEnabled(yoloEnabled)
     const defaultConversationModelId =
       selectedAssistant?.modelId ?? settings.chatModelId
     conversationModelIdRef.current.set(newId, defaultConversationModelId)
@@ -2562,22 +2867,52 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   }
 
   const handleAssistantMessageEditSave = useCallback(
-    (messageId: string, content: string) => {
+    (groupAnchorMessageId: string, replacementMessages: ChatMessage[]) => {
       setChatMessages((prevChatHistory) => {
-        const nextMessages = prevChatHistory.map((message) =>
-          message.role === 'assistant' && message.id === messageId
-            ? {
-                ...message,
-                content,
-              }
-            : message,
+        const groupedMessages = groupAssistantAndToolMessages(
+          prevChatHistory,
+          assistantGroupBoundaryMessageIds,
         )
+        const targetGroup = groupedMessages.find(
+          (item): item is AssistantToolMessageGroup =>
+            Array.isArray(item) &&
+            item.some((message) => message.id === groupAnchorMessageId),
+        )
+        if (!targetGroup) {
+          return prevChatHistory
+        }
+
+        const anchorMessage = targetGroup.find(
+          (message) => message.id === groupAnchorMessageId,
+        )
+        const anchorBranchId = anchorMessage?.metadata?.branchId
+        const targetMessages = anchorBranchId
+          ? targetGroup.filter(
+              (message) => message.metadata?.branchId === anchorBranchId,
+            )
+          : targetGroup
+        const targetIds = new Set(targetMessages.map((message) => message.id))
+        const targetIndexes = prevChatHistory
+          .map((message, index) => (targetIds.has(message.id) ? index : null))
+          .filter((index): index is number => index !== null)
+        const startIndex = targetIndexes[0]
+        const endIndex = targetIndexes.at(-1)
+        if (startIndex === undefined || endIndex === undefined) {
+          return prevChatHistory
+        }
+
+        const nextMessages = [
+          ...prevChatHistory.slice(0, startIndex),
+          ...replacementMessages,
+          ...prevChatHistory.slice(endIndex + 1),
+        ]
+        chatMessagesStateRef.current = nextMessages
         void persistConversation(nextMessages)
         return nextMessages
       })
       setEditingAssistantMessageId(null)
     },
-    [persistConversation],
+    [assistantGroupBoundaryMessageIds, persistConversation],
   )
 
   const handleAssistantMessageEditCancel = useCallback(() => {
@@ -2727,6 +3062,11 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         conversationOverrides ??
         null
       const nextChatMode = normalizeChatMode(nextOverrides?.chatMode, chatMode)
+      const nextYoloEnabled = normalizeYoloEnabled(
+        nextOverrides?.chatMode,
+        nextOverrides?.agentYoloEnabled,
+        yoloEnabled,
+      )
 
       const resolvedConversationModelId =
         conversationModelIdRef.current.get(currentConversationId) ??
@@ -2782,6 +3122,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       }
 
       setChatMode(nextChatMode)
+      setYoloEnabled(nextYoloEnabled)
 
       setConversationAssistantId(conversationAssistantId)
       conversationAssistantIdRef.current.set(
@@ -2819,6 +3160,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           {
             ...(nextOverrides ?? {}),
             chatMode: nextChatMode,
+            agentYoloEnabled: nextYoloEnabled,
           },
           resolvedConversationModelId,
           serializeMessageModelMap(nextMessages, nextMessageModelMap),
@@ -2840,6 +3182,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     [
       chatList,
       chatMode,
+      yoloEnabled,
       conversationAssistantId,
       conversationModelId,
       conversationOverrides,
@@ -3250,6 +3593,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         {
           ...(conversationOverrides ?? {}),
           chatMode,
+          agentYoloEnabled: yoloEnabled,
         },
         conversationModelId,
         serializeMessageModelMap(
@@ -3303,6 +3647,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       effectiveCompactionState,
       generateConversationTitle,
       chatMode,
+      yoloEnabled,
       messageModelMap,
       normalizeAssistantGroupBoundaryMessageIds,
       reasoningLevel,
@@ -3405,7 +3750,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       })
 
       if (!plan) {
-        throw new Error('The current content does not contain an applicable edit plan.')
+        throw new Error(
+          'The current content does not contain an applicable edit plan.',
+        )
       }
 
       const materialized = materializeTextEditPlan({
@@ -3426,7 +3773,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           operationCount: materialized.totalOperations,
           errors: materialized.errors,
         })
-        throw new Error('The edit plan did not match any modifiable content. Please regenerate.')
+        throw new Error(
+          'The edit plan did not match any modifiable content. Please regenerate.',
+        )
       }
 
       const selectionRange = getInlineSelectionRange(
@@ -3682,7 +4031,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           )
         }
       } catch (error) {
-        new Notice(t('chat.editSummary.undoFailed', 'Undo failed. Please try again later.'))
+        new Notice(
+          t(
+            'chat.editSummary.undoFailed',
+            'Undo failed. Please try again later.',
+          ),
+        )
         console.error('Failed to undo assistant edit summary', error)
       } finally {
         setUndoingEditSummaryTarget(null)
@@ -3711,7 +4065,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       if (!currentConversationId) {
         if (!targetFile) {
           new Notice(
-            t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'),
+            t(
+              'chat.editSummary.fileMissing',
+              'File does not exist or has been moved.',
+            ),
           )
           return
         }
@@ -3750,7 +4107,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
         if (!targetFile) {
           new Notice(
-            t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'),
+            t(
+              'chat.editSummary.fileMissing',
+              'File does not exist or has been moved.',
+            ),
           )
           return
         }
@@ -3779,7 +4139,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       }
 
       if (!targetFile) {
-        new Notice(t('chat.editSummary.fileMissing', 'File does not exist or has been moved.'))
+        new Notice(
+          t(
+            'chat.editSummary.fileMissing',
+            'File does not exist or has been moved.',
+          ),
+        )
         return
       }
 
@@ -3789,46 +4154,54 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     [app, app.vault, app.workspace, currentConversationId, plugin, settings, t],
   )
 
-  const handleToolMessageUpdate = useCallback(
-    (toolMessage: ChatToolMessage) => {
-      const toolMessageIndex = chatMessages.findIndex(
-        (message) => message.id === toolMessage.id,
-      )
-      if (toolMessageIndex === -1) {
-        // The tool message no longer exists in the chat history.
-        // This likely means a new message was submitted while this stream was running.
-        // Abort the tool calls and keep the current chat history.
-        void (async () => {
-          const mcpManager = await getMcpManager()
-          toolMessage.toolCalls.forEach((toolCall) => {
-            mcpManager.abortToolCall(toolCall.request.id)
-          })
-        })()
-        return
+  const updateToolMessageInChatHistory = useCallback(
+    (
+      update:
+        | ChatToolMessage
+        | ((currentToolMessage: ChatToolMessage) => ChatToolMessage),
+      targetToolMessageId?: string,
+    ): boolean => {
+      const targetId =
+        typeof update === 'function' ? targetToolMessageId : update.id
+      if (!targetId) {
+        return false
       }
 
-      const updatedMessages = chatMessages.map((message) =>
-        message.id === toolMessage.id ? toolMessage : message,
+      const sourceMessages = chatMessagesStateRef.current
+      const toolMessageIndex = sourceMessages.findIndex(
+        (message) => message.id === targetId,
       )
+      const currentToolMessage = sourceMessages[toolMessageIndex]
+      if (toolMessageIndex === -1 || currentToolMessage?.role !== 'tool') {
+        return false
+      }
+
+      const nextToolMessage =
+        typeof update === 'function' ? update(currentToolMessage) : update
+      if (nextToolMessage === currentToolMessage) {
+        return true
+      }
+
+      const updatedMessages = sourceMessages.map((message) =>
+        message.id === targetId ? nextToolMessage : message,
+      )
+      chatMessagesStateRef.current = updatedMessages
       setChatMessages(updatedMessages)
       agentService.replaceConversationMessages(
         currentConversationId,
         updatedMessages,
       )
 
-      // Resume the chat automatically if this tool message is the last message
-      // and all tool calls have completed.
-      if (
-        toolMessageIndex === chatMessages.length - 1 &&
-        toolMessage.toolCalls.every((toolCall) =>
+      const shouldResume =
+        toolMessageIndex === sourceMessages.length - 1 &&
+        nextToolMessage.toolCalls.every((toolCall) =>
           [
             ToolCallResponseStatus.Success,
             ToolCallResponseStatus.Error,
           ].includes(toolCall.response.status),
         )
-      ) {
-        // Using updated toolMessage directly because chatMessages state
-        // still contains the old values
+
+      if (shouldResume) {
         submitChatMutation.mutate({
           chatMessages: updatedMessages,
           conversationId: currentConversationId,
@@ -3839,16 +4212,84 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           forceScrollToBottom()
         })
       }
+
+      return true
     },
     [
-      chatMessages,
-      currentConversationId,
       agentService,
-      submitChatMutation,
-      getMcpManager,
+      currentConversationId,
       forceScrollToBottom,
       resolveReasoningLevelForMessages,
+      submitChatMutation,
     ],
+  )
+
+  const handleToolMessageUpdate = useCallback(
+    (toolMessage: ChatToolMessage) => {
+      // Normal Chat rendering uses handleToolCallResponseUpdate so unchanged
+      // sibling tool cards can stay memoized. This remains as the legacy whole
+      // message fallback for ToolMessage hosts that still call onMessageUpdate.
+      const didFindToolMessage = updateToolMessageInChatHistory(toolMessage)
+      if (didFindToolMessage) {
+        return
+      }
+
+      // The tool message no longer exists in the chat history.
+      // This likely means a new message was submitted while this stream was running.
+      // Abort the tool calls and keep the current chat history.
+      void (async () => {
+        const mcpManager = await getMcpManager()
+        toolMessage.toolCalls.forEach((toolCall) => {
+          mcpManager.abortToolCall(toolCall.request.id)
+        })
+      })()
+    },
+    [getMcpManager, updateToolMessageInChatHistory],
+  )
+
+  const handleToolCallResponseUpdate = useCallback(
+    (toolMessageId: string, toolCallId: string, response: ToolCallResponse) => {
+      let shouldAbortMissingToolCall = false
+      const didFindToolMessage = updateToolMessageInChatHistory(
+        (currentToolMessage) => {
+          if (currentToolMessage.id !== toolMessageId) {
+            return currentToolMessage
+          }
+          let didUpdate = false
+          let didChange = false
+          const nextToolCalls = currentToolMessage.toolCalls.map((toolCall) => {
+            if (toolCall.request.id !== toolCallId) {
+              return toolCall
+            }
+            didUpdate = true
+            if (toolCall.response === response) {
+              return toolCall
+            }
+            didChange = true
+            return { ...toolCall, response }
+          })
+
+          if (!didUpdate) {
+            shouldAbortMissingToolCall = true
+            return currentToolMessage
+          }
+          if (!didChange) {
+            return currentToolMessage
+          }
+
+          return { ...currentToolMessage, toolCalls: nextToolCalls }
+        },
+        toolMessageId,
+      )
+
+      if (!didFindToolMessage || shouldAbortMissingToolCall) {
+        void (async () => {
+          const mcpManager = await getMcpManager()
+          mcpManager.abortToolCall(toolCallId)
+        })()
+      }
+    },
+    [getMcpManager, updateToolMessageInChatHistory],
   )
 
   const handleContinueResponse = useCallback(() => {
@@ -4636,14 +5077,24 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     [currentConversationId],
   )
 
-  const handleChatModeChange = useCallback(
-    (nextMode: ChatMode) => {
-      const resolvedMode = nextMode
+  const applyYoloChange = useCallback(
+    (enabled: boolean) => {
+      setYoloEnabled(enabled)
+      setConversationOverrides((prev) => ({
+        ...(prev ?? {}),
+        agentYoloEnabled: enabled,
+      }))
+      conversationOverridesRef.current.set(currentConversationId, {
+        ...(conversationOverridesRef.current.get(currentConversationId) ?? {}),
+        agentYoloEnabled: enabled,
+      })
+    },
+    [currentConversationId],
+  )
 
-      if (
-        resolvedMode === 'agent-full' &&
-        !settings.chatOptions.fullAccessWarningConfirmed
-      ) {
+  const handleYoloChange = useCallback(
+    (enabled: boolean) => {
+      if (enabled && !settings.chatOptions.fullAccessWarningConfirmed) {
         new AgentModeWarningModal(app, {
           title: t(
             'chatMode.fullAccessWarning.title',
@@ -4677,20 +5128,20 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             'Continue with YOLO Mode',
           ),
           onConfirm: () => {
-            applyChatModeChange('agent-full')
-            void persistPreferredChatMode('agent-full')
+            applyYoloChange(true)
             void (async () => {
               try {
                 await setSettings({
                   ...settings,
                   chatOptions: {
                     ...settings.chatOptions,
+                    agentYoloEnabled: true,
                     fullAccessWarningConfirmed: true,
                   },
                 })
               } catch (error: unknown) {
                 console.error(
-                  'Failed to persist full access warning confirmation',
+                  'Failed to persist YOLO preference and warning confirmation',
                   error,
                 )
               }
@@ -4699,6 +5150,16 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         }).open()
         return
       }
+
+      applyYoloChange(enabled)
+      void persistPreferredYolo(enabled)
+    },
+    [app, applyYoloChange, persistPreferredYolo, setSettings, settings, t],
+  )
+
+  const handleChatModeChange = useCallback(
+    (nextMode: ChatMode) => {
+      const resolvedMode = nextMode
 
       if (
         resolvedMode === 'agent' &&
@@ -4909,30 +5370,13 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     return null
   }, [chatTimelineItems])
 
-  // Async dispatch results are appended as independent timeline items to the conversation flow.
-  // Showing a footer info bar between dispatch messages and results would interrupt the
-  // "dispatch -> wait for result -> result arrives" logical flow.
-  // Therefore, any assistant-group immediately followed by an external_agent_result group
-  // has its footer suppressed.
-  const renderKeysWithSuppressedAsyncFollowUpFooter = useMemo(() => {
-    const set = new Set<string>()
-    for (let i = 0; i < chatTimelineItems.length - 1; i++) {
-      const current = chatTimelineItems[i]
-      const next = chatTimelineItems[i + 1]
-      if (current.kind !== 'assistant-group') continue
-      if (next.kind !== 'assistant-group') continue
-      const nextFirst = next.messages[0]
-      if (
-        nextFirst &&
-        (nextFirst.role === 'external_agent_result' ||
-          nextFirst.role === 'subagent_result' ||
-          nextFirst.role === 'terminal_command_result')
-      ) {
-        set.add(current.renderKey)
-      }
-    }
-    return set
-  }, [chatTimelineItems])
+  // Background task results are re-attached to their corresponding tool card in the render,
+  // and subagent/terminal result standalone groups get filtered out of the timeline; so the
+  // “visual turn” footer ownership must be decided on the grouped messages before that filtering.
+  const foregroundAgentVisualTurnPlan = useMemo(
+    () => buildForegroundAgentVisualTurnPlan(groupedChatMessages),
+    [groupedChatMessages],
+  )
 
   const renderChatTimelineItem = useCallback(
     (timelineItem: ChatTimelineItem) => {
@@ -4977,6 +5421,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
       if (timelineItem.kind === 'assistant-group') {
         const messageOrGroup = timelineItem.messages
+        const foregroundAgentFooter = getForegroundAgentFooterForGroup(
+          foregroundAgentVisualTurnPlan,
+          messageOrGroup,
+        )
         const containsCompactionAnchor =
           compactionDividerAnchorMessageId !== null &&
           messageOrGroup.some(
@@ -5000,9 +5448,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             )}
             suppressFooter={
               shouldSuppressCompactionAnchorFooter ||
-              renderKeysWithSuppressedAsyncFollowUpFooter.has(
-                timelineItem.renderKey,
-              )
+              foregroundAgentFooter?.suppress === true
+            }
+            inlineInfoMessages={
+              foregroundAgentFooter?.inlineInfoMessages ?? messageOrGroup
             }
             showInlineInfo={chatSurfacePreset.assistantActions.showInlineInfo}
             showRetryAction={chatSurfacePreset.assistantActions.showRetryAction}
@@ -5021,6 +5470,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             activeApplyRequestKey={activeApplyRequestKey}
             onApply={handleApply}
             onToolMessageUpdate={handleToolMessageUpdate}
+            onToolCallResponseUpdate={handleToolCallResponseUpdate}
             terminalCommandResultsByToolCallId={
               terminalCommandResultsByToolCallId
             }
@@ -5345,7 +5795,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       persistConversation,
       queryProgress,
       reasoningLevel,
-      renderKeysWithSuppressedAsyncFollowUpFooter,
+      foregroundAgentVisualTurnPlan,
       shouldHidePendingAssistantPlaceholders,
       undoingEditSummaryTarget,
       updateHistoricalUserMessage,
@@ -5375,7 +5825,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   return (
     <div
-      ref={containerRef}
+      ref={handleContainerRef}
       className={containerClassName}
       style={containerStyle}
     >
@@ -5387,10 +5837,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       ) : (
         <ChatConversationPane
           chatMode={chatMode}
+          yoloEnabled={yoloEnabled}
           groupedChatMessagesLength={groupedChatMessages.length}
           isCurrentConversationRunActive={isCurrentConversationRunActive}
           isAutoFollowEnabled={isAutoFollowEnabled}
           currentConversationId={currentConversationId}
+          isRestoringConversation={isLoadingConversation}
           chatTimelineItems={chatTimelineItems}
           chatMessagesRef={chatMessagesRef}
           renderChatTimelineItem={renderChatTimelineItem}
@@ -5401,7 +5853,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           hasNewerMessages={hasNewerMessages}
           onLoadEarlier={loadEarlier}
           onLoadNewer={loadNewer}
-          loadEarlierLabel={t('chat.loadEarlierMessages', 'Loading earlier messages')}
+          loadEarlierLabel={t(
+            'chat.loadEarlierMessages',
+            'Loading earlier messages',
+          )}
           loadNewerLabel={t('chat.loadNewerMessages', 'Loading newer messages')}
           onForceScrollToBottom={handleForceScrollToBottom}
           hasStreamingMessages={hasStreamingMessages}
@@ -5410,8 +5865,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             'chat.scrollToBottomWhileStreaming',
             'Scroll to bottom and follow',
           )}
-          emptyStateAskTitle={t('chat.emptyState.askTitle', 'Think first, then write')}
-          emptyStateAgentTitle={t('chat.emptyState.agentTitle', 'Let AI take action')}
+          emptyStateAskTitle={t(
+            'chat.emptyState.askTitle',
+            'Think first, then write',
+          )}
+          emptyStateAgentTitle={t(
+            'chat.emptyState.agentTitle',
+            'Let AI take action',
+          )}
           emptyStateAgentFullTitle={t(
             'chat.emptyState.agentFullTitle',
             'Let AI run autonomously · YOLO mode',
@@ -5480,7 +5941,76 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                             className="yolo-chat-queued-messages__item"
                             title={preview}
                           >
-                            {preview || ' '}
+                            <span className="yolo-chat-queued-messages__preview">
+                              {preview || ' '}
+                            </span>
+                            <span className="yolo-chat-queued-messages__actions">
+                              <button
+                                type="button"
+                                className="yolo-chat-queued-messages__action"
+                                aria-label={t('common.edit', 'Edit')}
+                                title={t('common.edit', 'Edit')}
+                                disabled={queuedMessageEditState !== null}
+                                onClick={() => {
+                                  const removed =
+                                    agentService.removePendingUserMessage(
+                                      currentConversationId,
+                                      queued.id,
+                                    )
+                                  if (!removed) return
+
+                                  const preservedReasoningLevel = reasoningLevel
+                                  const editingReasoningLevel =
+                                    normalizeReasoningLevel(
+                                      removed.reasoningLevel,
+                                    ) ?? reasoningLevel
+                                  setQueuedMessageEditState({
+                                    preservedInputMessage:
+                                      inputMessageRef.current,
+                                    preservedReasoningLevel,
+                                  })
+                                  setReasoningLevel(editingReasoningLevel)
+                                  setInputMessage({
+                                    ...removed,
+                                    timeContext: undefined,
+                                  })
+                                  requestAnimationFrame(() => {
+                                    chatUserInputRefs.current
+                                      .get(removed.id)
+                                      ?.focus()
+                                  })
+                                }}
+                              >
+                                <Pencil size={13} strokeWidth={2.5} />
+                              </button>
+                              <button
+                                type="button"
+                                className="yolo-chat-queued-messages__action is-delete"
+                                aria-label={t('common.delete', 'Delete')}
+                                title={t('common.delete', 'Delete')}
+                                onClick={() => {
+                                  const removed =
+                                    agentService.removePendingUserMessage(
+                                      currentConversationId,
+                                      queued.id,
+                                    )
+                                  if (!removed) return
+                                  releaseHighlightIds(
+                                    collectSelectionHighlightIds(
+                                      removed.mentionables,
+                                    ),
+                                  )
+                                  setMessageReasoningMap((prev) => {
+                                    if (!prev.has(removed.id)) return prev
+                                    const next = new Map(prev)
+                                    next.delete(removed.id)
+                                    return next
+                                  })
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </span>
                           </div>
                         )
                       })}
@@ -5530,7 +6060,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       new Notice(
                         t(
                           'chat.queueMessage.blockedAwaitingInput',
-                          'Please answer the model\'s question in the conversation before sending a new message.',
+                          "Please answer the model's question in the conversation before sending a new message.",
                         ),
                       )
                       return
@@ -5563,7 +6093,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                         commitSentSelectionHighlights(
                           messageForSubmit.mentionables,
                         )
-                        setInputMessage(getNewInputMessage(reasoningLevel))
+                        if (queuedMessageEditState) {
+                          setReasoningLevel(
+                            queuedMessageEditState.preservedReasoningLevel,
+                          )
+                          conversationReasoningLevelRef.current.set(
+                            currentConversationId,
+                            queuedMessageEditState.preservedReasoningLevel,
+                          )
+                          setInputMessage(
+                            queuedMessageEditState.preservedInputMessage,
+                          )
+                          setQueuedMessageEditState(null)
+                        } else {
+                          setInputMessage(getNewInputMessage(reasoningLevel))
+                        }
                         return
                       }
                       if (enqueueResult === 'blocked_awaiting_approval') {
@@ -5608,7 +6152,21 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       return next
                     })
                     commitSentSelectionHighlights(messageForSubmit.mentionables)
-                    setInputMessage(getNewInputMessage(reasoningLevel))
+                    if (queuedMessageEditState) {
+                      setReasoningLevel(
+                        queuedMessageEditState.preservedReasoningLevel,
+                      )
+                      conversationReasoningLevelRef.current.set(
+                        currentConversationId,
+                        queuedMessageEditState.preservedReasoningLevel,
+                      )
+                      setInputMessage(
+                        queuedMessageEditState.preservedInputMessage,
+                      )
+                      setQueuedMessageEditState(null)
+                    } else {
+                      setInputMessage(getNewInputMessage(reasoningLevel))
+                    }
                   }}
                   onFocus={() => {
                     setFocusedMessageId(inputMessage.id)
@@ -5684,6 +6242,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                   onSelectChatModeForConversation={handleChatModeChange}
                   chatMode={chatMode}
                   onChatModeChange={handleChatModeChange}
+                  yoloEnabled={yoloEnabled}
+                  onYoloChange={handleYoloChange}
                   allowAgentModeOption={true}
                   enableResize
                   onRunSlashCommand={(command) => {

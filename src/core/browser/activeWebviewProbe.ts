@@ -164,9 +164,7 @@ export function findActiveWebviewHandle(app: App): ActiveWebviewHandle | null {
   }
 
   const recentWebviewLeaf = recentlyFocusedWebviewLeaves.get(app)
-  return recentWebviewLeaf
-    ? handleFromLeaf(recentWebviewLeaf, false)
-    : null
+  return recentWebviewLeaf ? handleFromLeaf(recentWebviewLeaf, false) : null
 }
 
 /**

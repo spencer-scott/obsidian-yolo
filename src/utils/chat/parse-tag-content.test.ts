@@ -206,7 +206,8 @@ Some text after without closing tag`,
       {
         type: 'yolo_block',
         content: '',
-        filename: 'Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md',
+        filename:
+          'Clinical-Medicine-KB/Basic-Medicine/Pathophysiology/Shock.md',
         language: 'markdown',
         startLine: 1782,
         endLine: 1784,

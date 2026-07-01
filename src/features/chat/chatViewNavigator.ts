@@ -372,6 +372,9 @@ export class ChatViewNavigator {
     await leaf.setViewState({
       type: CHAT_VIEW_TYPE,
       active: true,
+      ...(payload?.initialConversationId
+        ? { state: { currentConversationId: payload.initialConversationId } }
+        : {}),
     })
 
     if (!(leaf.view instanceof ChatView)) {

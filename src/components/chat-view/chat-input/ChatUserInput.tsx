@@ -12,9 +12,11 @@ import {
   type ParagraphNode,
   SerializedEditorState,
 } from 'lexical'
+import { FilePlus2 } from 'lucide-react'
 import { Notice } from 'obsidian'
 import {
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   forwardRef,
   useCallback,
@@ -37,7 +39,9 @@ import { ChatModel } from '../../../types/chat-model.types'
 import {
   Mentionable,
   MentionableImage,
+  MentionableOffice,
   MentionablePDF,
+  MentionableTextAttachment,
   SerializedMentionable,
 } from '../../../types/mentionable'
 import {
@@ -52,7 +56,9 @@ import {
 } from '../../../utils/chat/mentionable'
 import { fileToMentionableImage } from '../../../utils/llm/image'
 import { chatModelSupportsVision } from '../../../utils/llm/model-modalities'
+import { fileToMentionableOffice } from '../../../utils/llm/office'
 import { fileToMentionablePDF } from '../../../utils/llm/pdf'
+import { fileToMentionableTextAttachment } from '../../../utils/llm/text-attachment'
 import ContextUsagePopover from '../ContextUsagePopover'
 import ContextUsageRing from '../ContextUsageRing'
 import { useSnippetEntries } from '../hooks/useSnippetEntries'
@@ -122,6 +128,8 @@ export type ChatUserInputProps = {
   onSelectChatModeForConversation?: (mode: ChatMode) => void
   chatMode?: ChatMode
   onChatModeChange?: (mode: ChatMode) => void
+  yoloEnabled?: boolean
+  onYoloChange?: (enabled: boolean) => void
   controlLayout?: ChatUserInputControlLayout
   onControlPopoverOpenChange?: (isOpen: boolean) => void
   allowAgentModeOption?: boolean
@@ -162,6 +170,11 @@ const DEFAULT_INPUT_HEIGHT = 80
 const MIN_INPUT_HEIGHT = 80
 const MAX_INPUT_HEIGHT = 520
 
+function isFileDragEvent(event: ReactDragEvent<HTMLDivElement>) {
+  const types = Array.from(event.dataTransfer.types ?? [])
+  return types.includes('Files')
+}
+
 const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
   (
     {
@@ -191,6 +204,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       onSelectChatModeForConversation,
       chatMode,
       onChatModeChange,
+      yoloEnabled = false,
+      onYoloChange,
       controlLayout = 'composer-toolbar',
       onControlPopoverOpenChange,
       allowAgentModeOption = true,
@@ -247,6 +262,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
     const resizedHeightRef = useRef<number | null>(rememberedInputHeight)
     const dragStartYRef = useRef(0)
     const dragStartHeightRef = useRef(DEFAULT_INPUT_HEIGHT)
+    const fileDragDepthRef = useRef(0)
+    const [isFileDragActive, setIsFileDragActive] = useState(false)
 
     const effectiveMentionables = useMemo(
       () => displayMentionables ?? mentionables,
@@ -947,10 +964,115 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       [mentionableUnitLabels, mentionables, setMentionables],
     )
 
+    const handleCreateOfficeMentionables = useCallback(
+      (mentionableOffices: MentionableOffice[]) => {
+        const newMentionableOffices = mentionableOffices.filter(
+          (m) =>
+            !mentionables.some(
+              (mentionable) =>
+                getMentionableKey(serializeMentionable(mentionable)) ===
+                getMentionableKey(serializeMentionable(m)),
+            ),
+        )
+        if (newMentionableOffices.length === 0) return
+        const editor = editorRef.current
+        if (editor) {
+          editor.update(() => {
+            const nodesToInsert: LexicalNode[] = []
+            newMentionableOffices.forEach((mentionable) => {
+              nodesToInsert.push(
+                $createMentionNode(
+                  getMentionableName(mentionable, {
+                    unitLabels: mentionableUnitLabels,
+                  }),
+                  serializeMentionable(mentionable),
+                ),
+              )
+              nodesToInsert.push($createTextNode(' '))
+            })
+            const selection = $getSelection()
+            if (selection && $isRangeSelection(selection)) {
+              selection.insertNodes(nodesToInsert)
+              return
+            }
+
+            const root = $getRoot()
+            let paragraphNode = root.getFirstChild()
+            if (!paragraphNode || !$isParagraphNode(paragraphNode)) {
+              const created = $createParagraphNode()
+              root.append(created)
+              paragraphNode = created
+            }
+            const paragraph = paragraphNode as ParagraphNode
+            nodesToInsert.forEach((node) => {
+              paragraph.append(node)
+            })
+          })
+        }
+        setMentionables([...mentionables, ...newMentionableOffices])
+      },
+      [mentionableUnitLabels, mentionables, setMentionables],
+    )
+
+    const handleCreateTextAttachmentMentionables = useCallback(
+      (mentionableTextAttachments: MentionableTextAttachment[]) => {
+        const newMentionables = mentionableTextAttachments.filter(
+          (m) =>
+            !mentionables.some(
+              (mentionable) =>
+                getMentionableKey(serializeMentionable(mentionable)) ===
+                getMentionableKey(serializeMentionable(m)),
+            ),
+        )
+        if (newMentionables.length === 0) return
+        const editor = editorRef.current
+        if (editor) {
+          editor.update(() => {
+            const nodesToInsert: LexicalNode[] = []
+            newMentionables.forEach((mentionable) => {
+              nodesToInsert.push(
+                $createMentionNode(
+                  getMentionableName(mentionable, {
+                    unitLabels: mentionableUnitLabels,
+                  }),
+                  serializeMentionable(mentionable),
+                ),
+              )
+              nodesToInsert.push($createTextNode(' '))
+            })
+            const selection = $getSelection()
+            if (selection && $isRangeSelection(selection)) {
+              selection.insertNodes(nodesToInsert)
+              return
+            }
+
+            const root = $getRoot()
+            let paragraphNode = root.getFirstChild()
+            if (!paragraphNode || !$isParagraphNode(paragraphNode)) {
+              const created = $createParagraphNode()
+              root.append(created)
+              paragraphNode = created
+            }
+            const paragraph = paragraphNode as ParagraphNode
+            nodesToInsert.forEach((node) => {
+              paragraph.append(node)
+            })
+          })
+        }
+        setMentionables([...mentionables, ...newMentionables])
+      },
+      [mentionableUnitLabels, mentionables, setMentionables],
+    )
+
     const handleUploadFiles = useCallback(
       (files: File[]) => {
-        const { imageFiles, pdfFiles, unsupportedFiles } =
-          classifyUploadFiles(files)
+        const {
+          imageFiles,
+          pdfFiles,
+          officeFiles,
+          textAttachmentFiles,
+          unsupportedFiles,
+        } = classifyUploadFiles(files)
         if (unsupportedFiles.length > 0) {
           new Notice(
             t(
@@ -1012,12 +1134,85 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
             }
           })
         }
+        if (officeFiles.length > 0) {
+          void Promise.allSettled(
+            officeFiles.map((file) => fileToMentionableOffice(file)),
+          ).then((results) => {
+            const successes: MentionableOffice[] = []
+            results.forEach((result, idx) => {
+              if (result.status === 'fulfilled') {
+                successes.push(result.value)
+              } else {
+                const name = officeFiles[idx]?.name ?? 'Office document'
+                console.error(
+                  `Failed to extract Office document ${name}`,
+                  result.reason,
+                )
+                new Notice(
+                  t(
+                    'chat.readOfficeFailed',
+                    'Failed to read Office document "{name}": {error}',
+                  )
+                    .replace('{name}', name)
+                    .replace(
+                      '{error}',
+                      result.reason instanceof Error
+                        ? result.reason.message
+                        : 'unknown error',
+                    ),
+                )
+              }
+            })
+            if (successes.length > 0) {
+              handleCreateOfficeMentionables(successes)
+            }
+          })
+        }
+        if (textAttachmentFiles.length > 0) {
+          void Promise.allSettled(
+            textAttachmentFiles.map((file) =>
+              fileToMentionableTextAttachment(file),
+            ),
+          ).then((results) => {
+            const successes: MentionableTextAttachment[] = []
+            results.forEach((result, idx) => {
+              if (result.status === 'fulfilled') {
+                successes.push(result.value)
+              } else {
+                const name = textAttachmentFiles[idx]?.name ?? 'text file'
+                console.error(
+                  `Failed to read text attachment ${name}`,
+                  result.reason,
+                )
+                new Notice(
+                  t(
+                    'chat.readTextAttachmentFailed',
+                    'Failed to read text file "{name}": {error}',
+                  )
+                    .replace('{name}', name)
+                    .replace(
+                      '{error}',
+                      result.reason instanceof Error
+                        ? result.reason.message
+                        : 'unknown error',
+                    ),
+                )
+              }
+            })
+            if (successes.length > 0) {
+              handleCreateTextAttachmentMentionables(successes)
+            }
+          })
+        }
       },
       [
         app,
         handleCreateImageMentionables,
+        handleCreateOfficeMentionables,
         handleCreatePdfMentionables,
+        handleCreateTextAttachmentMentionables,
         settings,
+        t,
       ],
     )
 
@@ -1236,6 +1431,58 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
       [compact, enableResize, persistResizedHeight],
     )
 
+    const clearFileDragState = useCallback(() => {
+      fileDragDepthRef.current = 0
+      setIsFileDragActive(false)
+    }, [])
+
+    const handleContainerDragEnter = useCallback(
+      (event: ReactDragEvent<HTMLDivElement>) => {
+        if (compact || !isFileDragEvent(event)) {
+          return
+        }
+
+        fileDragDepthRef.current += 1
+        setIsFileDragActive(true)
+      },
+      [compact],
+    )
+
+    const handleContainerDragOver = useCallback(
+      (event: ReactDragEvent<HTMLDivElement>) => {
+        if (compact || !isFileDragEvent(event)) {
+          return
+        }
+
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+      },
+      [compact],
+    )
+
+    const handleContainerDragLeave = useCallback(
+      (event: ReactDragEvent<HTMLDivElement>) => {
+        if (compact || !isFileDragEvent(event)) {
+          return
+        }
+
+        fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1)
+        if (fileDragDepthRef.current === 0) {
+          setIsFileDragActive(false)
+        }
+      },
+      [compact],
+    )
+
+    const handleContainerDropCapture = useCallback(
+      (event: ReactDragEvent<HTMLDivElement>) => {
+        if (isFileDragEvent(event)) {
+          clearFileDragState()
+        }
+      },
+      [clearFileDragState],
+    )
+
     const handleContainerMouseDown = useCallback(
       (event: ReactMouseEvent<HTMLDivElement>) => {
         if (compact) {
@@ -1282,6 +1529,8 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
         <ChatModeSelect
           mode={chatMode}
           onChange={onChatModeChange}
+          yoloEnabled={yoloEnabled}
+          onYoloChange={onYoloChange ?? (() => {})}
           side="top"
           sideOffset={8}
         />
@@ -1394,6 +1643,7 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
           className="yolo-chat-user-input-container"
           ref={containerRef}
           data-resizable={enableResize && !compact ? 'true' : 'false'}
+          data-file-drag-active={isFileDragActive ? 'true' : 'false'}
           onClick={compact ? onToggleCompact : undefined}
           onKeyDown={
             compact
@@ -1406,10 +1656,20 @@ const ChatUserInput = forwardRef<ChatUserInputRef, ChatUserInputProps>(
               : undefined
           }
           onMouseDown={handleContainerMouseDown}
+          onDragEnter={handleContainerDragEnter}
+          onDragOver={handleContainerDragOver}
+          onDragLeave={handleContainerDragLeave}
+          onDropCapture={handleContainerDropCapture}
           role={compact ? 'button' : 'presentation'}
           tabIndex={compact ? 0 : undefined}
           style={containerStyle}
         >
+          {isFileDragActive && (
+            <div className="yolo-chat-user-input-drop-hint" aria-hidden="true">
+              <FilePlus2 size={24} />
+              <span>{t('chat.dropFilesHint', '松开以添加文件')}</span>
+            </div>
+          )}
           <div
             className="yolo-chat-user-input-editor"
             onMouseDown={handleEditorBackgroundMouseDown}

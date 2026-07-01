@@ -1,6 +1,7 @@
 import { LLMRequest } from '../../types/llm/request'
 
 import { OpenAIMessageAdapter } from './openaiMessageAdapter'
+import { LLMResponseFormatError } from './responseFormatError'
 
 class TestOpenAIMessageAdapter extends OpenAIMessageAdapter {
   buildParams(request: LLMRequest) {
@@ -15,6 +16,14 @@ class TestOpenAIMessageAdapter extends OpenAIMessageAdapter {
       request,
       stream: false,
     })
+  }
+
+  parseNonStreaming(raw: unknown) {
+    return this.parseNonStreamingResponse(raw as never)
+  }
+
+  parseStreaming(raw: unknown) {
+    return this.parseStreamingResponseChunk(raw as never)
   }
 }
 
@@ -165,5 +174,61 @@ describe('OpenAIMessageAdapter', () => {
         },
       },
     ])
+  })
+
+  it('throws a useful format error when a non-streaming response is missing choices', () => {
+    let caught: unknown
+    try {
+      adapter.parseNonStreaming({
+        error: {
+          message: 'The model does not support this request.',
+          type: 'invalid_request_error',
+          code: 'unsupported_model',
+        },
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(LLMResponseFormatError)
+    expect((caught as LLMResponseFormatError).payload).toMatchObject({
+      adapter: 'OpenAI-compatible',
+      stage: 'non-streaming response',
+      expected: 'choices_array',
+      problem: { type: 'missing_choices' },
+      responseKeys: ['error'],
+      upstreamError: {
+        message: 'The model does not support this request.',
+        type: 'invalid_request_error',
+        code: 'unsupported_model',
+      },
+      preview:
+        '{"error":{"message":"The model does not support this request.","type":"invalid_request_error","code":"unsupported_model"}}',
+    })
+  })
+
+  it('throws a useful format error when a streaming chunk has invalid choices', () => {
+    let caught: unknown
+    try {
+      adapter.parseStreaming({
+        id: 'chunk-1',
+        choices: null,
+        message: 'Invalid stream payload',
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(LLMResponseFormatError)
+    expect((caught as LLMResponseFormatError).payload).toMatchObject({
+      adapter: 'OpenAI-compatible',
+      stage: 'streaming response chunk',
+      expected: 'choices_array',
+      problem: { type: 'invalid_choices', actualType: 'null' },
+      responseKeys: ['id', 'choices', 'message'],
+      upstreamMessage: 'Invalid stream payload',
+      preview:
+        '{"id":"chunk-1","choices":null,"message":"Invalid stream payload"}',
+    })
   })
 })

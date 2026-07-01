@@ -16,10 +16,12 @@ import { SharedConversationSurface } from './SharedConversationSurface'
 
 type ChatConversationPaneProps = {
   chatMode: ChatMode
+  yoloEnabled: boolean
   groupedChatMessagesLength: number
   isCurrentConversationRunActive: boolean
   isAutoFollowEnabled: boolean
   currentConversationId: string
+  isRestoringConversation?: boolean
   chatTimelineItems: ChatTimelineItem[]
   chatMessagesRef: RefObject<HTMLDivElement>
   renderChatTimelineItem: (timelineItem: ChatTimelineItem) => ReactNode
@@ -53,10 +55,12 @@ type ChatConversationPaneProps = {
 
 export function ChatConversationPane({
   chatMode,
+  yoloEnabled,
   groupedChatMessagesLength,
   isCurrentConversationRunActive,
   isAutoFollowEnabled,
   currentConversationId,
+  isRestoringConversation = false,
   chatTimelineItems,
   chatMessagesRef,
   renderChatTimelineItem,
@@ -88,24 +92,25 @@ export function ChatConversationPane({
   bottomSpacerHeight,
 }: ChatConversationPaneProps) {
   const showEmptyState =
-    groupedChatMessagesLength === 0 && !isCurrentConversationRunActive
+    groupedChatMessagesLength === 0 &&
+    !isCurrentConversationRunActive &&
+    !isRestoringConversation
   const showScrollToBottomButton =
     !showEmptyState &&
     groupedChatMessagesLength > 0 &&
     (!isAutoFollowEnabled || hasNewerMessages)
 
-  const emptyStateTitle =
-    chatMode === 'agent-full'
-      ? emptyStateAgentFullTitle
-      : isAgentChatMode(chatMode)
-        ? emptyStateAgentTitle
-        : emptyStateAskTitle
-  const emptyStateDescription =
-    chatMode === 'agent-full'
-      ? emptyStateAgentFullDescription
-      : isAgentChatMode(chatMode)
-        ? emptyStateAgentDescription
-        : emptyStateAskDescription
+  const isYoloAgent = isAgentChatMode(chatMode) && yoloEnabled
+  const emptyStateTitle = isYoloAgent
+    ? emptyStateAgentFullTitle
+    : isAgentChatMode(chatMode)
+      ? emptyStateAgentTitle
+      : emptyStateAskTitle
+  const emptyStateDescription = isYoloAgent
+    ? emptyStateAgentFullDescription
+    : isAgentChatMode(chatMode)
+      ? emptyStateAgentDescription
+      : emptyStateAskDescription
 
   return (
     <>
@@ -130,11 +135,11 @@ export function ChatConversationPane({
                   <div className="yolo-chat-empty-state-overlay-inner">
                     <div className="yolo-chat-empty-state">
                       <div
-                        key={chatMode}
+                        key={`${chatMode}-${isYoloAgent ? 'yolo' : 'std'}`}
                         className="yolo-chat-empty-state-icon"
-                        data-mode={chatMode}
+                        data-mode={isYoloAgent ? 'agent-full' : chatMode}
                       >
-                        {chatMode === 'agent-full' ? (
+                        {isYoloAgent ? (
                           <InfinityIcon size={18} strokeWidth={2} />
                         ) : isAgentChatMode(chatMode) ? (
                           <Bot size={18} strokeWidth={2} />

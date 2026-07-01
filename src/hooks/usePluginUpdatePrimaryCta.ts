@@ -39,8 +39,12 @@ export function usePluginUpdatePrimaryCta(
   const { app } = plugin
   const [settings, setSettings] = useState<YoloSettings>(() => plugin.settings)
   const { result } = useUpdateCheck()
-  const { state: updateState, canSelfUpdate, startDownload, applyUpdate } =
-    usePluginUpdate()
+  const {
+    state: updateState,
+    canSelfUpdate,
+    startDownload,
+    applyUpdate,
+  } = usePluginUpdate()
 
   useEffect(() => {
     return plugin.addSettingsChangeListener((newSettings) => {

@@ -164,7 +164,10 @@ function ImportConfigModalComponent({
         setStep('select')
       } catch {
         new Notice(
-          t('configTransfer.import.noticeFileReadFailed', 'Failed to read configuration file'),
+          t(
+            'configTransfer.import.noticeFileReadFailed',
+            'Failed to read configuration file',
+          ),
           5000,
         )
       }
@@ -200,7 +203,10 @@ function ImportConfigModalComponent({
     if (!importData) return
     if (selectedKeys.size === 0) {
       new Notice(
-        t('configTransfer.import.noticeAtLeastOne', 'Please select at least one configuration item'),
+        t(
+          'configTransfer.import.noticeAtLeastOne',
+          'Please select at least one configuration item',
+        ),
       )
       return
     }
@@ -215,7 +221,12 @@ function ImportConfigModalComponent({
       })
 
       await plugin.setSettings(result)
-      new Notice(t('configTransfer.import.noticeSuccess', 'Configuration imported successfully'))
+      new Notice(
+        t(
+          'configTransfer.import.noticeSuccess',
+          'Configuration imported successfully',
+        ),
+      )
 
       if (importData.redacted) {
         new Notice(
@@ -272,7 +283,10 @@ function ImportConfigModalComponent({
             onClick={handleFileImport}
           >
             <strong>
-              {t('configTransfer.import.sourceFile', 'Import from configuration file')}
+              {t(
+                'configTransfer.import.sourceFile',
+                'Import from configuration file',
+              )}
             </strong>
             <span>
               {t(
@@ -288,7 +302,10 @@ function ImportConfigModalComponent({
               onClick={handleVaultImport}
             >
               <strong>
-                {t('configTransfer.import.sourceVault', 'Import from another vault')}
+                {t(
+                  'configTransfer.import.sourceVault',
+                  'Import from another vault',
+                )}
               </strong>
               <span>
                 {t(
@@ -313,7 +330,10 @@ function ImportConfigModalComponent({
     <div className="yolo-config-transfer-modal">
       <div className="yolo-config-transfer-toolbar">
         <div className="yolo-config-transfer-desc">
-          {t('configTransfer.import.description', 'Select configuration items to import')}
+          {t(
+            'configTransfer.import.description',
+            'Select configuration items to import',
+          )}
         </div>
         <div className="yolo-config-transfer-toolbar-actions">
           <button onClick={selectAll}>
@@ -358,7 +378,10 @@ function ImportConfigModalComponent({
           </span>
           <span>
             <strong>
-              {t('configTransfer.import.strategyOverwriteTitle', 'Full Overwrite')}
+              {t(
+                'configTransfer.import.strategyOverwriteTitle',
+                'Full Overwrite',
+              )}
             </strong>
             {' — '}
             {t(

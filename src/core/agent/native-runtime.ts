@@ -12,6 +12,7 @@ import type { RequestMessage, RequestTool } from '../../types/llm/request'
 import type { ReasoningLevel } from '../../types/reasoning'
 import {
   ToolCallRequest,
+  ToolCallResponse,
   ToolCallResponseStatus,
 } from '../../types/tool-call.types'
 import { runWithLLMDebugTrace } from '../llm/debugCapture'
@@ -110,6 +111,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       allowedToolNames: input.allowedToolNames,
       enableToolDisclosure: input.enableToolDisclosure,
       toolPreferences: input.toolPreferences,
+      toolServerPreferences: input.toolServerPreferences,
       workspaceScope: input.workspaceScope,
       allowedSkillPaths: input.allowedSkillPaths,
       apiType: input.apiType,
@@ -619,6 +621,56 @@ export class NativeAgentRuntime implements AgentRuntime {
           : toolCall,
       ),
     }
+  }
+
+  /**
+   * Locate a `tool` message that contains the given `toolCallId`. Returns the
+   * containing message and the tool call entry for read access. Used by the
+   * subagent approval routing path to bridge service-level approve/reject
+   * actions back into a child runtime.
+   */
+  findToolCall(toolCallId: string): {
+    toolMessage: ChatToolMessage
+    toolCall: { request: ToolCallRequest; response: ToolCallResponse }
+  } | null {
+    for (const message of this.messages) {
+      if (message.role !== 'tool') continue
+      const toolCall = message.toolCalls.find(
+        (entry) => entry.request.id === toolCallId,
+      )
+      if (toolCall) {
+        return { toolMessage: message, toolCall }
+      }
+    }
+    return null
+  }
+
+  /**
+   * Replace the response on a single tool call inside this runtime's messages.
+   * Notifies subscribers so the SubagentCard / parent UI re-renders.
+   *
+   * Used by the subagent approval routing path:
+   *   - approve: flip PendingApproval → Running → Success/Error
+   *   - reject: flip PendingApproval → Rejected
+   *   - timeout: flip PendingApproval → Rejected with structured error
+   */
+  setToolCallResponse(toolCallId: string, response: ToolCallResponse): boolean {
+    let didPatch = false
+    this.messages = this.messages.map((message) => {
+      if (message.role !== 'tool') return message
+      let messageUpdated = false
+      const nextToolCalls = message.toolCalls.map((toolCall) => {
+        if (toolCall.request.id !== toolCallId) return toolCall
+        didPatch = true
+        messageUpdated = true
+        return { ...toolCall, response }
+      })
+      return messageUpdated ? { ...message, toolCalls: nextToolCalls } : message
+    })
+    if (didPatch) {
+      this.notifySubscribers()
+    }
+    return didPatch
   }
 
   private mergeAbortSignals(

@@ -150,6 +150,8 @@ export const it: TranslationKeys = {
       name: 'Supporta il progetto',
       desc: 'Se trovi utile questo plugin, considera di supportarne lo sviluppo!',
       buyMeACoffee: 'Offrimi un caffè',
+      reportBug: 'Segnala bug',
+      featureRequest: 'Richiedi funzione',
     },
     defaults: {
       title: 'Criteri modello predefiniti e prompt',
@@ -315,6 +317,8 @@ export const it: TranslationKeys = {
       tools: 'Strumenti',
       toolsCount: '{count} strumenti',
       toolsCountWithEnabled: '{count} strumenti (abilitati {enabled})',
+      mcpLoadingStatus: 'Caricamento di {count} MCP…',
+      mcpErrorStatus: '{count} MCP non connessi',
       skills: 'Competenze',
       skillsCount: '{count} competenze',
       skillsCountWithEnabled: '{count} competenze (abilitate {enabled})',
@@ -519,8 +523,10 @@ export const it: TranslationKeys = {
       toolApproval: 'Approvazione',
       toolApprovalFullAccess: 'Accesso completo',
       toolApprovalRequire: 'Richiedi approvazione',
-      toolApprovalForced: 'Approvazione richiesta',
+      toolDisclosureAuto: 'Auto',
+      toolDisclosureAutoSelect: 'Selezione automatica',
       toolDisclosureAlways: 'In contesto',
+      toolDisclosureMixed: 'Misto',
       toolDisclosureOnDemand: 'Su richiesta',
       editorEnabled: 'Abilitato',
       editorDisabled: 'Disabilitato',
@@ -696,6 +702,7 @@ export const it: TranslationKeys = {
       baseUrl: 'URL base',
       baseUrlDesc: 'URL endpoint API personalizzato (facoltativo).',
       baseUrlPlaceholder: 'Ad esempio, https://api.openai.com/v1',
+      apiUrlPreviewLabel: 'Anteprima:',
       noStainlessHeaders: 'Nessun header stainless',
       noStainlessHeadersDesc:
         'Disabilita gli header SDK stainless (richiesto per alcuni provider compatibili).',
@@ -709,6 +716,12 @@ export const it: TranslationKeys = {
       requestTransportModeBrowser: 'Richiesta browser',
       requestTransportModeObsidian: 'Richiesta integrata Obsidian',
       requestTransportModeNode: 'Connessione diretta desktop (consigliata)',
+      responseStreamingMode: 'Modalita streaming risposta',
+      responseStreamingModeDesc:
+        'Controlla se questo provider usa risposte streaming o non streaming.',
+      responseStreamingModeAuto: 'Auto (predefinito)',
+      responseStreamingModeStreaming: 'Streaming',
+      responseStreamingModeNonStreaming: 'Non streaming',
       promptCaching: 'Cache del prompt',
       promptCachingDesc:
         "Abilita la cache effimera dei prompt Anthropic. Riutilizza prompt di sistema, strumenti e cronologia tra i turni per ridurre i token di input. Le scritture in cache hanno un sovrapprezzo del 25%; le letture costano circa il 10% del normale. Disponibile quando il tipo API del provider è Anthropic; l'upstream deve supportare il campo cache_control.",
@@ -1463,11 +1476,14 @@ export const it: TranslationKeys = {
     selectModel: 'Seleziona modello',
     uploadImage: 'Carica immagine',
     uploadFile: 'Aggiungi file',
+    dropFilesHint: 'Rilascia per aggiungere file',
     imageUnsupportedByModel:
       'Questo modello non dichiara il supporto alle immagini. Abilita la modalità di input "Vision" nelle impostazioni del modello per allegare immagini.',
     unsupportedFileType: 'Tipo di file non supportato: {names}',
     processImagesFailed: 'Impossibile elaborare le immagini caricate',
     readPdfFailed: 'Impossibile leggere il PDF "{name}": {error}',
+    readOfficeFailed: 'Failed to read Office document "{name}": {error}',
+    readTextAttachmentFailed: 'Failed to read text file "{name}": {error}',
     addContext: 'Aggiungi contesto',
     applyChanges: 'Applica modifiche',
     copyMessage: 'Copia messaggio',
@@ -1671,6 +1687,23 @@ export const it: TranslationKeys = {
     },
     errorCard: {
       title: 'Questa risposta non e stata generata',
+      responseFormat: {
+        responseNotObject:
+          'Il servizio modello ha restituito una risposta che non e un oggetto (valore effettivo: {{actual}}).',
+        missingChoices:
+          'Il servizio modello ha restituito un formato non analizzabile: array choices mancante.',
+        invalidChoices:
+          'Il servizio modello ha restituito un formato non analizzabile: choices non e un array (valore effettivo: {{actual}}).',
+        stage: 'Fase: {{stage}}',
+        expected: 'Campo atteso: {{field}}',
+        expectedChoicesArray: 'array choices',
+        responseFields: 'Campi risposta: {{fields}}',
+        upstreamError: 'Errore upstream: {{message}}',
+        errorType: 'Tipo errore: {{type}}',
+        errorCode: 'Codice errore: {{code}}',
+        upstreamMessage: 'Messaggio upstream: {{message}}',
+        responsePreview: 'Anteprima risposta: {{preview}}',
+      },
     },
     showMore: 'Mostra altro',
     showLess: 'Mostra meno',
@@ -1763,6 +1796,15 @@ export const it: TranslationKeys = {
       statusFailed: 'Fallito',
       toolUseCount: '{count} strumenti',
       tokenCount: '{count} token',
+      approval: {
+        heading: 'In attesa di approvazione',
+        headingMulti: 'In attesa di approvazione · {count}',
+        approve: 'Approva',
+        reject: 'Rifiuta',
+        approveAll: 'Approva tutto',
+        rejectAll: 'Rifiuta tutto',
+        viewDetails: 'Vedi parametri',
+      },
     },
     conversationSettings: {
       openAria: 'Impostazioni conversazione',
@@ -1939,6 +1981,9 @@ export const it: TranslationKeys = {
     agentFull: 'Agent (YOLO)',
     agentFullDesc:
       'Approva automaticamente le chiamate agli strumenti per task complessi',
+    yolo: 'YOLO',
+    yoloDesc:
+      'Approva automaticamente le chiamate agli strumenti per task complessi',
     warning: {
       title: 'Conferma prima di abilitare la modalita Agent',
       description:
@@ -1998,8 +2043,8 @@ export const it: TranslationKeys = {
     dismiss: 'Chiudi',
     languageEnglish: 'EN',
     languageChinese: '中文',
-    muteThisVersion: 'Non notificare per questa versione',
     viewHistory: 'Visualizza cronologia aggiornamenti',
+    skipVersion: 'Non ricordarmelo per questa versione',
     historyTitle: 'Cronologia aggiornamenti',
     historyLoading: 'Caricamento cronologia aggiornamenti...',
     historyError:
@@ -2010,9 +2055,13 @@ export const it: TranslationKeys = {
     historyNext: 'Successiva',
     installationIncompleteTitle: 'Installazione del plugin incompleta',
     installationIncompleteMeta:
-      'main.js {bakedVersion} · manifest {manifestVersion}',
+      'main.js {mainVersion} · manifest {manifestVersion} · styles {stylesVersion}',
+    installationIncompleteSuspects: 'File da riparare: {files}',
     installationIncompleteNotes:
-      'Di solito main.js non è stato scaricato completamente durante l’aggiornamento. Esegui il backup di data.json, rimuovi il plugin e reinstallalo.',
+      'I file del plugin potrebbero non essere stati scaricati completamente. La riparazione parte automaticamente; puoi anche riprovare qui sotto.',
+    tryRepair: 'Prova a riparare',
+    repairing: 'Riparazione {{progress}}%',
+    repairAndReload: 'Ripara e ricarica',
     downloadUpdate: 'Scarica aggiornamento',
     downloading: 'Download {{progress}}%',
     installAndReload: 'Installa e ricarica',
@@ -2021,6 +2070,7 @@ export const it: TranslationKeys = {
     installFailed: 'Installazione non riuscita',
     viewOnGitHub: 'Vedi su GitHub',
     updateInCommunityPlugins: 'Aggiorna dai plugin community',
-    manualInstallOnGitHub: 'Non riesci ad aggiornare? Installa manualmente da GitHub',
+    manualInstallOnGitHub:
+      'Non riesci ad aggiornare? Installa manualmente da GitHub',
   },
 }

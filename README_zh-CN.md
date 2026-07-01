@@ -103,12 +103,29 @@ YOLO 的 Agent 模式让大模型不再只是"问答机器"——它可以真正
 
 ## Roadmap
 
-- [x] 更好，更强的 Vault AI 搜索 
-- [ ] 后台 Agent（长程任务自动执行）
-- [ ] Cron 定时任务
-- [ ] 多 Agent 协同编排
-- [ ] 学习模式
+- [x] 更好，更强的 Vault AI 搜索
+- [x] 后台 Agent（长程任务自动执行）
+- [x] 多 Agent 协同编排（通过 subagent 实现）
+- [ ] 学习模式 —— 一个专用的学习视图
+- [ ] 批注模式 —— 对笔记进行实时的 AI 评注与建议
+- [ ] 内置助手 —— 右下角常驻，统管配置与 agent，支持自动压缩与定时任务
 - [ ] 更好的 AI 白板
+- [ ] 语音输入与会议纪要
+
+
+## 反馈与 Issue
+
+遇到 bug、有困惑或新想法,欢迎开 issue:
+
+🐛 [报告 bug](https://github.com/Lapis0x0/obsidian-yolo/issues/new?template=bug_report_zh.yml) · ✨ [提出想法](https://github.com/Lapis0x0/obsidian-yolo/issues/new?template=feature_request_zh.yml)
+
+这样的反馈最有帮助:
+
+- 带清晰复现步骤的 bug(Obsidian 版本、操作系统、插件版本、操作过程、实际现象)
+- "我做了 X 结果是 Y" 类问题——交互细节、文案混乱、文档过时、翻译错漏
+- 有具体使用场景的功能想法("我在做 A 时希望能 B,因为 C")
+
+提交前请先搜一下已有 issue,避免重复。
 
 
 ## Contributing
@@ -116,6 +133,8 @@ YOLO 的 Agent 模式让大模型不再只是"问答机器"——它可以真正
 欢迎各种形式的贡献——Bug 报告、文档改进、功能增强都可以。
 
 **重大功能请先开 issue 讨论可行性和实现方案。**
+
+详细规则请看 [CONTRIBUTING_zh-CN.md](./CONTRIBUTING_zh-CN.md)：什么样的贡献会被欢迎、AI 辅助 PR 的要求、PR 体量参考、开发环境搭建。
 
 
 ## Acknowledgments

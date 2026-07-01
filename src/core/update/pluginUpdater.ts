@@ -1,27 +1,32 @@
 import {
   App,
+  type DataAdapter,
   FileSystemAdapter,
   Platform,
   apiVersion,
   normalizePath,
   requestUrl,
-  type DataAdapter,
 } from 'obsidian'
 
 import type YoloPlugin from '../../main'
 
 import {
+  RELEASE_FILE_NAMES,
+  type ReleaseFileName,
+} from './installationIntegrity'
+import {
+  type ReleaseAssets,
   compareVersions,
   normalizePluginVersion,
-  type ReleaseAssetUrls,
 } from './updateChecker'
 
 const STAGING_ROOT = '.yolo-update-staging'
+const REPAIR_META_FILE = 'repair-meta.json'
 
 const RELEASE_FILES = {
-  mainJs: 'main.js',
-  manifestJson: 'manifest.json',
-  stylesCss: 'styles.css',
+  mainJs: RELEASE_FILE_NAMES.mainJs,
+  manifestJson: RELEASE_FILE_NAMES.manifestJson,
+  stylesCss: RELEASE_FILE_NAMES.stylesCss,
 } as const
 
 type StagedManifest = {
@@ -31,10 +36,34 @@ type StagedManifest = {
 
 export type PluginUpdateState =
   | { status: 'idle' }
-  | { status: 'downloading'; version: string; progress: number }
-  | { status: 'ready'; version: string }
-  | { status: 'applying'; version: string }
-  | { status: 'error'; version: string; message: string }
+  | {
+      status: 'downloading'
+      version: string
+      progress: number
+      repairFiles?: ReleaseFileName[]
+    }
+  | { status: 'ready'; version: string; repairFiles?: ReleaseFileName[] }
+  | { status: 'applying'; version: string; repairFiles?: ReleaseFileName[] }
+  | {
+      status: 'error'
+      version: string
+      message: string
+      repairFiles?: ReleaseFileName[]
+    }
+
+type RepairMeta = {
+  version: string
+  files: ReleaseFileName[]
+}
+
+export type RepairStagingStatus =
+  | { ready: false }
+  | {
+      ready: true
+      version: string
+      files: ReleaseFileName[]
+      minAppVersion: string
+    }
 
 export type StagingStatus =
   | { ready: false }
@@ -97,6 +126,91 @@ export function meetsMinAppVersion(
   return !compareVersions(appVersion, minAppVersion)
 }
 
+export function getRepairMetaPath(stagingDir: string): string {
+  return normalizePath(`${stagingDir}/${REPAIR_META_FILE}`)
+}
+
+function parseRepairMeta(raw: string): RepairMeta | null {
+  try {
+    const parsed = JSON.parse(raw) as {
+      version?: unknown
+      files?: unknown
+    }
+    const version =
+      typeof parsed.version === 'string' ? parsed.version.trim() : ''
+    if (!version || !Array.isArray(parsed.files) || parsed.files.length === 0) {
+      return null
+    }
+    const files = parsed.files.filter(
+      (file): file is ReleaseFileName =>
+        file === RELEASE_FILE_NAMES.mainJs ||
+        file === RELEASE_FILE_NAMES.manifestJson ||
+        file === RELEASE_FILE_NAMES.stylesCss,
+    )
+    if (files.length === 0) {
+      return null
+    }
+    return {
+      version: normalizePluginVersion(version),
+      files,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function getRepairStagingStatus(
+  adapter: DataAdapter,
+  stagingDir: string,
+  expectedVersion?: string,
+): Promise<RepairStagingStatus> {
+  const metaPath = getRepairMetaPath(stagingDir)
+  if (!(await adapter.exists(metaPath))) {
+    return { ready: false }
+  }
+
+  const meta = parseRepairMeta(await adapter.read(metaPath))
+  if (!meta) {
+    return { ready: false }
+  }
+
+  if (
+    expectedVersion &&
+    meta.version !== normalizePluginVersion(expectedVersion)
+  ) {
+    return { ready: false }
+  }
+
+  for (const fileName of meta.files) {
+    const filePath = normalizePath(`${stagingDir}/${fileName}`)
+    if (!(await adapter.exists(filePath))) {
+      return { ready: false }
+    }
+  }
+
+  let minAppVersion = ''
+  if (meta.files.includes(RELEASE_FILE_NAMES.manifestJson)) {
+    const manifestPath = normalizePath(
+      `${stagingDir}/${RELEASE_FILE_NAMES.manifestJson}`,
+    )
+    const manifest = parseStagedManifest(await adapter.read(manifestPath))
+    if (!manifest) {
+      return { ready: false }
+    }
+    if (normalizePluginVersion(manifest.version) !== meta.version) {
+      return { ready: false }
+    }
+    minAppVersion = manifest.minAppVersion
+  }
+
+  return {
+    ready: true,
+    version: meta.version,
+    files: meta.files,
+    minAppVersion,
+  }
+}
+
 export async function getStagingStatus(
   adapter: DataAdapter,
   stagingDir: string,
@@ -123,7 +237,10 @@ export async function getStagingStatus(
   }
 
   const normalized = normalizePluginVersion(manifest.version)
-  if (expectedVersion && normalized !== normalizePluginVersion(expectedVersion)) {
+  if (
+    expectedVersion &&
+    normalized !== normalizePluginVersion(expectedVersion)
+  ) {
     return { ready: false }
   }
 
@@ -157,9 +274,7 @@ export async function clearStagingRoot(
   await removeStagingDir(adapter, getStagingRoot(pluginDir))
 }
 
-async function downloadBinary(
-  url: string,
-): Promise<ArrayBuffer> {
+async function downloadBinary(url: string): Promise<ArrayBuffer> {
   const response = await requestUrl({ url, method: 'GET' })
   if (response.status < 200 || response.status >= 300) {
     throw new Error(`Download failed (${response.status})`)
@@ -179,7 +294,7 @@ export async function downloadReleaseToStaging(params: {
   adapter: DataAdapter
   pluginDir: string
   version: string
-  assets: ReleaseAssetUrls
+  assets: ReleaseAssets
   onProgress?: (progress: number) => void
 }): Promise<void> {
   const { adapter, pluginDir, version, assets, onProgress } = params
@@ -190,21 +305,21 @@ export async function downloadReleaseToStaging(params: {
 
   try {
     onProgress?.(0)
-    const mainBuffer = await downloadBinary(assets.mainJs)
+    const mainBuffer = await downloadBinary(assets.mainJs.url)
     await adapter.writeBinary(
       normalizePath(`${stagingDir}/${RELEASE_FILES.mainJs}`),
       mainBuffer,
     )
     onProgress?.(60)
 
-    const stylesText = await downloadText(assets.stylesCss)
+    const stylesText = await downloadText(assets.stylesCss.url)
     await adapter.write(
       normalizePath(`${stagingDir}/${RELEASE_FILES.stylesCss}`),
       stylesText,
     )
     onProgress?.(80)
 
-    const manifestText = await downloadText(assets.manifestJson)
+    const manifestText = await downloadText(assets.manifestJson.url)
     await adapter.write(
       normalizePath(`${stagingDir}/${RELEASE_FILES.manifestJson}`),
       manifestText,
@@ -214,6 +329,76 @@ export async function downloadReleaseToStaging(params: {
     const status = await getStagingStatus(adapter, stagingDir, version)
     if (!status.ready) {
       throw new Error('Staged release failed integrity check')
+    }
+  } catch (error) {
+    await clearStagingRoot(adapter, pluginDir)
+    throw error
+  }
+}
+
+function assetForFile(
+  assets: ReleaseAssets,
+  fileName: ReleaseFileName,
+): { url: string } {
+  switch (fileName) {
+    case RELEASE_FILE_NAMES.mainJs:
+      return assets.mainJs
+    case RELEASE_FILE_NAMES.manifestJson:
+      return assets.manifestJson
+    case RELEASE_FILE_NAMES.stylesCss:
+      return assets.stylesCss
+  }
+}
+
+export async function downloadRepairFilesToStaging(params: {
+  adapter: DataAdapter
+  pluginDir: string
+  version: string
+  assets: ReleaseAssets
+  files: ReleaseFileName[]
+  onProgress?: (progress: number) => void
+}): Promise<void> {
+  const { adapter, pluginDir, version, assets, files, onProgress } = params
+  const normalized = normalizePluginVersion(version)
+  const uniqueFiles = [...new Set(files)]
+  if (uniqueFiles.length === 0) {
+    throw new Error('No repair files requested')
+  }
+
+  const stagingDir = getStagingDir(pluginDir, normalized)
+  await clearStagingRoot(adapter, pluginDir)
+  await ensureDir(adapter, stagingDir)
+
+  try {
+    const step = 100 / uniqueFiles.length
+    for (let index = 0; index < uniqueFiles.length; index += 1) {
+      const fileName = uniqueFiles[index]
+      const asset = assetForFile(assets, fileName)
+      if (fileName === RELEASE_FILE_NAMES.mainJs) {
+        const mainBuffer = await downloadBinary(asset.url)
+        await adapter.writeBinary(
+          normalizePath(`${stagingDir}/${fileName}`),
+          mainBuffer,
+        )
+      } else {
+        const text = await downloadText(asset.url)
+        await adapter.write(normalizePath(`${stagingDir}/${fileName}`), text)
+      }
+      onProgress?.(Math.round(step * (index + 1)))
+    }
+
+    const repairMeta: RepairMeta = {
+      version: normalized,
+      files: uniqueFiles,
+    }
+    await adapter.write(
+      getRepairMetaPath(stagingDir),
+      JSON.stringify(repairMeta),
+    )
+
+    const status = await getRepairStagingStatus(adapter, stagingDir, normalized)
+    if (!status.ready) {
+      throw new Error('Staged repair failed integrity check')
     }
   } catch (error) {
     await clearStagingRoot(adapter, pluginDir)
@@ -297,5 +482,58 @@ export async function applyStagedUpdate(
   // toast stuck on "Installing…".
   window.location.reload()
 
+  return { ok: true }
+}
+
+const REPAIR_APPLY_ORDER: ReleaseFileName[] = [
+  RELEASE_FILE_NAMES.mainJs,
+  RELEASE_FILE_NAMES.stylesCss,
+  RELEASE_FILE_NAMES.manifestJson,
+]
+
+export async function applyRepairFiles(
+  app: App,
+  plugin: YoloPlugin,
+  version: string,
+): Promise<ApplyStagedUpdateResult> {
+  const pluginDir = plugin.manifest.dir
+  if (!pluginDir) {
+    return { ok: false, reason: 'write_failed' }
+  }
+
+  const adapter = app.vault.adapter
+  const stagingDir = getStagingDir(pluginDir, version)
+  const status = await getRepairStagingStatus(adapter, stagingDir, version)
+  if (!status.ready) {
+    return { ok: false, reason: 'not_ready' }
+  }
+
+  if (
+    status.files.includes(RELEASE_FILE_NAMES.manifestJson) &&
+    status.minAppVersion &&
+    !meetsMinAppVersion(apiVersion, status.minAppVersion)
+  ) {
+    return { ok: false, reason: 'min_app_version' }
+  }
+
+  try {
+    for (const fileName of REPAIR_APPLY_ORDER) {
+      if (!status.files.includes(fileName)) {
+        continue
+      }
+      await copyStagedFile(
+        adapter,
+        stagingDir,
+        pluginDir,
+        fileName,
+        fileName === RELEASE_FILE_NAMES.mainJs,
+      )
+    }
+  } catch {
+    return { ok: false, reason: 'write_failed' }
+  }
+
+  await clearStagingRoot(adapter, pluginDir)
+  window.location.reload()
   return { ok: true }
 }

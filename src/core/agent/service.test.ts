@@ -2,6 +2,7 @@ import { ChatMessage, ChatUserMessage } from '../../types/chat'
 import { ToolCallResponseStatus } from '../../types/tool-call.types'
 
 import { AgentService } from './service'
+import { subagentRuntimeRegistry } from './subagent/runtime-registry'
 import { AgentRuntimeRunInput } from './types'
 
 type MockRuntimeInstance = {
@@ -879,6 +880,63 @@ describe('AgentService mid-run user message queue', () => {
     await runPromise
   })
 
+  it('atomically removes a message while it is still queued', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-remove',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-remove', [makeUserMessage('u1', 'hi')]),
+    })
+    const runtime = runtimeInstances[0]
+    const first = makeUserMessage('u2', 'first')
+    const second = makeUserMessage('u3', 'second')
+
+    expect(service.enqueueUserMessage('conv-remove', first)).toBe('enqueued')
+    expect(service.enqueueUserMessage('conv-remove', second)).toBe('enqueued')
+
+    expect(service.removePendingUserMessage('conv-remove', 'u2')).toEqual(first)
+    expect(service.peekPendingUserMessages('conv-remove')).toEqual([second])
+    expect(
+      service.removePendingUserMessage('conv-remove', 'missing'),
+    ).toBeNull()
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
+  it('cannot remove a message after the runtime has drained it', async () => {
+    const service = new AgentService()
+    const runPromise = service.run({
+      conversationId: 'conv-remove-drained',
+      loopConfig: {
+        enableTools: true,
+        maxAutoIterations: 100,
+        includeBuiltinTools: true,
+      },
+      input: buildBaseRunInput('conv-remove-drained', [
+        makeUserMessage('u1', 'hi'),
+      ]),
+    })
+    const runtime = runtimeInstances[0]
+    const queued = makeUserMessage('u2', 'queued')
+    expect(service.enqueueUserMessage('conv-remove-drained', queued)).toBe(
+      'enqueued',
+    )
+
+    runtime.getRunInput()?.drainPendingUserMessages?.()
+
+    expect(
+      service.removePendingUserMessage('conv-remove-drained', 'u2'),
+    ).toBeNull()
+
+    runtime.resolveRun()
+    await runPromise
+  })
+
   it('refuses enqueue for non-default branches', async () => {
     const service = new AgentService()
     const runPromise = service.run({
@@ -1027,5 +1085,187 @@ describe('AgentService mid-run user message queue', () => {
 
     // No continuation run should have spawned.
     expect(runtimeInstances.length).toBe(1)
+  })
+})
+
+describe('AgentService subagent approval routing', () => {
+  type FakeRuntime = {
+    findToolCall: jest.Mock
+    setToolCallResponse: jest.Mock
+    getMessages: jest.Mock
+  }
+
+  const makeFakeRuntime = (toolCallId: string): FakeRuntime => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'tool',
+        id: 'tool-msg-1',
+        metadata: {},
+        toolCalls: [
+          {
+            request: {
+              id: toolCallId,
+              name: 'yolo_local__fs_edit',
+              arguments: undefined,
+            },
+            response: { status: ToolCallResponseStatus.PendingApproval },
+          },
+        ],
+      },
+    ]
+    return {
+      findToolCall: jest.fn().mockImplementation((id: string) => {
+        if (id !== toolCallId) return null
+        return {
+          toolMessage: messages[0],
+          toolCall: (messages[0] as Extract<ChatMessage, { role: 'tool' }>)
+            .toolCalls[0],
+        }
+      }),
+      setToolCallResponse: jest.fn().mockReturnValue(true),
+      getMessages: jest.fn().mockReturnValue(messages),
+    }
+  }
+
+  type FakeMcpManager = {
+    callTool: jest.Mock
+    allowToolForConversation: jest.Mock
+  }
+
+  const makeFakeMcpManager = (): FakeMcpManager => ({
+    callTool: jest.fn().mockResolvedValue({
+      status: ToolCallResponseStatus.Success,
+      data: { type: 'text', text: 'ok' },
+    }),
+    allowToolForConversation: jest.fn(),
+  })
+
+  const registerEntry = ({
+    taskId = 'sub_test',
+    toolCallId = 'tool-call-x',
+  }: { taskId?: string; toolCallId?: string } = {}) => {
+    const runtime = makeFakeRuntime(toolCallId)
+    const mcpManager = makeFakeMcpManager()
+    const resumeRun = jest.fn().mockResolvedValue(undefined)
+    subagentRuntimeRegistry.register({
+      taskId,
+      runtime: runtime as unknown as Parameters<
+        typeof subagentRuntimeRegistry.register
+      >[0]['runtime'],
+      mcpManager: mcpManager as unknown as Parameters<
+        typeof subagentRuntimeRegistry.register
+      >[0]['mcpManager'],
+      parentConversationId: 'conv-parent',
+      parentToolCallId: 'parent-call-1',
+      resumeRun,
+    })
+    return { taskId, toolCallId, runtime, mcpManager, resumeRun }
+  }
+
+  afterEach(() => {
+    for (const entry of subagentRuntimeRegistry.list()) {
+      subagentRuntimeRegistry.unregister(entry.taskId)
+    }
+    runtimeInstances.length = 0
+  })
+
+  it('approveToolCall routes to the subagent runtime, executes, and resumes', async () => {
+    const { toolCallId, runtime, mcpManager, resumeRun } = registerEntry()
+    const service = new AgentService()
+
+    const ok = await service.approveToolCall({
+      conversationId: 'irrelevant-parent-conv',
+      toolCallId,
+    })
+
+    expect(ok).toBe(true)
+    expect(mcpManager.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'yolo_local__fs_edit',
+        id: toolCallId,
+        conversationId: 'conv-parent',
+      }),
+    )
+    // Two patches: PendingApproval -> Running, then Running -> Success.
+    expect(runtime.setToolCallResponse).toHaveBeenCalledTimes(2)
+    expect(runtime.setToolCallResponse).toHaveBeenNthCalledWith(1, toolCallId, {
+      status: ToolCallResponseStatus.Running,
+    })
+    expect(runtime.setToolCallResponse).toHaveBeenNthCalledWith(
+      2,
+      toolCallId,
+      expect.objectContaining({ status: ToolCallResponseStatus.Success }),
+    )
+    expect(resumeRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('approveToolCall with allowForConversation scopes the allow to the parent conv', async () => {
+    const { toolCallId, mcpManager } = registerEntry()
+    const service = new AgentService()
+
+    await service.approveToolCall({
+      conversationId: 'irrelevant',
+      toolCallId,
+      allowForConversation: true,
+    })
+
+    expect(mcpManager.allowToolForConversation).toHaveBeenCalledWith(
+      'yolo_local__fs_edit',
+      'conv-parent',
+      undefined,
+    )
+  })
+
+  it('rejectToolCall routes to the subagent runtime and resumes', () => {
+    const { toolCallId, runtime, mcpManager, resumeRun } = registerEntry()
+    const service = new AgentService()
+
+    const ok = service.rejectToolCall({
+      conversationId: 'irrelevant',
+      toolCallId,
+    })
+
+    expect(ok).toBe(true)
+    expect(runtime.setToolCallResponse).toHaveBeenCalledWith(toolCallId, {
+      status: ToolCallResponseStatus.Rejected,
+    })
+    expect(mcpManager.callTool).not.toHaveBeenCalled()
+    expect(resumeRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('approveToolCall surfaces callTool errors as Error response', async () => {
+    const { toolCallId, runtime, mcpManager } = registerEntry()
+    mcpManager.callTool.mockRejectedValueOnce(new Error('boom'))
+    const service = new AgentService()
+
+    await service.approveToolCall({
+      conversationId: 'irrelevant',
+      toolCallId,
+    })
+
+    const lastCall =
+      runtime.setToolCallResponse.mock.calls[
+        runtime.setToolCallResponse.mock.calls.length - 1
+      ]
+    expect(lastCall?.[1]).toEqual(
+      expect.objectContaining({
+        status: ToolCallResponseStatus.Error,
+        error: expect.stringContaining('boom'),
+      }),
+    )
+  })
+
+  it('approveToolCall returns false when the runtime no longer hosts the call', async () => {
+    const { toolCallId, runtime } = registerEntry()
+    // Simulate a race: the call was already resolved before approve fired.
+    runtime.findToolCall.mockReturnValueOnce(null)
+    const service = new AgentService()
+
+    const ok = await service.approveToolCall({
+      conversationId: 'irrelevant',
+      toolCallId,
+    })
+
+    expect(ok).toBe(false)
   })
 })

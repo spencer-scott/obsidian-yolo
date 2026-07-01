@@ -378,7 +378,12 @@ function PanelShell({
     >
       <div className="yolo-ask-user-question-header">
         <MessageCircleQuestion size={14} />
-        <span>{t(`chat.askUserQuestion.${titleKey}`, 'The model is asking you a question')}</span>
+        <span>
+          {t(
+            `chat.askUserQuestion.${titleKey}`,
+            'The model is asking you a question',
+          )}
+        </span>
       </div>
       {children}
     </div>
@@ -397,7 +402,10 @@ function QuestionRow({
   onSubmit: () => void
 }) {
   const { t } = useLanguage()
-  const otherLabel = t('chat.askUserQuestion.otherOption', 'Other (please specify)')
+  const otherLabel = t(
+    'chat.askUserQuestion.otherOption',
+    'Other (please specify)',
+  )
   const otherPlaceholder = t(
     'chat.askUserQuestion.otherPlaceholder',
     'Please provide your answer...',

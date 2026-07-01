@@ -1,6 +1,7 @@
 import { TFile } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
 
+import { CHAT_VIEW_TYPE } from '../../constants'
 import type YoloPlugin from '../../main'
 
 import { ChatViewNavigator } from './chatViewNavigator'
@@ -55,11 +56,14 @@ describe('ChatViewNavigator', () => {
       setPendingPayload: overrides.setPendingPayload ?? jest.fn(),
       registerLeaf: overrides.registerLeaf ?? jest.fn(),
       touchLeafInteracted: overrides.touchLeafInteracted ?? jest.fn(),
+      getLeafPlacement: jest.fn(() => 'sidebar'),
+      inferLeafPlacement: jest.fn(() => 'sidebar'),
     }
 
     const workspace = {
       revealLeaf:
         overrides.revealLeaf ?? jest.fn().mockResolvedValue(undefined),
+      getActiveViewOfType: jest.fn(() => null),
       getRightLeaf:
         overrides.getRightLeaf ??
         (() => {
@@ -71,6 +75,12 @@ describe('ChatViewNavigator', () => {
       app: {
         workspace,
       },
+      settings: {
+        chatOptions: {
+          lastChatPlacement: 'sidebar',
+        },
+      },
+      setSettings: jest.fn().mockResolvedValue(undefined),
       getChatLeafSessionManager: () => sessionManager,
     } as unknown as YoloPlugin
   }
@@ -189,5 +199,35 @@ describe('ChatViewNavigator', () => {
       }),
     )
     expect(registerLeaf).toHaveBeenCalledWith(newLeaf, 'sidebar')
+  })
+
+  it('stores the initial conversation id in view state when creating a chat leaf', async () => {
+    const setViewState = jest.fn().mockImplementation(function setViewState() {
+      this.view = new (MockChatView as unknown as new () => object)()
+      return Promise.resolve()
+    })
+    const newLeaf = {
+      setViewState,
+    } as unknown as WorkspaceLeaf
+    const plugin = createPlugin({
+      resolveTargetLeaf: () => null,
+      revealLeaf: jest.fn().mockResolvedValue(undefined),
+      getRightLeaf: () => newLeaf,
+    })
+
+    const navigator = new ChatViewNavigator({ plugin })
+
+    await navigator.openChatView({
+      placement: 'sidebar',
+      initialConversationId: 'conversation-1',
+    })
+
+    expect(setViewState).toHaveBeenCalledWith({
+      type: CHAT_VIEW_TYPE,
+      active: true,
+      state: {
+        currentConversationId: 'conversation-1',
+      },
+    })
   })
 })

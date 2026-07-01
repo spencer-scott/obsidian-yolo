@@ -156,7 +156,9 @@ Body continues
     const entries = parseSnippets(content)
     expect(entries).toHaveLength(1)
     expect(entries[0].description).toBeUndefined()
-    expect(entries[0].content).toBe('> This is a quote the user wants to keep in the body\nBody continues')
+    expect(entries[0].content).toBe(
+      '> This is a quote the user wants to keep in the body\nBody continues',
+    )
   })
 
   it('treats heading with trailing spaces correctly', () => {

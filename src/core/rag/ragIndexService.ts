@@ -485,15 +485,27 @@ export class RagIndexService {
 
   private buildActivityTitle(): string {
     if (this.snapshot.status === 'retry_scheduled') {
-      return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base waiting to retry')
+      return this.t(
+        'statusBar.ragAutoUpdateRunning',
+        'Knowledge base waiting to retry',
+      )
     }
     if (this.snapshot.status === 'failed') {
-      return this.t('statusBar.ragAutoUpdateFailed', 'Knowledge base indexing failed')
+      return this.t(
+        'statusBar.ragAutoUpdateFailed',
+        'Knowledge base indexing failed',
+      )
     }
     if (this.snapshot.mode === 'rebuild') {
-      return this.t('notices.rebuildingIndex', 'Rebuilding knowledge base index')
+      return this.t(
+        'notices.rebuildingIndex',
+        'Rebuilding knowledge base index',
+      )
     }
-    return this.t('statusBar.ragAutoUpdateRunning', 'Knowledge base updating in the background')
+    return this.t(
+      'statusBar.ragAutoUpdateRunning',
+      'Knowledge base updating in the background',
+    )
   }
 
   private buildActivityDetail(): string {

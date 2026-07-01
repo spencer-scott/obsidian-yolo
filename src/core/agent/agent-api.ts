@@ -39,6 +39,8 @@ export type YoloAgentRunRequest = {
   prompt: string
   assistantId?: string
   mode?: 'ask' | 'agent' | 'agent-full'
+  /** Auto-approve tool calls (YOLO). Only effective in Agent mode. */
+  yolo?: boolean
   context?: YoloAgentContext[]
   tools?: {
     allowedToolNames?: string[]
@@ -303,8 +305,12 @@ export async function resolveAgentApiRunInput({
     (candidate) => candidate.id === resolvedClient.model.providerId,
   )
   const assistantEnabledToolNames = getEnabledAssistantToolNames(assistant)
+  const requestedMode = request.mode ?? 'ask'
+  const mode = requestedMode === 'agent-full' ? 'agent' : requestedMode
   const chatModeRuntime = resolveChatModeRuntime({
-    mode: request.mode ?? 'ask',
+    mode,
+    yoloEnabled:
+      requestedMode === 'agent-full' ? true : (request.yolo ?? false),
     assistant,
     assistantEnabledToolNames,
   })
@@ -374,12 +380,13 @@ export async function resolveAgentApiRunInput({
       allowedToolNames,
       enableToolDisclosure: settings.mcp.enableToolDisclosure,
       toolPreferences: chatModeRuntime.toolPreferences,
+      toolServerPreferences: chatModeRuntime.toolServerPreferences,
       runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
       bypassToolApproval: chatModeRuntime.bypassToolApproval,
       workspaceScope: resolveWorkspaceScopeForRuntimeInput(assistant),
       allowedSkillPaths,
       requestParams: {
-        stream: true,
+        deliveryMode: 'incremental',
         primaryRequestTimeoutMs:
           settings.continuationOptions.primaryRequestTimeoutMs,
         streamFallbackRecoveryEnabled:

@@ -1,7 +1,7 @@
 /* Todo list panel: a child of .yolo-chat-input-overlay, floating above
  * the input box, collapsible. Positioning and z-index are handled by
  * .yolo-chat-input-overlay; this component only manages its own styles.
- * Layout: header (summary + collapse button) -> body (list)
+ * Layout: header (collapse-summary button + close button) -> body (list)
  * Collapse animation: grid-template-rows 0fr <-> 1fr, no height
  * measurement needed.
  */
@@ -32,25 +32,69 @@
   }
 }
 
-/* The selector `button.yolo-todo-panel__header` is used to override
+/* The selector is written as `button.yolo-todo-panel__toggle` to counter
  * Obsidian `app.css`'s
  * `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }`
  * - equal or higher specificity is required, otherwise a shadow line
  * appears along the bottom of the header. */
-button.yolo-todo-panel__header {
+.yolo-todo-panel__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px 22px;
+  align-items: center;
+  column-gap: 2px;
+  width: 100%;
+  padding-right: var(--size-2-2);
+  box-sizing: border-box;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+button.yolo-todo-panel__toggle {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
   width: 100%;
+  min-width: 0;
+  min-height: 0;
   padding: var(--size-2-2) var(--size-4-2);
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   outline: 0;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.4;
   text-align: left;
+}
+
+button.yolo-todo-panel__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: var(--radius-s);
+  box-shadow: none !important;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 0;
+}
+
+button.yolo-todo-panel__toggle svg,
+button.yolo-todo-panel__icon-button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .yolo-todo-panel__header-icon {

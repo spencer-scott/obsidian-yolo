@@ -55,6 +55,20 @@ const REQUEST_TRANSPORT_MODE_SETTING = {
     'Choose how this provider sends network requests on this device. Desktop direct connection is recommended on desktop. On mobile, switch to Obsidian built-in request if browser requests fail.',
 }
 
+export const RESPONSE_STREAMING_MODE_SETTING = {
+  label: 'Response streaming mode',
+  key: 'responseStreamingMode',
+  type: 'select' as const,
+  required: false,
+  options: {
+    auto: 'Auto',
+    streaming: 'Streaming',
+    'non-streaming': 'Non-streaming',
+  },
+  description:
+    'Control whether this provider uses streaming or non-streaming responses.',
+}
+
 // Surfaced dynamically when a provider's apiType is 'anthropic'
 // (native Anthropic or Anthropic-compatible endpoints like Moonshot/Kimi).
 export const PROMPT_CACHING_SETTING = {
@@ -71,7 +85,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'chatgpt-oauth': {
     label: 'ChatGPT OAuth',
@@ -79,7 +96,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: false,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'gemini-oauth': {
     label: 'Gemini OAuth',
@@ -98,6 +118,7 @@ export const PROVIDER_PRESET_INFO = {
           'Optional. Some Gemini plans require a Google Cloud project ID to access paid quotas.',
       },
       REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
     ],
   },
   'qwen-oauth': {
@@ -106,7 +127,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: false,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   anthropic: {
     label: 'Anthropic',
@@ -114,7 +138,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   gemini: {
     label: 'Gemini',
@@ -122,7 +149,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   groq: {
     label: 'Groq',
@@ -130,7 +160,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   openrouter: {
     label: 'OpenRouter',
@@ -138,7 +171,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   ollama: {
     label: 'Ollama',
@@ -146,7 +182,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: false,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'lm-studio': {
     label: 'LM Studio',
@@ -154,7 +193,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: false,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   deepseek: {
     label: 'DeepSeek',
@@ -162,7 +204,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   moonshot: {
     label: 'Moonshot',
@@ -170,7 +215,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   perplexity: {
     label: 'Perplexity',
@@ -178,7 +226,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   mistral: {
     label: 'Mistral',
@@ -186,7 +237,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   morph: {
     label: 'Morph',
@@ -194,7 +248,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'azure-openai': {
     label: 'Azure OpenAI',
@@ -218,6 +275,7 @@ export const PROVIDER_PRESET_INFO = {
         required: true,
       },
       REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
     ],
   },
   'amazon-bedrock': {
@@ -235,6 +293,7 @@ export const PROVIDER_PRESET_INFO = {
         required: true,
       },
       REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
     ],
   },
   zhipu: {
@@ -243,7 +302,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   doubao: {
     label: 'Doubao',
@@ -251,7 +313,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   siliconflow: {
     label: 'SiliconFlow',
@@ -259,7 +324,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   stepfun: {
     label: 'StepFun',
@@ -267,7 +335,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   minimax: {
     label: 'MiniMax',
@@ -275,7 +346,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   hunyuan: {
     label: 'Hunyuan',
@@ -283,7 +357,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   xai: {
     label: 'xAI',
@@ -291,7 +368,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'together-ai': {
     label: 'Together AI',
@@ -299,7 +379,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: true,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   cerebras: {
     label: 'Cerebras',
@@ -307,7 +390,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   sambanova: {
     label: 'SambaNova',
@@ -315,7 +401,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   xiaomimimo: {
     label: 'Xiaomi MiMo',
@@ -323,7 +412,10 @@ export const PROVIDER_PRESET_INFO = {
     requireApiKey: true,
     requireBaseUrl: false,
     supportEmbedding: false,
-    additionalSettings: [REQUEST_TRANSPORT_MODE_SETTING],
+    additionalSettings: [
+      REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
+    ],
   },
   'openai-compatible': {
     label: 'OpenAI Compatible',
@@ -341,6 +433,7 @@ export const PROVIDER_PRESET_INFO = {
           'Enable this if you encounter CORS errors related to Stainless headers (x-stainless-os, etc.)',
       },
       REQUEST_TRANSPORT_MODE_SETTING,
+      RESPONSE_STREAMING_MODE_SETTING,
     ],
   },
 } as const satisfies Record<
@@ -497,9 +590,9 @@ export const DEFAULT_CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     providerId: PROVIDER_PRESET_INFO['chatgpt-oauth'].defaultProviderId,
-    id: 'chatgpt-oauth/gpt-5.3-codex',
-    model: 'gpt-5.3-codex',
-    name: 'GPT-5.3 Codex',
+    id: 'chatgpt-oauth/gpt-5.3-codex-spark',
+    model: 'gpt-5.3-codex-spark',
+    name: 'GPT-5.3 Codex Spark',
     enable: false,
     reasoningType: 'openai',
   },

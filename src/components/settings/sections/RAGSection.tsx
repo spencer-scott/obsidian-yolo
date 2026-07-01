@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RECOMMENDED_MODELS_FOR_EMBEDDING } from '../../../constants'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
+import { getYoloBaseDir } from '../../../core/paths/yoloPaths'
 import {
   RagIndexBusyError,
   type RagIndexRunSnapshot,
@@ -144,6 +145,7 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
     indexPdf: boolean
     includePatternsKey: string
     excludePatternsKey: string
+    yoloExcludeKey: string
   } | null>(null)
   const scheduledIndexJobRef = useRef<IndexJob | null>(null)
   const queuedIndexJobRef = useRef<IndexJob | null>(null)
@@ -494,10 +496,20 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
     [settings.ragOptions.includePatterns],
   )
 
-  const excludeFolders = useMemo(
-    () => includePatternsToFolderPaths(settings.ragOptions.excludePatterns),
-    [settings.ragOptions.excludePatterns],
-  )
+  const yoloBaseDir = useMemo(() => getYoloBaseDir(settings), [settings])
+
+  const excludeFolders = useMemo(() => {
+    const userFolders = includePatternsToFolderPaths(
+      settings.ragOptions.excludePatterns,
+    )
+    if (!settings.ragOptions.excludeYoloBaseDir) return userFolders
+    if (userFolders.includes(yoloBaseDir)) return userFolders
+    return [yoloBaseDir, ...userFolders]
+  }, [
+    settings.ragOptions.excludePatterns,
+    settings.ragOptions.excludeYoloBaseDir,
+    yoloBaseDir,
+  ])
 
   const pgliteStatusLabel = useMemo(() => {
     if (isCheckingPgliteResources && pgliteResourceStatus === null) {
@@ -647,7 +659,12 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
         }
       } catch (error) {
         if (error instanceof RagIndexBusyError) {
-          new Notice(t('statusBar.ragAutoUpdateRunning', 'Knowledge base index is running'))
+          new Notice(
+            t(
+              'statusBar.ragAutoUpdateRunning',
+              'Knowledge base index is running',
+            ),
+          )
         } else if (
           error instanceof DOMException &&
           error.name === 'AbortError'
@@ -707,6 +724,9 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
       indexPdf: settings.ragOptions.indexPdf ?? true,
       includePatternsKey: JSON.stringify(settings.ragOptions.includePatterns),
       excludePatternsKey: JSON.stringify(settings.ragOptions.excludePatterns),
+      // Treat the dynamic YOLO chip as part of the exclude config: toggling
+      // the flag or moving `yolo.baseDir` shifts the indexable file set.
+      yoloExcludeKey: settings.ragOptions.excludeYoloBaseDir ? yoloBaseDir : '',
     }
     const previousSyncInputs = syncInputsRef.current
     syncInputsRef.current = nextSyncInputs
@@ -737,7 +757,8 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
       previousSyncInputs.includePatternsKey !==
         nextSyncInputs.includePatternsKey ||
       previousSyncInputs.excludePatternsKey !==
-        nextSyncInputs.excludePatternsKey
+        nextSyncInputs.excludePatternsKey ||
+      previousSyncInputs.yoloExcludeKey !== nextSyncInputs.yoloExcludeKey
     if (changed) {
       scheduleIndexJob({
         mode: 'sync',
@@ -752,6 +773,8 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
     settings.ragOptions.indexPdf,
     settings.ragOptions.excludePatterns,
     settings.ragOptions.includePatterns,
+    settings.ragOptions.excludeYoloBaseDir,
+    yoloBaseDir,
     t,
   ])
 
@@ -982,7 +1005,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
           {isRagEnabled && (
             <>
               <ObsidianSetting
-                name={t('settings.rag.maintenanceActions', 'Maintenance actions')}
+                name={t(
+                  'settings.rag.maintenanceActions',
+                  'Maintenance actions',
+                )}
                 nameExtra={
                   <div className="yolo-index-inline-status">
                     <IndexProgressRing percent={ringPercent} />
@@ -1052,7 +1078,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                         'Continue indexing failed',
                       )
                     } else if (status === 'failed') {
-                      primaryLabel = t('settings.rag.continueIndex', 'Continue indexing')
+                      primaryLabel = t(
+                        'settings.rag.continueIndex',
+                        'Continue indexing',
+                      )
                       primaryMode = 'sync'
                       primarySuccess = t(
                         'notices.continueComplete',
@@ -1063,7 +1092,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                         'Continue indexing failed',
                       )
                     } else {
-                      primaryLabel = t('settings.rag.rebuildIndex', 'Rebuild index')
+                      primaryLabel = t(
+                        'settings.rag.rebuildIndex',
+                        'Rebuild index',
+                      )
                       primaryMode = 'rebuild'
                       primarySuccess = t('notices.rebuildComplete')
                       primaryFailure = t('notices.rebuildFailed')
@@ -1124,7 +1156,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                         console.debug('[YOLO] Cancel button clicked')
                         plugin.cancelRagIndex()
                         new Notice(
-                          t('notices.indexCancelling', 'Cancelling indexing...'),
+                          t(
+                            'notices.indexCancelling',
+                            'Cancelling indexing...',
+                          ),
                         )
                       }}
                     />
@@ -1209,7 +1244,10 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
-                    title={t('settings.rag.selectedFolders', 'Selected folders')}
+                    title={t(
+                      'settings.rag.selectedFolders',
+                      'Selected folders',
+                    )}
                     value={includeFolders}
                     onChange={(folders: string[]) => {
                       const patterns = folderPathsToIncludePatterns(folders)
@@ -1235,7 +1273,13 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                     text={t('settings.rag.testPatterns')}
                     onClick={() => {
                       void (async () => {
-                        const patterns = settings.ragOptions.excludePatterns
+                        const basePatterns = settings.ragOptions.excludePatterns
+                        const patterns = settings.ragOptions.excludeYoloBaseDir
+                          ? [
+                              ...basePatterns,
+                              ...folderPathsToIncludePatterns([yoloBaseDir]),
+                            ]
+                          : basePatterns
                         const excludedFiles = await findFilesMatchingPatterns(
                           patterns,
                           plugin.app.vault,
@@ -1252,19 +1296,31 @@ export function RAGSection({ app, plugin }: RAGSectionProps) {
                   <FolderSelectionList
                     app={app}
                     vault={plugin.app.vault}
-                    title={t('settings.rag.excludedFolders', 'Excluded folders')}
+                    title={t(
+                      'settings.rag.excludedFolders',
+                      'Excluded folders',
+                    )}
                     placeholder={t(
                       'settings.rag.selectExcludeFoldersPlaceholder',
                       'Click here to select folders to exclude (leave empty to exclude none)',
                     )}
                     value={excludeFolders}
                     onChange={(folders: string[]) => {
-                      const patterns = folderPathsToIncludePatterns(folders)
+                      const yoloRemoved =
+                        settings.ragOptions.excludeYoloBaseDir &&
+                        !folders.includes(yoloBaseDir)
+                      const userFolders = settings.ragOptions.excludeYoloBaseDir
+                        ? folders.filter((f) => f !== yoloBaseDir)
+                        : folders
+                      const patterns = folderPathsToIncludePatterns(userFolders)
                       applySettingsUpdate({
                         ...settings,
                         ragOptions: {
                           ...settings.ragOptions,
                           excludePatterns: patterns,
+                          excludeYoloBaseDir: yoloRemoved
+                            ? false
+                            : settings.ragOptions.excludeYoloBaseDir,
                         },
                       })
                     }}

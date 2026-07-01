@@ -63,6 +63,7 @@ jest.mock('./ToolMessage', () => ({
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { LLMResponseFormatError } from '../../core/llm/responseFormatError'
 import type { ChatAssistantMessage } from '../../types/chat'
 
 import AssistantToolMessageGroupActions from './AssistantToolMessageGroupActions'
@@ -110,6 +111,55 @@ describe('AssistantToolMessageGroupItem', () => {
 
     expect(html).toContain('Response generation failed')
     expect(html).toContain('400 Reasoning is mandatory for this endpoint.')
+  })
+
+  it('renders structured LLM response format errors as user-facing text', () => {
+    const error = new LLMResponseFormatError({
+      adapter: 'Kimi',
+      stage: 'non-streaming response',
+      expected: 'choices 数组',
+      response: {
+        error: {
+          message: 'bad response',
+          type: 'invalid_request_error',
+        },
+      },
+    })
+    const assistantMessage: ChatAssistantMessage = {
+      role: 'assistant',
+      id: 'assistant-1',
+      content: '',
+      metadata: {
+        generationState: 'error',
+        errorMessage: error.message,
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <AssistantToolMessageGroupItem
+        messages={[assistantMessage]}
+        conversationId="conversation-1"
+        isApplying={false}
+        activeApplyRequestKey={null}
+        onApply={() => {}}
+        onToolMessageUpdate={() => {}}
+        onEditStart={() => {}}
+        onEditCancel={() => {}}
+        onEditSave={() => {}}
+        onDeleteGroup={() => {}}
+        onRetryGroup={() => {}}
+        onBranchGroup={() => {}}
+        onQuoteAssistantSelection={() => {}}
+        onOpenEditSummaryFile={() => {}}
+      />,
+    )
+
+    expect(html).toContain(
+      'The model service returned a response that cannot be parsed: missing choices array.',
+    )
+    expect(html).toContain('Stage: Kimi non-streaming response')
+    expect(html).toContain('Upstream error: bad response')
+    expect(html).not.toContain('YOLO_LLM_RESPONSE_FORMAT_ERROR')
   })
 
   it('enables retry action when the assistant group can be traced to a user message', () => {

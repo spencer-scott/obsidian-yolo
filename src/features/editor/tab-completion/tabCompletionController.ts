@@ -2,6 +2,7 @@ import type { Extension, Text } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import type { Editor, MarkdownView } from 'obsidian'
 
+import { isRequestErrorNonRetryable } from '../../../core/ai/requestRetry'
 import { executeSingleTurn } from '../../../core/ai/single-turn'
 import { getChatModelClient } from '../../../core/llm/manager'
 import { promoteProviderTransportModeToObsidian } from '../../../core/llm/transportModePromotion'
@@ -514,7 +515,7 @@ export class TabCompletionController {
               providerClient,
               model,
               request: baseRequest,
-              stream: true,
+              deliveryMode: 'incremental',
               purpose: 'lightweight',
               signal: controller.signal,
               onStreamDelta: ({ contentDelta }) => {
@@ -561,7 +562,11 @@ export class TabCompletionController {
 
           const aborted =
             controller.signal.aborted || error?.name === 'AbortError'
-          if (attempt < attempts - 1 && aborted) {
+          if (
+            attempt < attempts - 1 &&
+            aborted &&
+            !isRequestErrorNonRetryable(error)
+          ) {
             this.deps.removeAbortController(controller)
             this.tabCompletionAbortController = null
             continue

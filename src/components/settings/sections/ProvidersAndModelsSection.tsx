@@ -134,7 +134,10 @@ function ChatGPTOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('ChatGPT OAuth login page opened. Please complete authorization in your browser.', 8000)
+      new Notice(
+        'ChatGPT OAuth login page opened. Please complete authorization in your browser.',
+        8000,
+      )
       await authorization.complete
       new Notice('ChatGPT OAuth connected successfully')
       await refreshStatus()
@@ -280,7 +283,10 @@ function GeminiOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('Gemini OAuth login page opened. Please complete authorization in your browser.', 8000)
+      new Notice(
+        'Gemini OAuth login page opened. Please complete authorization in your browser.',
+        8000,
+      )
       await authorization.complete
       new Notice('Gemini OAuth connected successfully')
       await refreshStatus()
@@ -420,7 +426,10 @@ function QwenOAuthPanel({
         '_blank',
         'noopener,noreferrer',
       )
-      new Notice('Qwen OAuth login page opened. Please complete authorization in your browser.', 8000)
+      new Notice(
+        'Qwen OAuth login page opened. Please complete authorization in your browser.',
+        8000,
+      )
       await authorization.complete
       new Notice('Qwen OAuth connected successfully')
       await refreshStatus()
@@ -645,7 +654,10 @@ function ProviderSectionItem({
               onRequestDeleteProvider(provider.id)
             }}
             className="clickable-icon"
-            aria-label={t('settings.providers.requestDelete', 'Delete provider')}
+            aria-label={t(
+              'settings.providers.requestDelete',
+              'Delete provider',
+            )}
           >
             <Trash2 />
           </button>

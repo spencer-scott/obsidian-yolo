@@ -97,11 +97,27 @@ Se usi YOLO su mobile, potresti comunque incontrare funzionalità non disponibil
 ## Roadmap
 
 - [x] Ricerca Vault AI migliore e più forte
-- [ ] Agent in Background (automazione task lunghi)
-- [ ] Task programmati Cron
-- [ ] Orchestrazione Multi-Agent
-- [ ] Learning Mode
+- [x] Agent in Background (automazione task lunghi)
+- [x] Orchestrazione Multi-Agent (tramite subagent)
+- [ ] Learning Mode — una vista di studio dedicata
+- [ ] Annotation Mode — annotazioni e suggerimenti AI in tempo reale sulle note
+- [ ] Assistente integrato — helper fissato nell'angolo per config/agent, con compattazione automatica e task programmati
 - [ ] Lavagna AI migliore
+- [ ] Input vocale e note riunione
+
+## Feedback & Issue
+
+Hai trovato un bug, qualcosa di confuso o hai un'idea? Apri un issue:
+
+🐛 [Segnala un bug](https://github.com/Lapis0x0/obsidian-yolo/issues/new?template=bug_report.yml) · ✨ [Richiedi una funzionalità](https://github.com/Lapis0x0/obsidian-yolo/issues/new?template=feature_request.yml)
+
+Cosa aiuta di più:
+
+- Bug con una riproduzione chiara (versione di Obsidian, sistema operativo, versione del plugin, cosa hai fatto, cosa è successo)
+- Segnalazioni "ho provato X e ho ottenuto Y" — attriti UX, formulazioni confuse, documentazione rotta, traduzioni obsolete
+- Idee di funzionalità concrete legate a un caso d'uso reale ("quando faccio A, vorrei B perché C")
+
+Per favore cerca tra gli issue esistenti prima per evitare duplicati. I template sono in inglese.
 
 ## Contribuire
 

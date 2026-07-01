@@ -107,7 +107,11 @@ describe('filterRequestMessagesByToolBoundary', () => {
         ],
       },
       toolMessage('call-1'),
-      { role: 'assistant', content: 'Continue processing', tool_calls: undefined },
+      {
+        role: 'assistant',
+        content: 'Continue processing',
+        tool_calls: undefined,
+      },
     ])
   })
 

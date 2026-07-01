@@ -343,7 +343,7 @@ export default function LexicalContentEditable({
       <ImagePastePlugin onCreateImageMentionables={onCreateImageMentionables} />
       <PlainTextPastePlugin />
       <ObsidianFileDropPlugin />
-      <DragDropPaste onCreateImageMentionables={onCreateImageMentionables} />
+      <DragDropPaste onDropFiles={onPasteFiles} />
       {/* templates feature removed */}
     </LexicalComposer>
   )

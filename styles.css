@@ -1,3 +1,5 @@
+/* @yolo-version: 1.5.12.11 */
+
 /* Settings */
 
 .yolo-settings-support-yolo {
@@ -351,13 +353,13 @@
 }
 
 .yolo-drag-handle {
-  padding: 0; /* 去掉手柄内部左右留白 */
+  padding: 0; /* Remove internal horizontal padding from handle */
   transition:
     transform 120ms ease,
     color 120ms ease;
 }
 
-/* 紧凑化：手柄列（第一列）不占额外空间，仅按内容宽度布局 */
+/* Compact: handle column (first column) takes no extra space, sized by content width only */
 
 .yolo-settings-table th:first-child,
 .yolo-settings-table td:first-child,
@@ -365,16 +367,16 @@
 .yolo-models-table td:first-child {
   padding-left: 0;
   padding-right: 0;
-  width: 0; /* 让列宽收缩为内容宽度（图标本身宽度）*/
+  width: 0; /* Let column width shrink to content width (icon width) */
 }
 
-/* 覆盖 ChatModelsSubSection 中 colgroup 的第一列固定宽度 */
+/* Override the fixed first-column width from ChatModelsSubSection colgroup */
 
 .yolo-settings-table col:first-child {
   width: 0 !important;
 }
 
-/* Plan A: 拖拽行与插入位置的视觉反馈（无布局抖动） */
+/* Plan A: Visual feedback for dragged row and insertion position (no layout jitter) */
 
 .yolo-row-dragging {
   background-color: var(--background-modifier-hover);
@@ -389,7 +391,7 @@
   will-change: transform, opacity;
 }
 
-/* 使用 inset box-shadow 绘制顶部/底部插入线，避免改变 row 高度导致抖动 */
+/* Use inset box-shadow to draw top/bottom insertion lines, avoiding row height changes that cause jitter */
 
 .yolo-row-drag-over-before {
   box-shadow: inset 0 2px 0 0 var(--interactive-accent);
@@ -401,14 +403,14 @@
   transition: box-shadow 120ms ease;
 }
 
-/* 手柄抓取时的轻微强调 */
+/* Subtle emphasis when handle is grabbed */
 
 .yolo-drag-handle--active {
   color: var(--text-normal);
   transform: scale(1.05);
 }
 
-/* 放下成功后的瞬时反馈：高亮并轻微回弹（不改变布局尺寸） */
+/* Instant feedback after successful drop: highlight with subtle bounce (no layout size change) */
 
 .yolo-row-drop-success {
   animation: yolo-drop-flash 650ms ease-out;
@@ -1912,8 +1914,9 @@
     color 0.12s ease;
 }
 
-/* 纯 CSS tooltip：以 chip 自身为定位锚点，绕开 Radix Portal + fixed 在 Obsidian
-   宿主里被祖先 transform/contain 污染坐标系的问题。 */
+/* Pure CSS tooltip: uses the chip itself as the positioning anchor,
+   avoiding Radix Portal + fixed positioning coordinate pollution caused
+   by ancestor transform/contain in the Obsidian host. */
 
 .yolo-modality-chip[data-tooltip]:hover::after,
 .yolo-modality-chip[data-tooltip]:focus-visible::after {
@@ -1975,6 +1978,57 @@
   .setting-item:not(.yolo-settings-kv-entry)
   .setting-item-description {
   margin-top: 6px;
+}
+
+.yolo-provider-field-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 8px;
+}
+
+.yolo-provider-field-header {
+  display: flex;
+  align-items: center;
+}
+
+.yolo-provider-field-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yolo-provider-field-input {
+  width: 100%;
+}
+
+.yolo-provider-field-help {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+}
+
+.yolo-provider-api-url-preview {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+}
+
+.yolo-provider-api-url-preview-label {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+.yolo-provider-api-url-preview-url {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
 }
 
 /*
@@ -4339,26 +4393,26 @@ button.yolo-assistant-selector-footer-btn:hover {
 
 /* ==================== Emoji Icon Styles (No Background) ==================== */
 
-/* 助手选择器当前图标 - emoji 无背景 */
+/* Assistant selector current icon - no background for emoji */
 
 .yolo-assistant-selector-current-icon:has(.yolo-icon-emoji) {
   background: none;
   box-shadow: none;
 }
 
-/* 助手选择器列表项图标 - emoji 无背景 */
+/* Assistant selector list item icon - no background for emoji */
 
 .yolo-assistant-selector-item-icon:has(.yolo-icon-emoji) {
   background: none;
 }
 
-/* 设置面板助手列表图标 - emoji 无背景 */
+/* Settings panel assistant list icon - no background for emoji */
 
 .yolo-assistant-icon:has(.yolo-icon-emoji) {
   background: none;
 }
 
-/* Emoji 图标字体大小调整 */
+/* Emoji icon font size adjustments */
 
 .yolo-icon-emoji {
   display: flex;
@@ -4663,6 +4717,14 @@ button.yolo-assistant-selector-footer-btn:hover {
   font-size: var(--font-ui-smaller);
 }
 
+.yolo-agent-cap-status {
+  color: var(--text-faint);
+}
+
+.yolo-agent-cap-status::before {
+  content: ' · ';
+}
+
 .yolo-agent-cap-tags {
   margin-top: var(--size-4-2);
   display: flex;
@@ -4731,19 +4793,6 @@ button.yolo-assistant-selector-footer-btn:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-
-.yolo-agent-tool-forced-approval {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 3px 8px;
-  border-radius: var(--radius-s);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
-  background: var(--background-primary);
-  font-size: var(--font-ui-smaller);
-  white-space: nowrap;
 }
 
 .yolo-agent-tool-select .yolo-simple-select__trigger {
@@ -4988,7 +5037,7 @@ button.yolo-assistant-selector-footer-btn:hover {
   background: color-mix(in srgb, var(--text-error) 10%, transparent);
 }
 
-/* 操作行:URL 输入框 + 提交按钮共用一行 */
+/* Action row: URL input + submit button share one line */
 
 .yolo-import-skill-actions {
   display: flex;
@@ -5023,7 +5072,8 @@ button.yolo-assistant-selector-footer-btn:hover {
   cursor: not-allowed;
 }
 
-/* 提交按钮:沿用 Obsidian mod-cta 主色,只调间距与 spinner 对齐 */
+/* Submit button: uses Obsidian mod-cta primary color, only adjusts
+   spacing and spinner alignment */
 
 .yolo-import-skill-submit {
   display: inline-flex;
@@ -5123,31 +5173,41 @@ button.yolo-assistant-selector-footer-btn:hover {
 }
 
 button.yolo-agent-tool-group-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
   margin-left: var(--size-2-2);
-  padding: 0;
+  padding: 1px 4px;
   height: auto;
   line-height: 1.4;
   border: none;
+  border-radius: var(--radius-s);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  text-decoration: underline;
-  text-decoration-color: var(--background-modifier-border);
-  text-underline-offset: 2px;
+  text-decoration: none;
   cursor: pointer;
 }
 
 button.yolo-agent-tool-group-disclosure:hover {
   color: var(--text-normal);
-  text-decoration-color: currentColor;
   background: transparent;
+}
+
+button.yolo-agent-tool-group-disclosure svg {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+button.yolo-agent-tool-group-approval-trigger {
+  margin-left: 0;
 }
 
 .yolo-agent-tool-group-meta {
   display: inline-flex;
   align-items: center;
-  gap: var(--size-4-4);
+  gap: var(--size-4-3);
   margin-right: var(--size-4-1);
 }
 
@@ -6512,30 +6572,6 @@ button.yolo-agent-chip--more:hover {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-}
-
-.yolo-js-exec-risk-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--size-2-1);
-  flex: 0 0 auto;
-  padding: 3px 8px;
-  border-radius: 999px;
-  color: var(--text-warning, var(--text-normal));
-  background: color-mix(
-    in srgb,
-    var(--color-yellow, #d6a100) 12%,
-    var(--background-primary)
-  );
-  border: 1px solid
-    color-mix(
-      in srgb,
-      var(--color-yellow, #d6a100) 24%,
-      var(--background-modifier-border)
-    );
-  font-size: var(--font-ui-smaller);
-  font-weight: var(--font-medium);
-  white-space: nowrap;
 }
 
 .yolo-js-exec-cap-list {
@@ -8257,52 +8293,54 @@ button.yolo-agent-chip--more:hover {
 }
 
 /*
- * yolo-popover surface classes —— 项目所有弹窗 / 下拉的视觉地基。
- * 改这块代码 / 写新弹窗前，请通读以下约定（历史曾两次踩坑）。
+ * yolo-popover surface classes - visual foundation for all popovers / dropdowns in the project.
+ * Before modifying this code or creating a new popover, read the conventions below (we have been bitten twice historically).
  *
  * ─────────────────────────────────────────────
- * 1. consumer 必须用抽象组件，不要自己组 Portal + Content
+ * 1. Consumers must use abstract components, do not assemble Portal + Content yourself
  * ─────────────────────────────────────────────
- * 禁止在调用方写 `DropdownMenu.Portal + DropdownMenu.Content + className=...` 的
- * 组合。统一用 src/components/common/popover/ 下的 <YoloDropdownContent> /
- * <YoloPopoverContent>，所有视觉 variant 与尺寸通过 props 显式声明。
- * 参考迁移：ModelSelect.tsx、ReasoningSelect.tsx、ChatListDropdown.tsx。
+ * Do not write `DropdownMenu.Portal + DropdownMenu.Content + className=...` combinations
+ * in call sites. Use <YoloDropdownContent> / <YoloPopoverContent> from
+ * src/components/common/popover/, declaring all visual variants and sizing via explicit props.
+ * Reference migrations: ModelSelect.tsx, ReasoningSelect.tsx, ChatListDropdown.tsx.
  *
  * ─────────────────────────────────────────────
- * 2. 视觉 vs 尺寸：共用 class 只管视觉表面
+ * 2. Visuals vs sizing: shared classes only handle visual surfaces
  * ─────────────────────────────────────────────
- * 本文件里的 .yolo-popover-surface* class 只允许定义：
+ * The .yolo-popover-surface* classes in this file may only define:
  *   background / border / box-shadow / animation / overflow / z-index
- * 严禁出现：
+ * Forbidden properties:
  *   min-width / max-width / max-height / width / margin
- * 尺寸是 consumer 的责任 —— 通过 minWidth/maxWidth/maxHeight props 传入，
- * 或一次性需求自带 `yolo-popover-<purpose>` class（例如聊天历史的 -64px 对齐）。
- * 违反这条会跨组件污染（历史踩坑详见 docs/plans/parsed-wiggling-shore.md）。
+ * Sizing is the consumer's responsibility - pass via minWidth/maxWidth/maxHeight props,
+ * or for one-off needs add a `yolo-popover-<purpose>` class (e.g. the -64px alignment for chat history).
+ * Violating this causes cross-component pollution (see docs/plans/parsed-wiggling-shore.md for past issues).
  *
  * ─────────────────────────────────────────────
- * 3. 变体规则按文件归属，禁止跨文件覆盖
+ * 3. Variant rules belong to their owning file, no cross-file overrides
  * ─────────────────────────────────────────────
- *   --default 变体的样式      → src/styles/chat/popover.css
- *   --smart-space 变体的样式  → src/styles/panels/smart-space.css
- * 不要在 smart-space.css 里写 `.yolo-popover-surface--default ...`，反之亦然。
- * 同一选择器跨文件出现时胜负只剩源码顺序，是最隐蔽的"屎山"来源。
- * 真正跨变体共享的样式（如 [data-state='checked']）写无前缀版本，
- * 但必须在注释里写明"有意跨变体共享"。
+ *   --default variant styles      -> src/styles/chat/popover.css
+ *   --smart-space variant styles  -> src/styles/panels/smart-space.css
+ * Do not write `.yolo-popover-surface--default ...` in smart-space.css, or vice versa.
+ * When the same selector appears in multiple files, the winner is determined solely by source order,
+ * which is the most insidious source of style conflicts.
+ * Styles that are intentionally shared across variants (e.g. [data-state='checked']) should use
+ * the unprefixed version, but must include a comment stating "intentionally shared across variants".
  *
  * ─────────────────────────────────────────────
- * 4. 慎用裸标签选择器
+ * 4. Be cautious with bare tag selectors
  * ─────────────────────────────────────────────
- * 避免 `.yolo-popover-surface ul / li / button` 这种命中所有后代标签的写法 ——
- * 等同于隐式全局副作用，未来任何弹窗内出现 ul/li 都会被牵连。要写就用 class 限定。
+ * Avoid selectors like `.yolo-popover-surface ul / li / button` that match all descendant tags -
+ * this is equivalent to an implicit global side effect; any future ul/li inside a popover will
+ * be affected. Use class-scoped selectors instead.
  *
  * ─────────────────────────────────────────────
- * 5. 新增弹窗 checklist
+ * 5. New popover checklist
  * ─────────────────────────────────────────────
- *   [ ] consumer 用 <YoloDropdownContent> / <YoloPopoverContent>
- *   [ ] 显式传 minWidth / maxWidth / maxHeight，不依赖任何继承
- *   [ ] 非通用视觉需求自带 `yolo-popover-<purpose>` class，不复用别人的
- *   [ ] 新 class 一律 `yolo-` 前缀，不新增 `yolo-`
- *   [ ] 写 variant-scoped 规则时确认放在了对应变体的归属文件里
+ *   [ ] Consumer uses <YoloDropdownContent> / <YoloPopoverContent>
+ *   [ ] Explicitly passes minWidth / maxWidth / maxHeight, does not rely on inheritance
+ *   [ ] Non-generic visual needs use a dedicated `yolo-popover-<purpose>` class, not reusing others
+ *   [ ] New classes always use the `yolo-` prefix, do not add new `smtcmp-` ones
+ *   [ ] When writing variant-scoped rules, confirm they are placed in the correct owning file
  */
 
 .yolo-popover-surface {
@@ -8710,6 +8748,16 @@ button.yolo-agent-chip--more:hover {
   min-height: 0;
 }
 
+body.is-mobile
+  .workspace-leaf-content[data-type='yolo-chat-view']
+  > .view-content.yolo-chat-view-content--keyboard-managed {
+  padding-bottom: 0;
+}
+
+body.is-mobile .yolo-chat-container--mobile-keyboard-managed {
+  height: var(--yolo-chat-mobile-viewport-height, 100%);
+}
+
 .yolo-chat-container--sidebar {
   --yolo-chat-sidebar-inline-padding: calc(var(--size-4-6) / 2);
 }
@@ -8854,7 +8902,8 @@ button.yolo-agent-chip--more:hover {
 
 .yolo-chat-footer {
   position: relative;
-  /* 工具栏与 Obsidian 面板底栏（词数/字符数等）之间留一点呼吸感 */
+  /* Leave a bit of breathing room between the toolbar and Obsidian's panel
+   * status bar (word/character count, etc.). */
   padding-bottom: 4px;
 }
 
@@ -9394,7 +9443,7 @@ button.yolo-agent-chip--more:hover {
   border-top: none;
 }
 
-/* 特殊样式：模型选择区域 */
+/* Special styles: model selection area */
 
 .yolo-composer-section--primary {
   background: transparent !important;
@@ -9412,7 +9461,7 @@ button.yolo-agent-chip--more:hover {
   height: 20px;
 }
 
-/* 功能开关区域 */
+/* Feature toggle area */
 
 .yolo-composer-section--toggles .yolo-composer-option {
   background: var(--background-primary);
@@ -9426,7 +9475,7 @@ button.yolo-agent-chip--more:hover {
   border-color: var(--background-modifier-border-hover);
 }
 
-/* 高级设置区域 */
+/* Advanced settings area */
 
 .yolo-composer-section--advanced {
   background: transparent !important;
@@ -9434,7 +9483,7 @@ button.yolo-agent-chip--more:hover {
   opacity: 0.9;
 }
 
-/* 让高级设置标题样式与默认卡片标题完全一致 */
+/* Make advanced settings title style identical to default card title */
 
 .yolo-composer-section--advanced .yolo-composer-heading-title::before {
   background: var(--h1-color, var(--text-accent));
@@ -9442,12 +9491,12 @@ button.yolo-agent-chip--more:hover {
   height: 18px;
 }
 
-/* 与 ObsidianToggle 组件配套的外层容器 hook：
-   唯一作用是给 `.yolo-composer-option-control` 里右对齐规则提供命中目标
-   （见本文件 949 行附近的 margin-left: auto）。
-   以前这里有一整段覆写，把原本 opacity:0 的 <input> 强行画成紫色轨道 + 自定义白点，
-   导致和 Obsidian 原生 .checkbox-container::after 叠在一起出现白点凸出/偏下，
-   已移除。switch 外观完全沿用 Obsidian 原生实现。 */
+/* Outer container hook for the ObsidianToggle component:
+   provides a target for the right-alignment rule in .yolo-composer-option-control
+   (see margin-left: auto around line 949).
+   Previously had a full override that forced the opacity:0 <input> into a purple track
+   with a custom white dot, which clashed with Obsidian's native .checkbox-container::after.
+   Removed. Switch appearance now uses native Obsidian styling. */
 
 .yolo-checkbox-container {
   position: relative;
@@ -9461,7 +9510,7 @@ button.yolo-agent-chip--more:hover {
   pointer-events: none;
 }
 
-/* 优先参考目录样式优化 */
+/* Priority reference directory style improvements */
 
 .yolo-composer-hint {
   margin-top: var(--size-4-3);
@@ -10205,6 +10254,14 @@ button.yolo-agent-chip--more:hover {
   text-overflow: ellipsis;
 }
 
+.yolo-update-toast-header-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 46%;
+}
+
 .yolo-update-toast-lang {
   flex-shrink: 0;
   display: inline-flex;
@@ -10399,6 +10456,21 @@ button.yolo-agent-chip--more:hover {
   padding: 7px 0 6px;
 }
 
+.yolo-update-toast-footer-start {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.yolo-update-toast-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .yolo-update-toast-history-btn {
   flex-shrink: 0;
   padding: 4px 10px;
@@ -10418,6 +10490,31 @@ button.yolo-agent-chip--more:hover {
 .yolo-update-toast-history-btn:hover {
   background: var(--background-modifier-hover) !important;
   color: var(--text-normal);
+}
+
+.yolo-update-toast-skip-btn {
+  flex-shrink: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none !important;
+  border-radius: var(--radius-s);
+  box-shadow: none !important;
+  background: transparent !important;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  line-height: 1.3;
+  white-space: normal;
+  text-align: right;
+  cursor: var(--cursor);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.yolo-update-toast-skip-btn:hover {
+  background: var(--background-modifier-hover) !important;
+  color: var(--text-muted);
 }
 
 .yolo-update-toast-cta {
@@ -10451,7 +10548,6 @@ button.yolo-agent-chip--more:hover {
 .yolo-update-toast-github-btn,
 .yolo-update-toast-secondary-btn {
   flex-shrink: 0;
-  margin-left: auto;
   padding: 4px 10px;
   border: none !important;
   border-radius: var(--radius-s);
@@ -10967,12 +11063,100 @@ button.yolo-agent-chip--more:hover {
   outline: none;
   --yolo-mention-max-width: 240px;
   --yolo-mention-badge-max-width: 180px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .yolo-chat-user-input-container:focus-within,.yolo-chat-user-input-container:focus,.yolo-chat-user-input-container:focus-visible,.yolo-chat-user-input-container:active {
     box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
     transition: box-shadow 0.15s ease-in-out;
   }
+
+.yolo-chat-user-input-container[data-file-drag-active='true'] {
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 11%,
+    var(--background-modifier-form-field)
+  );
+  border-color: color-mix(in srgb, var(--interactive-accent) 72%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--interactive-accent) 28%, transparent),
+    0 10px 28px color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+
+.yolo-chat-user-input-container[data-file-drag-active='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.yolo-chat-user-input-container[data-file-drag-active='true']::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--size-2-3) - 1px);
+  border: 1px dashed
+    color-mix(in srgb, var(--interactive-accent) 72%, transparent);
+  border-radius: calc(var(--radius-s) - 1px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  .yolo-chat-user-input-editor,
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  .yolo-chat-user-input-send-row,
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  .yolo-chat-user-input-controls {
+  position: relative;
+  z-index: 2;
+}
+
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  .yolo-chat-user-input-placeholder {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.yolo-chat-user-input-drop-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-3);
+  max-width: min(80%, 240px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--interactive-accent);
+  box-shadow: none;
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.yolo-chat-user-input-drop-hint svg {
+  flex: 0 0 auto;
+}
+
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  .yolo-chat-user-input-upload-button,
+.yolo-chat-user-input-container[data-file-drag-active='true']
+  button.yolo-chat-user-input-submit-button-circle {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
 
 .yolo-chat-user-input-container[data-resizable='true'] .yolo-obsidian-textarea,
 .yolo-chat-user-input-container[data-resizable='true'] .yolo-content-editable {
@@ -11221,8 +11405,10 @@ button.yolo-agent-chip--more:hover {
   justify-content: space-between;
   flex-shrink: 0;
   margin-top: auto;
-  /* 用 min-height 而非固定 height：发送圆按钮（24px）比该尺寸大时
-   * 行会自然撑高，避免按钮底边伸出行外、与容器底 padding 视觉不对称 */
+  /* Use min-height instead of a fixed height: when the round send button
+   * (24px) is taller than this size, the row naturally grows so the button's
+   * bottom edge stays inside the row and doesn't visually clash with the
+   * container's bottom padding. */
   min-height: var(--size-4-4);
   gap: var(--size-4-1);
 }
@@ -11232,7 +11418,8 @@ button.yolo-agent-chip--more:hover {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
-  /* 让占用环到发送按钮的距离 = 发送按钮到输入框右边内边距 */
+  /* Match the gap from the usage ring to the send button with the gap from
+   * the send button to the input box's right padding. */
   gap: calc(var(--size-2-3) + 1px);
 }
 
@@ -11242,8 +11429,10 @@ button.yolo-agent-chip--more:hover {
   gap: var(--size-4-1);
   align-items: center;
   flex-wrap: nowrap;
-  /* 用 min-height 而非固定 height：发送圆按钮（24px）比该尺寸大时
-   * 行会自然撑高，避免按钮底边伸出行外、与容器底 padding 视觉不对称 */
+  /* Use min-height instead of fixed height: when the circular send button
+   * (24px) exceeds this size, the row naturally expands, preventing the
+   * button bottom from protruding outside and visual asymmetry with the
+   * container's bottom padding. */
   min-height: var(--size-4-4);
 }
 
@@ -11287,7 +11476,8 @@ button.yolo-agent-chip--more:hover {
   justify-content: space-between;
   gap: var(--size-4-1);
   flex-wrap: nowrap;
-  /* 与 .yolo-chat-user-input-container 内边距对齐，使工具栏与编辑区左缘对齐 */
+  /* Aligns with .yolo-chat-user-input-container padding so the toolbar's left
+   * edge lines up with the editor's left edge. */
   padding-inline: calc(var(--size-2-3) + 1px);
 }
 
@@ -11325,7 +11515,8 @@ button.yolo-agent-chip--more:hover {
   max-width: 120px;
 }
 
-/* 底部工具栏控件：默认用 text-muted + normal 字重，比全局 medium 略轻但仍可读 */
+/* Bottom toolbar controls: default to text-muted + normal weight — a touch
+ * lighter than the global medium weight but still readable. */
 
 .yolo-chat-user-input-toolbar button.yolo-chat-input-model-select {
   font-weight: var(--font-normal);
@@ -11398,25 +11589,30 @@ button.yolo-agent-chip--more:hover {
   flex: 1 1 auto;
 }
 
-/* 圆形发送/停止按钮（ChatGPT/Claude 风格）。
+/* Circular send/stop button (ChatGPT/Claude style).
  *
- * 选择器写成 `button.yolo-chat-user-input-submit-button-circle`，是为了对抗
- * Obsidian `app.css` 里的 `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }`
- * ——必须保持等同或更高特异度，否则按钮内会出现一圈 inset 灰环。
+ * The selector is `button.yolo-chat-user-input-submit-button-circle` to
+ * override Obsidian `app.css`'s
+ * `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }` rule
+ * - we need equal or higher specificity, otherwise an inset gray ring
+ * appears inside the button.
  *
- * 同样地，Obsidian 的全局规则 `svg { width/height: var(--icon-size) }`
- * 会覆盖 lucide 通过 inline 属性写入的尺寸 —— 必须在选择器内显式给 svg
- * 兜底宽高，否则图标会被撑大或缩成奇形怪状。 */
+ * Likewise, Obsidian's global `svg { width/height: var(--icon-size) }`
+ * overrides sizes set via inline attributes by lucide - explicit fallback
+ * width/height on svg inside this selector is required, otherwise icons
+ * get distorted. */
 
 button.yolo-chat-user-input-submit-button-circle {
-  /* 略大于左侧 `+` 按钮（var(--size-4-5) ≈ 20px），强化"主按钮"地位但
-   * 又不至于撑出 var(--size-4-4) 行高太多。 */
+  /* Slightly larger than the `+` button on the left (var(--size-4-5) ~
+   * 20px), reinforcing the "primary button" visual weight without
+   * exceeding the var(--size-4-4) row height by too much. */
   width: 24px;
   height: 24px;
   padding: 0;
   border-radius: 50%;
   border: none;
-  /* 用 Obsidian 设计系统的「主操作按钮」语义色对，自动跟随主题。 */
+  /* Use Obsidian design system's primary action button semantic color
+   * pair, automatically following the active theme. */
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   display: flex;
@@ -11451,9 +11647,11 @@ button.yolo-chat-user-input-submit-button-circle:active:not(:disabled) {
   transform: scale(0.94);
 }
 
-/* 空输入：淡化态。色用 text-faint 给箭头、bg 用 background-modifier-border
- * 既保持圆形剪影，又明显比激活态弱很多。`cursor: default` 是为了对抗
- * `.yolo-quick-ask-user-message--editing button { cursor: pointer }` 的兜底。 */
+/* Empty input: dimmed state. Uses text-faint for the arrow and
+ * background-modifier-border for the bg, keeping the circular silhouette
+ * while being clearly weaker than the active state. `cursor: default`
+ * overrides the `.yolo-quick-ask-user-message--editing button
+ * { cursor: pointer }` fallback. */
 
 button.yolo-chat-user-input-submit-button-circle:disabled {
   background: var(--background-modifier-border);
@@ -11461,7 +11659,8 @@ button.yolo-chat-user-input-submit-button-circle:disabled {
   cursor: default;
 }
 
-/* 生成中：方块图标比箭头略小一点（实心方块视觉重，需要瘦身） */
+/* Generating: square icon slightly smaller than the arrow (solid square
+ * is visually heavier and needs to be slimmed down). */
 
 button.yolo-chat-user-input-submit-button-circle.is-generating svg,
 button.yolo-chat-user-input-submit-button-circle.is-stop svg {
@@ -11469,7 +11668,8 @@ button.yolo-chat-user-input-submit-button-circle.is-stop svg {
   height: 10px;
 }
 
-/* 停止按钮：用次级语义色对，避免和"主提交"撞色。 */
+/* Stop button: uses secondary semantic color pair to avoid clashing
+ * with the primary submit color. */
 
 button.yolo-chat-user-input-submit-button-circle.is-stop {
   background: var(--background-modifier-border);
@@ -11480,8 +11680,10 @@ button.yolo-chat-user-input-submit-button-circle.is-stop:hover:not(:disabled) {
   background: var(--background-modifier-hover);
 }
 
-/* 输入框上方浮层容器：承载 queued 气泡（顶）+ Todo 清单（底，贴近输入框）。
- * 用 absolute 浮在 .yolo-chat-input-wrapper 之上，不挤压输入框高度。 */
+/* Floating overlay container above the input box: hosts queued message
+ * bubbles (top) + Todo list panel (bottom, flush with input). Uses
+ * absolute positioning above .yolo-chat-input-wrapper without affecting
+ * the input box height. */
 
 .yolo-chat-input-overlay {
   position: absolute;
@@ -11495,13 +11697,15 @@ button.yolo-chat-user-input-submit-button-circle.is-stop:hover:not(:disabled) {
   pointer-events: none;
 }
 
-/* 让浮层内可交互元素恢复点击（如 Todo 折叠按钮）。 */
+/* Re-enable pointer events on interactive children inside the overlay
+ * (e.g. Todo panel collapse button). */
 
 .yolo-chat-input-overlay > * {
   pointer-events: auto;
 }
 
-/* 运行中等待注入的用户消息：低饱和度气泡叠在输入框上方。 */
+/* Queued user messages waiting to be injected during a run: low-saturation
+ * bubbles stacked above the input box. */
 
 .yolo-chat-queued-messages {
   display: flex;
@@ -11522,10 +11726,67 @@ button.yolo-chat-user-input-submit-button-circle.is-stop:hover:not(:disabled) {
 }
 
 .yolo-chat-queued-messages__item {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  min-width: 0;
+}
+
+.yolo-chat-queued-messages__preview {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0.85;
+}
+
+.yolo-chat-queued-messages__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--size-2-1);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.yolo-chat-queued-messages__item:hover .yolo-chat-queued-messages__actions,
+.yolo-chat-queued-messages__item:focus-within
+  .yolo-chat-queued-messages__actions {
+  opacity: 1;
+}
+
+.yolo-chat-queued-messages__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: var(--radius-s);
+  background: transparent !important;
+  color: var(--text-muted);
+  box-shadow: none !important;
+}
+
+.yolo-chat-queued-messages__action:hover:not(:disabled) {
+  background: transparent !important;
+  color: var(--interactive-accent-hover, var(--interactive-accent));
+  box-shadow: none !important;
+}
+
+.yolo-chat-queued-messages__action.is-delete:hover:not(:disabled) {
+  color: var(--text-error);
+}
+
+.yolo-chat-queued-messages__action:disabled {
+  opacity: 0.4;
+}
+
+@media (hover: none) {
+  .yolo-chat-queued-messages__actions {
+    opacity: 1;
+  }
 }
 
 /* Chat Mode Select */
@@ -11546,6 +11807,7 @@ button.yolo-chat-user-input-submit-button-circle.is-stop:hover:not(:disabled) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  min-height: 56px;
   padding: 8px 10px !important;
 }
 
@@ -11588,9 +11850,159 @@ button.yolo-chat-user-input-submit-button-circle.is-stop:hover:not(:disabled) {
 
 .yolo-chat-mode-select-item[data-state='checked']
   .yolo-chat-mode-select-item__icon,
+.yolo-chat-mode-agent-card[data-state='checked']
+  .yolo-chat-mode-select-item__icon,
 .yolo-chat-mode-select-item[data-highlighted]
   .yolo-chat-mode-select-item__icon {
   color: var(--text-normal);
+}
+
+/* Self-drawn dropdown rows: Ask remains a plain button; Agent hosts the YOLO
+ * switch while the outer row keeps the same popover-item sizing as before. */
+
+button.yolo-chat-mode-select-item {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button.yolo-chat-mode-select-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--interactive-accent) !important;
+  border-radius: var(--radius-s);
+}
+
+button.yolo-chat-mode-select-item:hover,
+button.yolo-chat-mode-select-item[data-highlighted] {
+  background: color-mix(
+    in srgb,
+    var(--background-modifier-hover) 90%,
+    transparent
+  ) !important;
+}
+
+button.yolo-chat-mode-select-item[data-state='checked'] {
+  background: color-mix(
+    in srgb,
+    var(--background-modifier-hover) 45%,
+    transparent
+  ) !important;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--background-modifier-border) 60%, transparent) !important;
+}
+
+.yolo-chat-mode-agent-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.yolo-chat-mode-agent-card:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--interactive-accent) !important;
+  border-radius: var(--radius-s);
+}
+
+.yolo-chat-mode-agent-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.yolo-chat-mode-agent-card__title-row .yolo-chat-mode-select-item__label {
+  flex: 0 0 auto;
+}
+
+.yolo-chat-mode-yolo-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--interactive-accent) !important;
+  border-radius: var(--radius-s);
+}
+
+.yolo-chat-mode-yolo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 18px;
+  min-height: 0;
+  padding: 2px 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.yolo-chat-mode-yolo-toggle[data-active='true'] {
+  color: var(--interactive-accent);
+}
+
+.yolo-chat-mode-yolo-toggle__label {
+  letter-spacing: 0.02em;
+}
+
+.yolo-chat-mode-yolo-toggle__switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 26px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.yolo-chat-mode-yolo-toggle[data-active='true']
+  .yolo-chat-mode-yolo-toggle__switch {
+  background: var(--interactive-accent);
+}
+
+.yolo-chat-mode-yolo-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.yolo-chat-mode-yolo-toggle[data-active='true']
+  .yolo-chat-mode-yolo-toggle__thumb {
+  transform: translateX(11px);
+}
+
+/* Trigger badge while YOLO is on (sits between label and chevron). */
+
+.yolo-chat-mode-select__yolo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--interactive-accent);
+}
+
+.yolo-chat-mode-select__yolo-badge svg {
+  width: 11px;
+  height: 11px;
 }
 
 /* Reasoning Select */
@@ -12307,7 +12719,7 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   }
 }
 
-/* OpenAI-Style Thinking Loader - OpenAI 风格思考动画 */
+/* OpenAI-Style Thinking Loader */
 
 .yolo-thinking-loader {
   display: inline-flex;
@@ -12315,7 +12727,7 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   gap: 6px;
 }
 
-/* 内联思考指示器 - 在编辑器中显示 */
+/* Inline thinking indicator - shown in the editor */
 
 .yolo-thinking-indicator-inline {
   display: inline-flex;
@@ -12325,7 +12737,7 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   line-height: 1;
 }
 
-/* 旋转的 Sparkles 图标 */
+/* Spinning Sparkles icon */
 
 .yolo-thinking-icon {
   position: relative;
@@ -12355,7 +12767,7 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   }
 }
 
-/* 高光流动的文字 */
+/* Highlight-shimmer text */
 
 .yolo-thinking-text {
   font-size: var(--font-ui-medium);
@@ -12438,7 +12850,7 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   }
 }
 
-/* 保留旧的 dot-loader 作为后备 */
+/* Keep the legacy dot-loader as fallback */
 
 .yolo-dot-loader {
   display: inline-block;
@@ -12476,9 +12888,10 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   animation: fadeIn 0.1s ease-in-out;
 }
 
-/* Radix 渲染的 popper wrapper 默认 z-index: auto，在 Obsidian Settings Modal
-   （--layer-modal）里会被盖住。给含 yolo-tooltip-content 的 wrapper 显式抬到
-   menu 层级，保证 modal 内 hover 也能看到 tooltip。 */
+/* Radix's popper wrapper defaults to z-index: auto, which gets covered
+   by the Obsidian Settings Modal (--layer-modal). Explicitly elevate the
+   wrapper containing yolo-tooltip-content to the menu layer so tooltips
+   remain visible on hover inside modals. */
 
 [data-radix-popper-content-wrapper]:has(.yolo-tooltip-content) {
   z-index: var(--layer-menu);
@@ -12790,7 +13203,21 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   margin-top: var(--size-2-2);
 }
 
-.yolo-assistant-message-editor-textarea {
+.yolo-assistant-group-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+  margin-top: var(--size-2-2);
+}
+
+.yolo-assistant-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1);
+}
+
+.yolo-assistant-message-editor-textarea,
+.yolo-assistant-group-editor-textarea {
   width: 100%;
   min-height: 120px;
   max-height: 320px;
@@ -12809,10 +13236,24 @@ button.yolo-chat-user-input-file-badge-delete:focus-visible,
   overscroll-behavior: contain;
 }
 
+.yolo-assistant-group-editor-textarea {
+  min-height: 240px;
+  max-height: 60vh;
+  font-family: var(--font-monospace);
+}
+
 .yolo-assistant-message-editor-textarea:focus,
-.yolo-assistant-message-editor-textarea:focus-visible {
+.yolo-assistant-message-editor-textarea:focus-visible,
+.yolo-assistant-group-editor-textarea:focus,
+.yolo-assistant-group-editor-textarea:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.yolo-assistant-editor-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-2-2);
 }
 
 .yolo-assistant-message-footer {
@@ -13349,7 +13790,7 @@ button.yolo-llm-inline-info-debug-button:focus-visible {
  * `button.<class>` selector is needed because Obsidian's `button { ... }`
  * rule out-specifies a plain class. */
 
-/* Compact per-call grid: index + ↑(含 cached %) + ↓ + ⚡ + 🕐. Negative
+/* Compact per-call grid: index + input (incl. cached %) + output + speed + duration. Negative
  * right-margin + matching padding-right extends the scroll track to the
  * tooltip's right edge — otherwise the scrollbar floats mid-air and visually
  * suggests "a box inside a box". The padding keeps the row content aligned
@@ -13616,14 +14057,14 @@ button.yolo-llm-debug-modal-button:focus-visible {
   background: var(--background-modifier-hover);
 }
 
-/* 视图切换标签页样式 - 手风琴展开效果
+/* View toggle tab styles - accordion expand effect
    ─────────────────────────────────────────────────────────────────
    Sizing model: the toggle declares an ideal width (200px), but the
    two-button (non-`--single`) form uses flex so that when the host
    shrinks the toggle, the expanded button absorbs the squeeze and the
-   collapsed slot keeps its full size — collapsed has no slack to give.
+   collapsed slot keeps its full size - collapsed has no slack to give.
    The indicator is absolutely positioned and derives its `left/width`
-   from the toggle's actual padding-box width via `calc(100% - …)`,
+   from the toggle's actual padding-box width via `calc(100% - ...)`,
    so it stays glued to the active button regardless of how narrow the
    toggle becomes. The container query at the bottom of this block folds
    the expanded button to icon-only when the toggle itself is too narrow
@@ -14028,10 +14469,10 @@ button.yolo-llm-debug-modal-button:focus-visible {
   user-select: none;
 }
 
-/* 鼠标 hover 任意项都给视觉反馈；键盘 highlight 仅对非选中项给 bg。
-   原因：弹窗打开时 Radix 会把当前选中项自动设为 [data-highlighted]，若在
-   [data-state='checked'] 上叠加 bg 会让"被动选中"出现一块灰底，与 ✓ 图标重复
-   且视觉上像 hover 状态，违和。 */
+/* Mouse hover gives visual feedback on all items; keyboard highlight only applies bg to non-checked items.
+   Reason: when the popover opens, Radix auto-sets [data-highlighted] on the current checked item; if we
+   also apply bg on [data-state='checked'], the "passively checked" item gets a gray background that
+   duplicates the checkmark icon and looks like a hover state, which feels inconsistent. */
 
 .yolo-roller-select-list-item:hover,
 .yolo-roller-select-list-item:not([data-state='checked'])[data-highlighted] {
@@ -14055,7 +14496,7 @@ button.yolo-llm-debug-modal-button:focus-visible {
   flex-direction: column;
   gap: 1px;
   flex: 1;
-  /* 让 flex 子元素允许收缩到 0，配合下面 label/desc 的 ellipsis 才会生效 */
+  /* Allow flex children to shrink to 0, required for label/desc ellipsis below to take effect */
   min-width: 0;
 }
 
@@ -14417,18 +14858,27 @@ button.yolo-llm-debug-modal-button:focus-visible {
  */
 
 /**
- * @mention 菜单的二级 hover/方向键预览子面板。
- * popover 根（.yolo-smart-space-mention-popover）是 flex 容器（见 panels/smart-space.css）；
- * 主面板宽度由 LexicalMenu 锁定为输入框宽度（containerDiv width），如果子面板作为 flex item
- * 会把主面板挤压成 0 宽。所以子面板改用 position:absolute 浮在主面板侧边，不参与 flex 布局；
- * popover 根加 position:relative 作为其定位参考。
- * 注意：子面板必须保持为 popover 的直接子节点。这里的 100% intentionally 指向
- * LexicalMenu 已定位好的 popover/root 宽度；不要把子面板移进主面板 DOM 内部，
- * 否则 placement='top' 的向上展开锚点和 hover safe-area 都会偏离原行为。
- * 是否允许侧向展开由 MentionPlugin 读取 LexicalMenu 写入的 Chat 容器边界决定；
- * 侧边栏 Chat pane 内放不下时隐藏子面板，点击一级菜单走 drill-down。
- * 空间不够时由组件切到 data-side="left" 翻到主面板左侧；
- * 两侧都不够时组件不渲染（drill-down 兜底）。 */
+ * Secondary hover/arrow-key preview sub-panel for the @mention menu.
+ * The popover root (.yolo-smart-space-mention-popover) is a flex
+ * container (see panels/smart-space.css); the main panel width is locked
+ * to the input width by LexicalMenu (containerDiv width). If the
+ * sub-panel were a flex item it would squeeze the main panel to 0 width.
+ * So the sub-panel uses position:absolute to float beside the main
+ * panel without participating in flex layout; the popover root adds
+ * position:relative as the positioning reference.
+ * Note: the sub-panel must remain a direct child of the popover. The
+ * 100% here intentionally refers to the popover/root width already
+ * positioned by LexicalMenu; do not move the sub-panel inside the main
+ * panel's DOM, otherwise the upward-expanding anchor for placement='top'
+ * and the hover safe-area will deviate from expected behavior.
+ * Whether side-expansion is allowed is determined by MentionPlugin
+ * reading the Chat container bounds written by LexicalMenu; when the
+ * sidebar Chat pane is too narrow, the sub-panel is hidden and the
+ * primary menu uses drill-down navigation.
+ * When there is not enough space, the component switches to
+ * data-side="left" to flip to the left side of the main panel;
+ * when neither side has enough space, the component is not rendered
+ * (drill-down fallback). */
 
 .yolo-smart-space-mention-popover {
   position: relative;
@@ -14477,10 +14927,13 @@ button.yolo-llm-debug-modal-button:focus-visible {
   }
 }
 
-/* 子菜单与主菜单同向展开：
- * placement='bottom'（主菜单向下） → 子菜单顶对齐 hover 项的顶 → 向下延伸；
- * placement='top'   （主菜单向上） → 子菜单底对齐 hover 项的底 → 向上延伸。
- * CSS 变量由 MentionPlugin 在测量 hover 项后写到 popover 根。 */
+/* Sub-menu expands in the same direction as the main menu:
+ * placement='bottom' (main menu downward) - sub-menu top aligns with the
+ *   hovered item's top, extending downward;
+ * placement='top' (main menu upward) - sub-menu bottom aligns with the
+ *   hovered item's bottom, extending upward.
+ * CSS variables are written to the popover root by MentionPlugin after
+ * measuring the hovered item. */
 
 .yolo-smart-space-mention-popover[data-placement='bottom']
   .yolo-smart-space-mention-subpanel {
@@ -14494,8 +14947,10 @@ button.yolo-llm-debug-modal-button:focus-visible {
   bottom: calc(100% - var(--yolo-sub-anchor-bottom, 100%));
 }
 
-/* Safe triangle 内：抑制主面板（非子面板）item 的 :hover 染色，
- * 让 React 的 data-highlighted 完全主导视觉。这样鼠标穿越其他 entry 时不会瞬时高亮。 */
+/* Inside the safe triangle: suppress :hover highlighting on main panel
+ * (not sub-panel) items, letting React's data-highlighted fully control
+ * visuals. This prevents momentary highlighting when the mouse crosses
+ * other entries. */
 
 .yolo-smart-space-mention-popover[data-safe-active='true']
   > .yolo-smart-space-mention-dropdown:not(.yolo-smart-space-mention-subpanel)
@@ -14546,7 +15001,11 @@ button.yolo-llm-debug-modal-button:focus-visible {
 /* Typed inline mentions (file/folder/...) render a leading type icon instead
    of an "@" prefix, mirroring the skill mention treatment above. Icons are
    lucide SVGs from getMentionableIcon, drawn via mask so they inherit the tag
-   color. */
+   color.
+
+   When adding a new Mentionable.type, add a matching .yolo-mention--<type>
+   mask rule below. Without it the generic ::before block has no mask and
+   renders as a solid color square. */
 
 .yolo-lexical-content-editable-root .mention[class*='yolo-mention--'] {
   display: inline-flex;
@@ -14607,6 +15066,10 @@ button.yolo-llm-debug-modal-button:focus-visible {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
 }
 
+.yolo-lexical-content-editable-root .yolo-mention--office::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4'/%3E%3Cpath d='M10 9H8'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E");
+}
+
 .yolo-lexical-content-editable-root .yolo-mention--image::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E");
 }
@@ -14644,9 +15107,9 @@ button.yolo-llm-debug-modal-button:focus-visible {
   padding: var(--size-4-1) 0;
 }
 
-/* default 变体下的 group-label / separator / list / item 样式集中在这里。
-   --smart-space 变体的同名元素样式集中在 src/styles/panels/smart-space.css。
-   两个文件按变体严格隔离，避免源码顺序决定胜者的"屎山"问题。 */
+/* Styles for group-label / separator / list / item under the default variant are centralized here.
+   Styles for the same elements under the --smart-space variant are in src/styles/panels/smart-space.css.
+   The two files are strictly isolated by variant to avoid source-order-wins style conflicts. */
 
 .yolo-popover-surface--default .yolo-popover-group-label {
   display: block;
@@ -14710,7 +15173,8 @@ button.yolo-llm-debug-modal-button:focus-visible {
   outline: none;
 }
 
-/* 首/末项高亮贴面板边缘：列表不再纵向留白，圆角交给边缘项。 */
+/* First/last item highlight hugs the panel edge: no vertical list padding;
+ * the corner radius lives on the edge items themselves. */
 
 .yolo-popover-surface--default
   .yolo-model-select-list
@@ -14756,7 +15220,8 @@ button.yolo-llm-debug-modal-button:focus-visible {
   box-shadow: inset 0 0 0 1px var(--yolo-popover-item-checked-inset);
 }
 
-/* 贴边选中态：去掉与面板边框重叠的顶/底 inset 描边。 */
+/* Edge-hugging checked state: drop the top/bottom inset outline that would
+ * overlap the panel border. */
 
 .yolo-popover-surface
   .yolo-model-select-list
@@ -14917,7 +15382,7 @@ button.yolo-llm-debug-modal-button:focus-visible {
   width: 100%;
   max-width: 420px;
   min-width: 0;
-  /* 让弹层左侧与聊天面板外层布局对齐（仅聊天历史下拉需要）。 */
+  /* Align popover left edge with the outer chat panel layout (only needed for chat history dropdown). */
   margin-left: -64px;
 }
 
@@ -16536,18 +17001,20 @@ button.yolo-chat-input-model-select .yolo-chat-input-model-select__icon {
   color: var(--text-faint);
 }
 
-/* ViewToggle 模式切换下拉的 purpose 类——按 surface.css 头部约定一次性需求
-   自带 yolo-popover-<purpose> class。这里只覆盖宽度（跟 trigger 按钮严格对齐），
-   背景沿用 --default 变体的 --background-primary：在侧栏/独立窗口里都能跟周围
-   bg 自然过渡，不会出现"独立窗口白底但 popover 灰底"的违和。 */
+/* ViewToggle mode-switch dropdown purpose class - per the surface.css header convention,
+   one-off needs use their own yolo-popover-<purpose> class. This only overrides width
+   (strictly aligned to the trigger button). Background uses the --default variant's
+   --background-primary so it blends naturally in both sidebar and standalone windows,
+   avoiding the visual mismatch of a gray popover on a white standalone window background. */
 
 .yolo-popover-surface.yolo-popover-view-toggle-mode {
   width: var(--radix-dropdown-menu-trigger-width);
 }
 
-/* 上下文占用分解 popover ——purpose 类，仅承担尺寸 / 内容布局。
-   宽度跟随 anchor（即 .yolo-chat-user-input-container）；
-   背景 / 阴影沿用 --default 变体（见 popover/surface.css）。 */
+/* Context usage breakdown popover - purpose class, responsible only for
+   sizing / content layout. Width follows the anchor (i.e.
+   .yolo-chat-user-input-container); background / shadow inherited from
+   the --default variant (see popover/surface.css). */
 
 .yolo-popover-surface.yolo-context-breakdown-popover {
   /* Keep the surface border for definition; drop only the shadow so the card
@@ -16872,9 +17339,9 @@ button.yolo-chat-input-model-select .yolo-chat-input-model-select__icon {
   }
 }
 
-/* 外部 Agent 工具卡：终端样式
- * 布局：状态条 → Progress（始终展开+自动滚底） → Output → metadata chips
- * 终端命令与实时任务卡片共用此样式。
+/* External Agent tool card: terminal style
+ * Layout: status bar -> Progress (always expanded + auto-scroll to bottom) -> Output -> metadata chips
+ * Shared by terminal_command and live task cards.
  */
 
 .yolo-external-agent-card {
@@ -16888,7 +17355,7 @@ button.yolo-chat-input-model-select .yolo-chat-input-model-select__icon {
   gap: var(--size-2-2);
 }
 
-/* ── 状态条 ── */
+/* -- Status bar -- */
 
 .yolo-external-agent-card__status-row {
   display: flex;
@@ -17008,7 +17475,7 @@ button.yolo-external-agent-card__compact-abort-btn:focus-visible {
   color: var(--text-normal);
 }
 
-/* ── 输出块（Progress / Output 共用） ── */
+/* -- Output blocks (shared by Progress / Output) -- */
 
 .yolo-external-agent-card__stream-section {
   display: flex;
@@ -17046,7 +17513,7 @@ button.yolo-external-agent-card__compact-abort-btn:focus-visible {
   color: var(--text-muted);
 }
 
-/* progress 中按行渲染的容器（用于 claude 标签着色） */
+/* Per-line rendering container in progress (used for claude tag coloring) */
 
 .yolo-external-agent-card__line {
   display: block;
@@ -17084,7 +17551,7 @@ button.yolo-external-agent-card__compact-abort-btn:focus-visible {
   opacity: 0.7;
 }
 
-/* ── metadata chips（底部） ── */
+/* -- metadata chips (bottom) -- */
 
 .yolo-external-agent-card__meta-row {
   display: flex;
@@ -17107,7 +17574,7 @@ button.yolo-external-agent-card__compact-abort-btn:focus-visible {
   flex-shrink: 0;
 }
 
-/* ── 截断/无输出提示 ── */
+/* -- Truncation / no output notice -- */
 
 .yolo-external-agent-card__truncation-notice {
   font-size: var(--font-ui-smaller);
@@ -17121,20 +17588,30 @@ button.yolo-external-agent-card__compact-abort-btn:focus-visible {
   font-style: italic;
 }
 
-/* Subagent 工具卡：Cursor 风格紧凑卡片 + 详情弹窗 */
+/* Subagent tool card: Cursor-style compact card + details popup */
 
 .yolo-subagent-card {
   display: flex;
-  align-items: flex-start;
-  gap: var(--size-4-2);
-  margin: var(--size-4-2) 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--size-2-2);
+  margin: var(--size-4-2) 0 var(--size-4-4);
   border: 0;
   border-radius: 0;
   background: transparent;
   overflow: visible;
 }
 
+.yolo-subagent-card__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-4-2);
+  min-width: 0;
+}
+
 button.yolo-subagent-card__main {
+  all: unset;
+  box-sizing: border-box;
   appearance: none;
   display: flex;
   align-items: flex-start;
@@ -17344,7 +17821,7 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   }
 }
 
-/* ── 详情弹窗 ── */
+/* ── Details popup ── */
 
 .yolo-subagent-detail-overlay {
   position: absolute;
@@ -17458,10 +17935,150 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   margin: 0;
 }
 
-/* 任务清单面板：作为 .yolo-chat-input-overlay 的子项，浮在输入框上方，可折叠。
- * 定位与层级由 .yolo-chat-input-overlay 统一负责，本组件只关心自身样式。
- * 布局：header（摘要+折叠按钮） → body（列表）
- * 折叠动画：grid-template-rows 0fr ↔ 1fr，无需测量高度
+/* ── 紧凑审批列表（沿用 SubagentCard 的行式视觉） ── */
+
+.yolo-subagent-approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+  margin-left: calc(var(--size-2-3) + 16px);
+  min-width: 0;
+}
+
+.yolo-subagent-approval__items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.yolo-subagent-approval__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+  min-height: 24px;
+  min-width: 0;
+}
+
+.yolo-subagent-approval__item-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-2-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.yolo-subagent-approval__item-label {
+  flex-shrink: 0;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-monospace);
+  color: var(--text-normal);
+}
+
+.yolo-subagent-approval__item-detail {
+  min-width: 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yolo-subagent-approval__item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  flex-shrink: 0;
+}
+
+button.yolo-subagent-approval__btn,
+button.yolo-subagent-approval__bulk-btn {
+  all: unset;
+  box-sizing: border-box;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 var(--size-2-3);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button.yolo-subagent-approval__btn {
+  color: var(--text-muted);
+}
+
+button.yolo-subagent-approval__btn:hover,
+button.yolo-subagent-approval__btn:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+button.yolo-subagent-approval__btn:focus-visible,
+button.yolo-subagent-approval__bulk-btn:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+button.yolo-subagent-approval__btn--primary {
+  color: var(--text-accent);
+}
+
+button.yolo-subagent-approval__btn--primary:hover,
+button.yolo-subagent-approval__btn--primary:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-accent-hover);
+}
+
+button.yolo-subagent-approval__btn--ghost {
+  color: var(--text-muted);
+}
+
+button.yolo-subagent-approval__btn--ghost:hover,
+button.yolo-subagent-approval__btn--ghost:focus-visible {
+  color: var(--text-normal);
+}
+
+.yolo-subagent-approval__bulk {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-2-2);
+  padding-top: var(--size-2-1);
+}
+
+button.yolo-subagent-approval__bulk-btn {
+  color: var(--text-muted);
+}
+
+button.yolo-subagent-approval__bulk-btn--primary {
+  color: var(--text-accent);
+}
+
+button.yolo-subagent-approval__bulk-btn--primary:hover,
+button.yolo-subagent-approval__bulk-btn--primary:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-accent-hover);
+}
+
+button.yolo-subagent-approval__bulk-btn--ghost {
+  color: var(--text-muted);
+}
+
+button.yolo-subagent-approval__bulk-btn--ghost:hover,
+button.yolo-subagent-approval__bulk-btn--ghost:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Todo list panel: a child of .yolo-chat-input-overlay, floating above
+ * the input box, collapsible. Positioning and z-index are handled by
+ * .yolo-chat-input-overlay; this component only manages its own styles.
+ * Layout: header (collapse-summary button + close button) -> body (list)
+ * Collapse animation: grid-template-rows 0fr <-> 1fr, no height
+ * measurement needed.
  */
 
 .yolo-todo-panel {
@@ -17472,8 +18089,10 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   background: var(--background-primary);
   font-size: var(--font-ui-small);
   overflow: hidden;
-  /* 入场动画：从输入框上沿向上"冒出来"。每次组件从 null 切到渲染都会重跑
-   * （首次出现、清空后再出现、切会话/分支等），不需要 React 端配合。 */
+  /* Entry animation: "bubbles up" from the top edge of the input box.
+   * Replays every time the component transitions from null to rendered
+   * (first appearance, reappearance after clearing, switching
+   * conversations/branches, etc.) without needing React coordination. */
   animation: yolo-todo-panel-appear 220ms cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -17488,24 +18107,70 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   }
 }
 
-/* 选择器写成 `button.yolo-todo-panel__header` 是为了对抗 Obsidian
- * `app.css` 里的 `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }`
- * ——必须保持等同或更高特异度，否则会画出一条贴在 header 底部的投影线。 */
+/* The selector is written as `button.yolo-todo-panel__toggle` to counter
+ * Obsidian `app.css`'s
+ * `button:not(.clickable-icon) { box-shadow: var(--input-shadow) }`
+ * - equal or higher specificity is required, otherwise a shadow line
+ * appears along the bottom of the header. */
 
-button.yolo-todo-panel__header {
+.yolo-todo-panel__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px 22px;
+  align-items: center;
+  column-gap: 2px;
+  width: 100%;
+  padding-right: var(--size-2-2);
+  box-sizing: border-box;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+button.yolo-todo-panel__toggle {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
   width: 100%;
+  min-width: 0;
+  min-height: 0;
   padding: var(--size-2-2) var(--size-4-2);
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   outline: 0;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.4;
   text-align: left;
+}
+
+button.yolo-todo-panel__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  box-sizing: border-box;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: var(--radius-s);
+  box-shadow: none !important;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 0;
+}
+
+button.yolo-todo-panel__toggle svg,
+button.yolo-todo-panel__icon-button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .yolo-todo-panel__header-icon {
@@ -17898,7 +18563,7 @@ button.yolo-todo-panel__header {
   animation: yolo-smart-space-fade-out 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
-/* Smart Space 弹出动画 */
+/* Smart Space pop-in animation */
 
 @keyframes yolo-smart-space-fade-in {
   0% {
@@ -17911,7 +18576,7 @@ button.yolo-todo-panel__header {
   }
 }
 
-/* Smart Space 关闭动画 */
+/* Smart Space close animation */
 
 @keyframes yolo-smart-space-fade-out {
   0% {
@@ -17924,7 +18589,7 @@ button.yolo-todo-panel__header {
   }
 }
 
-/* Smart Space 内部元素淡入动画 */
+/* Smart Space inner element fade-in animation */
 
 @keyframes yolo-smart-space-item-fade-in {
   0% {
@@ -18135,9 +18800,9 @@ button.yolo-todo-panel__header {
   max-width: min(100%, var(--yolo-chat-typeahead-max-width, 480px));
   pointer-events: auto;
   padding: 0;
-  /* 视觉表面由 .yolo-popover-surface--smart-space 提供；此处不再覆盖 background/border/box-shadow。
-     宽度上限用 CSS 变量 --yolo-chat-typeahead-max-width 控制：
-     默认 480px；centered 容器（input.css）会覆盖为 400px。 */
+  /* Visual surface provided by .yolo-popover-surface--smart-space; no background/border/box-shadow overrides here.
+     Max width controlled by CSS variable --yolo-chat-typeahead-max-width:
+     default 480px; centered container (input.css) overrides to 400px. */
 }
 
 .yolo-smart-space-mention-list {
@@ -18429,7 +19094,7 @@ button.yolo-todo-panel__header {
     backwards;
 }
 
-/* 为不同的选项添加渐进式延迟 */
+/* Add progressive delay for different options */
 
 .yolo-smart-space-item:nth-child(1) {
   animation-delay: 0.15s;
@@ -18479,7 +19144,7 @@ button.yolo-todo-panel__header {
   outline: none;
 }
 
-/* 键盘导航时禁用鼠标 hover 的视觉反馈，避免与焦点状态冲突 */
+/* Disable mouse hover visual feedback during keyboard navigation to avoid conflicts with focus state */
 
 .yolo-smart-space-section-card.is-keyboard-nav
   .yolo-smart-space-item:hover:not(:focus-visible):not(:focus) {
@@ -18562,7 +19227,7 @@ button.yolo-todo-panel__header {
   margin-left: auto;
 }
 
-/* Smart Space Model Select - 精致的按钮设计 */
+/* Smart Space Model Select - refined button design */
 
 .yolo-smart-space-model-select {
   display: flex;
@@ -18588,7 +19253,7 @@ button.yolo-todo-panel__header {
   }
 }
 
-/* 多行输入时，将模型选择等控件移到底部一行，右对齐 */
+/* When input is multiline, move model select and other controls to a bottom row, right-aligned */
 
 .yolo-smart-space-header:not(.is-empty) {
   padding-bottom: 22px;
@@ -18762,8 +19427,8 @@ button.yolo-todo-panel__header {
   opacity: 0.85;
 }
 
-/* --smart-space 变体下 model-select-list 的容器样式。
-   --default 变体的对应规则在 src/styles/chat/popover.css。 */
+/* Container styles for model-select-list under the --smart-space variant.
+   Corresponding rules for the --default variant are in src/styles/chat/popover.css. */
 
 .yolo-popover-surface--smart-space .yolo-model-select-list {
   max-height: 380px;
@@ -20990,8 +21655,9 @@ body.yolo-quick-ask-global-interaction * {
 
 .yolo-selection-menu-content {
   background: var(--background-primary);
-  /* border 借一丝 accent 与浮标 (.yolo-selection-indicator) 呼应；shadow ring
-     保持中性灰，避免主题色叠加成"双层高亮" */
+  /* Border picks up a hint of accent to echo the floating selection indicator
+     (.yolo-selection-indicator); the shadow ring stays neutral grey so the
+     theme color doesn't compound into a "double highlight". */
   border: 1px solid
     color-mix(in srgb, var(--interactive-accent) 18%, transparent);
   border-radius: var(--radius-m);
@@ -21179,7 +21845,7 @@ body.yolo-quick-ask-global-interaction * {
   background: var(--background-modifier-hover);
 }
 
-/* 配置导入/导出 Modal */
+/* Config import/export Modal */
 
 .yolo-config-transfer-modal {
   display: flex;
@@ -21193,7 +21859,7 @@ body.yolo-quick-ask-global-interaction * {
   font-size: var(--font-ui-small);
 }
 
-/* 来源选择按钮 */
+/* Source selection buttons */
 
 .yolo-config-transfer-source-buttons {
   display: flex;
@@ -21236,7 +21902,7 @@ body.yolo-quick-ask-global-interaction * {
   line-height: normal;
 }
 
-/* 配置项列表 */
+/* Config item list */
 
 .yolo-config-transfer-toolbar {
   display: flex;
@@ -21317,7 +21983,7 @@ body.yolo-quick-ask-global-interaction * {
   flex-shrink: 0;
 }
 
-/* 脱敏选项 */
+/* Redaction options */
 
 .yolo-config-transfer-option {
   display: flex;
@@ -21338,7 +22004,7 @@ body.yolo-quick-ask-global-interaction * {
   margin: 0;
 }
 
-/* 合并策略 */
+/* Merge strategy */
 
 .yolo-config-transfer-strategy {
   display: flex;
