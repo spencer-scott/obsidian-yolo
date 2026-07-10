@@ -11,6 +11,7 @@ import type { ChatTimelineItem } from '../../types/chat-timeline'
 
 import type { ChatMode } from './chat-input/ChatModeSelect'
 import { isAgentChatMode } from './chat-input/ChatModeSelect'
+import type { ChatTimelineRenderVersion } from './ChatTimelineList'
 import { InstallationIncompleteBanner } from './InstallationIncompleteBanner'
 import { SharedConversationSurface } from './SharedConversationSurface'
 
@@ -25,6 +26,7 @@ type ChatConversationPaneProps = {
   chatTimelineItems: ChatTimelineItem[]
   chatMessagesRef: RefObject<HTMLDivElement>
   renderChatTimelineItem: (timelineItem: ChatTimelineItem) => ReactNode
+  timelineRenderVersion?: ChatTimelineRenderVersion<ChatTimelineItem>
   followOutput: FollowOutput
   onAtBottomStateChange: (atBottom: boolean) => void
   editingAssistantMessageId: string | null
@@ -64,6 +66,7 @@ export function ChatConversationPane({
   chatTimelineItems,
   chatMessagesRef,
   renderChatTimelineItem,
+  timelineRenderVersion,
   followOutput,
   onAtBottomStateChange,
   editingAssistantMessageId,
@@ -120,6 +123,7 @@ export function ChatConversationPane({
         conversationId={currentConversationId}
         scrollContainerRef={chatMessagesRef}
         renderItem={renderChatTimelineItem}
+        renderVersion={timelineRenderVersion}
         forceRenderItemIds={['bottom-anchor']}
         followOutput={followOutput}
         onAtBottomStateChange={onAtBottomStateChange}

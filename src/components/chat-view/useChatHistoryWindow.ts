@@ -5,18 +5,18 @@ import type {
   ChatUserMessage,
 } from '../../types/chat'
 
-const INITIAL_WINDOW_TURNS = 10
-const PAGE_TURNS = 8
-const MAX_WINDOW_TURNS = 40
+const INITIAL_WINDOW_TURNS = 6
+const PAGE_TURNS = 6
+const MAX_WINDOW_TURNS = 12
 
-type GroupedChatMessage = ChatUserMessage | AssistantToolMessageGroup
+export type GroupedChatMessage = ChatUserMessage | AssistantToolMessageGroup
 
 type TurnRange = {
   startIndex: number
   endIndex: number
 }
 
-type ChatHistoryWindow = {
+export type ChatHistoryWindow = {
   startTurnIndex: number
   endTurnIndex: number
 }
@@ -24,6 +24,36 @@ type ChatHistoryWindow = {
 type UserMessageTurnIndex = {
   messageId: string
   turnIndex: number
+}
+
+export function createChatHistoryWindowSelector() {
+  let previousMessages: GroupedChatMessage[] | null = null
+  let previousStartIndex = -1
+  let previousEndIndex = -1
+  let previousResult: GroupedChatMessage[] = []
+
+  return (
+    groupedChatMessages: GroupedChatMessage[],
+    startIndex: number,
+    endIndex: number,
+  ): GroupedChatMessage[] => {
+    if (
+      previousMessages === groupedChatMessages &&
+      previousStartIndex === startIndex &&
+      previousEndIndex === endIndex
+    ) {
+      return previousResult
+    }
+
+    previousMessages = groupedChatMessages
+    previousStartIndex = startIndex
+    previousEndIndex = endIndex
+    previousResult =
+      startIndex >= 0 && endIndex >= 0
+        ? groupedChatMessages.slice(startIndex, endIndex + 1)
+        : []
+    return previousResult
+  }
 }
 
 function buildTurnRanges(
@@ -151,6 +181,81 @@ function normalizeWindow(
   }
 }
 
+export function getWindowAfterTurnCountChange(
+  currentWindow: ChatHistoryWindow,
+  previousTotalTurns: number,
+  totalTurns: number,
+): ChatHistoryWindow {
+  if (totalTurns === 0) {
+    return getLatestWindow(totalTurns)
+  }
+
+  const normalizedWindow = normalizeWindow(currentWindow, totalTurns)
+  const wasAtLatest =
+    previousTotalTurns === 0 ||
+    currentWindow.endTurnIndex >= previousTotalTurns - 1
+
+  if (!wasAtLatest) {
+    return normalizedWindow
+  }
+
+  const currentWindowTurns =
+    currentWindow.endTurnIndex - currentWindow.startTurnIndex + 1
+  const windowTurns = Math.min(
+    totalTurns,
+    Math.max(
+      INITIAL_WINDOW_TURNS,
+      Math.min(MAX_WINDOW_TURNS, currentWindowTurns),
+    ),
+  )
+  const endTurnIndex = Math.max(0, totalTurns - 1)
+
+  return {
+    startTurnIndex: Math.max(0, endTurnIndex - windowTurns + 1),
+    endTurnIndex,
+  }
+}
+
+export function getEarlierWindow(
+  currentWindow: ChatHistoryWindow,
+  totalTurns: number,
+): ChatHistoryWindow {
+  if (totalTurns === 0 || currentWindow.startTurnIndex === 0) {
+    return currentWindow
+  }
+
+  const startTurnIndex = Math.max(0, currentWindow.startTurnIndex - PAGE_TURNS)
+  const endTurnIndex = Math.min(
+    currentWindow.endTurnIndex,
+    startTurnIndex + MAX_WINDOW_TURNS - 1,
+  )
+
+  return {
+    startTurnIndex,
+    endTurnIndex,
+  }
+}
+
+export function getNewerWindow(
+  currentWindow: ChatHistoryWindow,
+  totalTurns: number,
+): ChatHistoryWindow {
+  if (totalTurns === 0 || currentWindow.endTurnIndex >= totalTurns - 1) {
+    return currentWindow
+  }
+
+  const endTurnIndex = Math.min(
+    totalTurns - 1,
+    currentWindow.endTurnIndex + PAGE_TURNS,
+  )
+  const startTurnIndex = Math.max(0, endTurnIndex - MAX_WINDOW_TURNS + 1)
+
+  return {
+    startTurnIndex,
+    endTurnIndex,
+  }
+}
+
 export function useChatHistoryWindow({
   conversationId,
   groupedChatMessages,
@@ -175,6 +280,7 @@ export function useChatHistoryWindow({
     useState<string | null>(null)
   const previousConversationIdRef = useRef(conversationId)
   const previousTotalTurnsRef = useRef(totalTurns)
+  const windowSelectorRef = useRef(createChatHistoryWindowSelector())
 
   useEffect(() => {
     const previousConversationId = previousConversationIdRef.current
@@ -188,62 +294,21 @@ export function useChatHistoryWindow({
       return
     }
 
-    setWindow((currentWindow) => {
-      const normalizedWindow = normalizeWindow(currentWindow, totalTurns)
-      const wasAtLatest =
-        previousTotalTurns === 0 ||
-        currentWindow.endTurnIndex >= previousTotalTurns - 1
-
-      if (!wasAtLatest) {
-        return normalizedWindow
-      }
-
-      return {
-        startTurnIndex: normalizedWindow.startTurnIndex,
-        endTurnIndex: Math.max(0, totalTurns - 1),
-      }
-    })
+    setWindow((currentWindow) =>
+      getWindowAfterTurnCountChange(
+        currentWindow,
+        previousTotalTurns,
+        totalTurns,
+      ),
+    )
   }, [conversationId, totalTurns])
 
   const loadEarlier = useCallback(() => {
-    setWindow((currentWindow) => {
-      if (totalTurns === 0 || currentWindow.startTurnIndex === 0) {
-        return currentWindow
-      }
-
-      const startTurnIndex = Math.max(
-        0,
-        currentWindow.startTurnIndex - PAGE_TURNS,
-      )
-      const endTurnIndex = Math.min(
-        currentWindow.endTurnIndex,
-        startTurnIndex + MAX_WINDOW_TURNS - 1,
-      )
-
-      return {
-        startTurnIndex,
-        endTurnIndex,
-      }
-    })
+    setWindow((currentWindow) => getEarlierWindow(currentWindow, totalTurns))
   }, [totalTurns])
 
   const loadNewer = useCallback(() => {
-    setWindow((currentWindow) => {
-      if (totalTurns === 0 || currentWindow.endTurnIndex >= totalTurns - 1) {
-        return currentWindow
-      }
-
-      const endTurnIndex = Math.min(
-        totalTurns - 1,
-        currentWindow.endTurnIndex + PAGE_TURNS,
-      )
-      const startTurnIndex = Math.max(0, endTurnIndex - MAX_WINDOW_TURNS + 1)
-
-      return {
-        startTurnIndex,
-        endTurnIndex,
-      }
-    })
+    setWindow((currentWindow) => getNewerWindow(currentWindow, totalTurns))
   }, [totalTurns])
 
   const resetToLatest = useCallback(() => {
@@ -268,13 +333,19 @@ export function useChatHistoryWindow({
     [totalTurns, userMessageTurnIndices],
   )
 
-  const normalizedWindow = normalizeWindow(window, totalTurns)
+  const normalizedWindow = useMemo(
+    () => normalizeWindow(window, totalTurns),
+    [totalTurns, window],
+  )
   const startRange = turnRanges[normalizedWindow.startTurnIndex]
   const endRange = turnRanges[normalizedWindow.endTurnIndex]
-  const windowedGroupedChatMessages =
-    startRange && endRange
-      ? groupedChatMessages.slice(startRange.startIndex, endRange.endIndex + 1)
-      : []
+  const startMessageIndex = startRange?.startIndex ?? -1
+  const endMessageIndex = endRange?.endIndex ?? -1
+  const windowedGroupedChatMessages = windowSelectorRef.current(
+    groupedChatMessages,
+    startMessageIndex,
+    endMessageIndex,
+  )
 
   return {
     windowedGroupedChatMessages,

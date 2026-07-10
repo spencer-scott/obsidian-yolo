@@ -517,14 +517,14 @@ const buildCompactionInstructionMessage = (
 
 Produce a high-signal summary that loses nothing needed to resume. Sections:
 
-1. 当前目标 (Current Goal) — 用户最新的显式意图，逐字引用关键句。
-2. 已做决策与理由 (Decisions & Rationale) — 拍板了什么、为什么。
-3. 尝试与失败记录 (Trial & Error Log) — 每个试过的方案 + 失败/放弃的具体原因。不得省略。
-4. 所有 user 消息 (All User Messages) — 按时间逐字列出全部非 tool-result 的 user 消息，原文保留，尤其中途的更正、偏好覆盖、意图变化。
-5. 关键实体 (Key Entities) — 文件路径、版本号、ID、关键工具结果，精确。
-6. 已完成工作 (Work Completed)
-7. 未解决项 (Unresolved) — 悬而未决、待确认、已知风险。
-8. 下一步 (Next Step) — 与最近显式请求直接对齐；附最近对话的逐字引用以防漂移。
+1. Current Goal — The user's latest explicit intent; quote the key sentences verbatim.
+2. Decisions & Rationale — What was decided, and why.
+3. Trial & Error Log — Every approach attempted, plus the specific reason each one failed or was abandoned. Do not omit any.
+4. All User Messages — List every non-tool-result user message verbatim in chronological order, preserving the original wording — especially mid-course corrections, preference overrides, and changes of intent.
+5. Key Entities — File paths, version numbers, IDs, key tool results. Be exact.
+6. Work Completed
+7. Unresolved — Open questions, items awaiting confirmation, known risks.
+8. Next Step — Directly aligned with the most recent explicit request; include a verbatim quote from the recent conversation to prevent drift.
 ${focusBlock}
 Output format: <summary> ... </summary>`,
   }

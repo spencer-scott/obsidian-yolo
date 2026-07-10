@@ -51,6 +51,8 @@ export type TranslationKeys = {
     characters: string
     words: string
     wordsCharacters: string
+    rows?: string
+    columns?: string
     // additions
     default?: string
     modelDefault?: string
@@ -70,6 +72,8 @@ export type TranslationKeys = {
       searchPlaceholder?: string
       empty?: string
       current?: string
+      pinConversation?: string
+      unpinConversation?: string
       retryTitle?: string
       archived?: string
       hideArchived?: string
@@ -324,6 +328,8 @@ export type TranslationKeys = {
       fsEditReviewToggleDesc?: string
       safetyControls?: string
       safetyControlsDesc?: string
+      builtinFsEditOpsLabel?: string
+      builtinFsEditOpsDesc?: string
       builtinFsFileOpsLabel?: string
       builtinFsFileOpsDesc?: string
       builtinMemoryOpsLabel?: string
@@ -1542,6 +1548,7 @@ export type TranslationKeys = {
         fs_search?: string
         fs_read?: string
         fs_edit?: string
+        fs_edit_ops?: string
         fs_file_ops?: string
         memory_add?: string
         memory_update?: string

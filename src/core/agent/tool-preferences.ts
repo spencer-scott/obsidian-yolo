@@ -16,6 +16,8 @@ import {
 import { McpManager } from '../mcp/mcpManager'
 import { parseToolName } from '../mcp/tool-name-utils'
 
+import { FILE_EDIT_GROUP_TOOL_NAME } from './builtinToolUiMeta'
+
 export const DEFAULT_ASSISTANT_TOOL_APPROVAL_MODE: AssistantToolApprovalMode =
   'require_approval'
 export const DEFAULT_ASSISTANT_TOOL_DISCLOSURE_MODE: AssistantToolDisclosureMode =
@@ -37,6 +39,7 @@ export const ALWAYS_ALLOW_DISABLED_TOOL_NAMES: readonly string[] = [
  * follows the agent's saved approval mode.
  */
 const REQUIRE_APPROVAL_LOCAL_TOOLS: ReadonlySet<string> = new Set([
+  FILE_EDIT_GROUP_TOOL_NAME,
   'fs_file_ops',
   ...LOCAL_FS_SPLIT_ACTION_TOOL_NAMES,
   'terminal_command',

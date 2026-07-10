@@ -122,6 +122,7 @@ export class ChatView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.isClosed = false
+    await this.plugin.warmupAgentService()
     const manager = this.plugin.getChatLeafSessionManager()
     const pendingPayload = manager.consumePendingPayload(this.leaf)
     const placement =
@@ -170,6 +171,8 @@ export class ChatView extends ItemView {
 
   onClose(): Promise<void> {
     this.isClosed = true
+    this.runtimeSnapshot =
+      this.chatRef.current?.getRuntimeSnapshot() ?? this.runtimeSnapshot
     if (this.rebuildRafId !== null) {
       window.cancelAnimationFrame(this.rebuildRafId)
       this.rebuildRafId = null
@@ -212,6 +215,8 @@ export class ChatView extends ItemView {
   private async rebuild(): Promise<void> {
     const newHost = this.containerEl.children[1] as HTMLElement | undefined
     if (!newHost) return
+    this.runtimeSnapshot =
+      this.chatRef.current?.getRuntimeSnapshot() ?? this.runtimeSnapshot
     this.root?.unmount()
     this.root = createRoot(newHost)
     this.mountedHost = newHost

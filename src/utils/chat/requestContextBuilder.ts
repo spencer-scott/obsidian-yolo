@@ -1067,19 +1067,29 @@ export class RequestContextBuilder {
       (m): m is MentionableWebSelection => m.type === 'web-selection',
     )
     const blockPrompt = blocks
-      .map(({ file, content, startLine, pageNumber }) => {
-        const pageTag = pageNumber !== undefined ? ` (page ${pageNumber})` : ''
-        const header = `${file.path}${pageTag}`
-        if (pageNumber !== undefined) {
-          // PDF block: skip line numbering (startLine/endLine are 0)
-          return `\`\`\`${header}\n${content}\n\`\`\`\n`
-        }
-        const numberedContent = this.addLineNumbersToContent({
-          content,
-          startLine,
-        })
-        return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
-      })
+      .map(
+        ({ file, content, startLine, endLine, pageNumber, contentFormat }) => {
+          const pageTag =
+            pageNumber !== undefined ? ` (page ${pageNumber})` : ''
+          const header = `${file.path}${pageTag}`
+          if (pageNumber !== undefined) {
+            // PDF block: skip line numbering (startLine/endLine are 0)
+            return `\`\`\`${header}\n${content}\n\`\`\`\n`
+          }
+          if (contentFormat === 'markdown-table') {
+            const lineTag =
+              startLine === endLine
+                ? `line ${startLine}`
+                : `lines ${startLine}-${endLine}`
+            return `${file.path} (${lineTag}, table selection)\n\n\`\`\`md\n${content}\n\`\`\`\n`
+          }
+          const numberedContent = this.addLineNumbersToContent({
+            content,
+            startLine,
+          })
+          return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
+        },
+      )
       .join('')
     const assistantQuotePrompt = this.buildAssistantQuotePrompt(assistantQuotes)
     const webSelectionPrompt = this.buildWebSelectionPrompt(webSelections)
@@ -1488,19 +1498,29 @@ ${message.annotations
       (m): m is MentionableWebSelection => m.type === 'web-selection',
     )
     const blockPrompt = blocks
-      .map(({ file, content, startLine, pageNumber }) => {
-        const pageTag = pageNumber !== undefined ? ` (page ${pageNumber})` : ''
-        const header = `${file.path}${pageTag}`
-        if (pageNumber !== undefined) {
-          // PDF block: skip line numbering (startLine/endLine are 0)
-          return `\`\`\`${header}\n${content}\n\`\`\`\n`
-        }
-        const numberedContent = this.addLineNumbersToContent({
-          content,
-          startLine,
-        })
-        return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
-      })
+      .map(
+        ({ file, content, startLine, endLine, pageNumber, contentFormat }) => {
+          const pageTag =
+            pageNumber !== undefined ? ` (page ${pageNumber})` : ''
+          const header = `${file.path}${pageTag}`
+          if (pageNumber !== undefined) {
+            // PDF block: skip line numbering (startLine/endLine are 0)
+            return `\`\`\`${header}\n${content}\n\`\`\`\n`
+          }
+          if (contentFormat === 'markdown-table') {
+            const lineTag =
+              startLine === endLine
+                ? `line ${startLine}`
+                : `lines ${startLine}-${endLine}`
+            return `${file.path} (${lineTag}, table selection)\n\n\`\`\`md\n${content}\n\`\`\`\n`
+          }
+          const numberedContent = this.addLineNumbersToContent({
+            content,
+            startLine,
+          })
+          return `\`\`\`${header}\n${numberedContent}\n\`\`\`\n`
+        },
+      )
       .join('')
     const assistantQuotePrompt = this.buildAssistantQuotePrompt(assistantQuotes)
     const webSelectionPrompt = this.buildWebSelectionPrompt(webSelections)
@@ -2083,7 +2103,6 @@ ${customInstruction}
 - You have access to tools that can help you perform actions. Use them when appropriate to provide better assistance.
 - When using tools, focus on providing clear results to the user. Only briefly mention tool usage if it helps understanding.
 - Prefer using content already provided in the current message. Only call file tools when the current message is insufficient, you need another file, or you need to verify the latest contents. Avoid repeatedly reading the same window.
-- If available skills are listed, use yolo_local__fs_read on the listed path to load the full skill only when it is relevant to the current task.
 - If the current user message already includes <user_selected_skills>, treat them as user-selected context and avoid reloading the same skill again unless you need to verify something.`
       if (hasOnDemandTools) {
         section += `

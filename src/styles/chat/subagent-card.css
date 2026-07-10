@@ -345,7 +345,7 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   margin: 0;
 }
 
-/* ── 紧凑审批列表（沿用 SubagentCard 的行式视觉） ── */
+/* ── Compact approval list (reuses SubagentCard's row visuals) ── */
 
 .yolo-subagent-approval {
   display: flex;

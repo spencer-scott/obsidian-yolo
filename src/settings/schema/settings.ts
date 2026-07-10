@@ -111,7 +111,7 @@ export function normalizeYoloSettingsReferences(
   return normalizeSubagentModelOptions(normalized)
 }
 
-/** 只执行设置迁移链，不做 schema 解析、默认值填充或引用规范化。 */
+/** Runs only the settings migration chain — no schema parsing, default filling, or reference normalization. */
 export function migrateYoloSettingsData(
   data: Record<string, unknown>,
 ): Record<string, unknown> {

@@ -1,3 +1,4 @@
+import { FILE_EDIT_GROUP_TOOL_NAME } from '../../core/agent/builtinToolUiMeta'
 import type { AgentRuntimeLoopConfig } from '../../core/agent/types'
 import { getLocalFileToolServerName } from '../../core/mcp/localFileTools'
 import { getToolName } from '../../core/mcp/tool-name-utils'
@@ -18,6 +19,7 @@ export const DEFAULT_AGENT_MAX_AUTO_ITERATIONS = 100
 
 export const CHAT_BLOCKED_TOOL_NAMES: readonly string[] = [
   getToolName(getLocalFileToolServerName(), 'fs_file_ops'),
+  getToolName(getLocalFileToolServerName(), FILE_EDIT_GROUP_TOOL_NAME),
   getToolName(getLocalFileToolServerName(), 'fs_edit'),
   getToolName(getLocalFileToolServerName(), 'fs_write'),
   getToolName(getLocalFileToolServerName(), 'fs_delete'),

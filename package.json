@@ -1,10 +1,11 @@
 {
   "name": "obsidian-yolo",
-  "version": "1.5.12.11",
+  "version": "1.5.13",
   "description": "AI chat with note context, smart writing assistance, and one-click edits for your vault.",
   "main": "main.js",
   "scripts": {
     "dev": "concurrently -n app,styles -c blue,magenta \"npm:dev:app\" \"npm:styles:watch\"",
+    "ob": "osascript -e 'quit app \"Obsidian\"' >/dev/null 2>&1 || true && sleep 1 && open -a Obsidian --args --remote-debugging-port=9222 && npm run dev",
     "dev:app": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && npm run styles:build && node esbuild.config.mjs production",
     "styles:build": "postcss src/styles/index.css -o styles.css",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/cross-spawn": "^6.0.6",
+    "@types/d3-force": "^3.0.10",
     "@types/jest": "^29.5.13",
     "@types/js-yaml": "^4.0.9",
     "@types/lodash.debounce": "^4.0.9",
@@ -92,6 +94,7 @@
     "ajv": "^8.17.1",
     "clsx": "^2.1.1",
     "cross-spawn": "^7.0.6",
+    "d3-force": "^3.0.0",
     "dayjs": "^1.11.13",
     "drizzle-orm": "^0.39.0",
     "exponential-backoff": "^3.1.1",

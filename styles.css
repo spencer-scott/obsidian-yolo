@@ -1,4 +1,4 @@
-/* @yolo-version: 1.5.12.11 */
+/* @yolo-version: 1.5.13 */
 
 /* Settings */
 
@@ -125,6 +125,12 @@
   font-size: var(--font-ui-small);
   font-weight: var(--font-normal);
   line-height: 1;
+}
+
+.yolo-settings-loading {
+  padding: var(--size-4-6) var(--size-4-4);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
 }
 
 /* Settings: Embedding DB Manage */
@@ -8351,15 +8357,25 @@ button.yolo-agent-chip--more:hover {
    AssistantSelector, ViewToggle. */
 
 .yolo-popover-surface--default {
+  --yolo-popover-border: color-mix(
+    in srgb,
+    var(--background-modifier-border) 75%,
+    transparent
+  );
+  --yolo-popover-ring: color-mix(
+    in srgb,
+    var(--background-modifier-border) 35%,
+    transparent
+  );
+
   z-index: 1000;
   background: var(--background-primary);
-  border: 1px solid
-    color-mix(in srgb, var(--background-modifier-border) 75%, transparent);
+  border: 1px solid;
+  border-color: var(--yolo-popover-border);
   border-radius: var(--radius-m);
   box-shadow:
     0 6px 18px rgba(0, 0, 0, 0.12),
-    0 0 0 1px
-      color-mix(in srgb, var(--background-modifier-border) 35%, transparent);
+    0 0 0 1px var(--yolo-popover-ring);
   animation: yolo-popover-fade-in 130ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
@@ -8367,14 +8383,24 @@ button.yolo-agent-chip--more:hover {
    Used by SmartSpace panel, QuickAsk panel, mention/slash menus. */
 
 .yolo-popover-surface--smart-space {
+  --yolo-popover-border: color-mix(
+    in srgb,
+    var(--background-modifier-border) 65%,
+    transparent
+  );
+  --yolo-popover-ring: color-mix(
+    in srgb,
+    var(--background-modifier-border) 20%,
+    transparent
+  );
+
   z-index: 10000;
   background: var(--background-primary);
-  border: 1px solid
-    color-mix(in srgb, var(--background-modifier-border) 65%, transparent);
+  border: 1px solid;
+  border-color: var(--yolo-popover-border);
   border-radius: 12px;
   box-shadow:
-    0 0 0 3px
-      color-mix(in srgb, var(--background-modifier-border) 20%, transparent),
+    0 0 0 3px var(--yolo-popover-ring),
     0 12px 32px -8px rgba(0, 0, 0, 0.2),
     0 4px 12px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(16px);
@@ -10096,8 +10122,6 @@ body.is-mobile .yolo-chat-container--mobile-keyboard-managed {
     color-mix(in srgb, var(--background-secondary) 90%, transparent) 0%,
     color-mix(in srgb, var(--background-primary-alt) 88%, transparent) 100%
   );
-  box-shadow: 0 14px 34px
-    color-mix(in srgb, var(--background-modifier-box-shadow) 12%, transparent);
   text-align: center;
 }
 
@@ -14853,6 +14877,18 @@ button.yolo-llm-debug-modal-button:focus-visible {
   overflow-x: auto;
 }
 
+.yolo-chat-messages {
+  --yolo-chat-response-font-family: var(--font-interface);
+}
+
+.yolo-chat-messages
+  .yolo-chat-messages-assistant
+  .yolo-markdown-rendered.markdown-rendered:not(
+    .yolo-assistant-message-metadata-content .yolo-markdown-rendered
+  ) {
+  font-family: var(--yolo-chat-response-font-family);
+}
+
 /**
  * ChatUserInput
  */
@@ -15888,6 +15924,13 @@ button.yolo-chat-list-dropdown-archive-toggle:focus-visible
     width: var(--icon-xs);
     stroke-width: var(--icon-stroke);
   }
+
+body.is-mobile .yolo-chat-list-dropdown-item-actions:empty {
+  width: 86px;
+  min-height: 26px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
 
 .yolo-chat-list-inline-actions {
   display: grid;
@@ -17339,6 +17382,78 @@ button.yolo-chat-input-model-select .yolo-chat-input-model-select__icon {
   }
 }
 
+.yolo-chat-list-dropdown-item {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+.yolo-chat-list-ctx-menu {
+  position: absolute;
+  z-index: 210;
+  width: 176px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 4px;
+  box-shadow: var(--shadow-s);
+  opacity: 0;
+  transform: scale(0.9);
+  transform-origin: top center;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.yolo-chat-list-ctx-menu.is-open {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.yolo-chat-list-ctx-menu button {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-normal);
+  padding: 7px 9px;
+  border-radius: var(--radius-s);
+  text-align: left;
+}
+
+.yolo-chat-list-ctx-menu button svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.yolo-chat-list-ctx-menu button:active {
+  background: var(--background-modifier-hover);
+}
+
+.yolo-chat-list-ctx-menu button.danger {
+  color: var(--color-red);
+}
+
+.yolo-chat-list-ctx-menu hr {
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 3px 2px;
+}
+
 /* External Agent tool card: terminal style
  * Layout: status bar -> Progress (always expanded + auto-scroll to bottom) -> Output -> metadata chips
  * Shared by terminal_command and live task cards.
@@ -17935,7 +18050,7 @@ button.yolo-subagent-card__abort-btn:focus-visible {
   margin: 0;
 }
 
-/* ── 紧凑审批列表（沿用 SubagentCard 的行式视觉） ── */
+/* ── Compact approval list (reuses SubagentCard's row visuals) ── */
 
 .yolo-subagent-approval {
   display: flex;
@@ -20414,8 +20529,16 @@ button.yolo-todo-panel__icon-button svg {
   max-height: min(500px, 70vh);
 }
 
-.yolo-quick-ask-panel.has-messages .yolo-quick-ask-input-row {
-  order: 2;
+/* Composer keeps input + toolbar glued together; chat sits above when present. */
+
+.yolo-quick-ask-composer {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  background: color-mix(in srgb, var(--background-primary) 96%, transparent);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 
 /* Input Row */
@@ -20424,13 +20547,19 @@ button.yolo-todo-panel__icon-button svg {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* Right 32px reserves space for the absolute close button in the empty
+     (top-input) layout. Dropped under .has-messages where input sits at the
+     bottom and no longer collides with the header chrome. */
   padding: 2px 32px 0 6px;
-  margin-top: 4px;
+  margin-top: 0;
   background: transparent;
   border-bottom: none;
   position: relative;
   min-height: 0;
-  order: 0;
+}
+
+.yolo-quick-ask-panel.has-messages .yolo-quick-ask-input-row {
+  padding-right: 6px;
 }
 
 .yolo-quick-ask-assistant-trigger {
@@ -20796,6 +20925,12 @@ button.yolo-todo-panel__icon-button svg {
   min-height: 34px;
 }
 
+.yolo-quick-ask-input.is-disabled .yolo-message-input-core,
+.yolo-quick-ask-input .yolo-message-input-core.is-disabled {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
 .yolo-quick-ask-content-editable {
   width: 100%;
   max-width: 100%;
@@ -20878,13 +21013,23 @@ button.yolo-todo-panel__icon-button svg {
   }
 }
 
-.yolo-quick-ask-close-button {
+.yolo-quick-ask-header-actions {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.yolo-quick-ask-header-button {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
-  margin-top: 0;
+  margin: 0;
   padding: 0;
   background: transparent !important;
   border: none !important;
@@ -20897,13 +21042,9 @@ button.yolo-todo-panel__icon-button svg {
   appearance: none;
   -webkit-appearance: none;
   outline: none !important;
-  position: absolute;
-  top: 7px;
-  right: 6px;
-  z-index: 3;
 }
 
-.yolo-quick-ask-close-button:hover {
+.yolo-quick-ask-header-button:hover {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -20916,12 +21057,17 @@ button.yolo-todo-panel__icon-button svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Stable gap from the input line — independent of chat length / panel height. */
   padding: 0px 8px 6px;
   border-top: none;
-  background: color-mix(in srgb, var(--background-primary) 96%, transparent);
+  background: transparent;
   border-bottom-left-radius: inherit;
   border-bottom-right-radius: inherit;
-  order: 3;
+}
+
+.yolo-quick-ask-panel.is-resized-empty .yolo-quick-ask-composer {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .yolo-quick-ask-panel.is-resized-empty .yolo-quick-ask-input-row {
@@ -20960,96 +21106,6 @@ button.yolo-todo-panel__icon-button svg {
   flex-shrink: 0;
 }
 
-/* Toolbar action buttons */
-
-.yolo-quick-ask-toolbar-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: color-mix(in srgb, var(--text-normal) 82%, transparent);
-  transition: all 0.15s ease;
-  appearance: none;
-  -webkit-appearance: none;
-  outline: none;
-}
-
-.yolo-quick-ask-toolbar-button:hover {
-  background: transparent;
-  color: var(--text-normal);
-}
-
-/* Divider between action buttons and send */
-
-.yolo-quick-ask-toolbar-divider {
-  width: 1px;
-  height: 12px;
-  margin: 0 2px;
-  background: color-mix(
-    in srgb,
-    var(--background-modifier-border) 75%,
-    transparent
-  );
-}
-
-/* Send button */
-
-.yolo-quick-ask-send-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: color-mix(in srgb, var(--text-normal) 82%, transparent);
-  transition: all 0.15s ease;
-  appearance: none;
-  -webkit-appearance: none;
-  outline: none;
-}
-
-.yolo-quick-ask-send-button:hover:not(:disabled) {
-  background: transparent;
-  color: var(--text-on-accent);
-}
-
-.yolo-quick-ask-send-button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.yolo-quick-ask-send-button.stop {
-  background: color-mix(
-    in srgb,
-    var(--text-error) 24%,
-    var(--background-secondary) 76%
-  );
-  color: var(--text-on-accent);
-  border-color: color-mix(
-    in srgb,
-    var(--text-error) 30%,
-    var(--background-modifier-border) 70%
-  );
-}
-
-.yolo-quick-ask-send-button.stop:hover {
-  background: color-mix(
-    in srgb,
-    var(--text-error) 58%,
-    var(--background-secondary)
-  );
-}
-
 /* Chat Area - only shown when there are messages */
 
 .yolo-quick-ask-chat-shell {
@@ -21061,7 +21117,6 @@ button.yolo-todo-panel__icon-button svg {
   overflow: hidden;
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
-  order: 1;
 }
 
 .yolo-quick-ask-chat-area {
@@ -21075,6 +21130,38 @@ button.yolo-todo-panel__icon-button svg {
   gap: 10px;
   user-select: text;
   pointer-events: auto;
+  /* Same thin auto-hide overlay scrollbar as .yolo-model-select-list.
+     Do NOT transition scrollbar-color — Chromium can't interpolate it. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.yolo-quick-ask-chat-area:hover,
+.yolo-quick-ask-chat-area:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 35%, transparent)
+    transparent;
+}
+
+.yolo-quick-ask-chat-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.yolo-quick-ask-chat-area::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+.yolo-quick-ask-chat-area::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.yolo-quick-ask-chat-area:hover::-webkit-scrollbar-thumb,
+.yolo-quick-ask-chat-area:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 50%, transparent);
+  background-clip: padding-box;
 }
 
 .yolo-quick-ask-chat-area.yolo-quick-ask-chat-area--hide-scrollbar {
