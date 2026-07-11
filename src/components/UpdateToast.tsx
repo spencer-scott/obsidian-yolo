@@ -88,6 +88,7 @@ function UpdateToast() {
   const separator = lang === 'zh' ? '：' : ': '
 
   const closeLabel = t('update.dismiss', 'Dismiss')
+  const chineseLabel = t('update.languageChinese', '中文') // i18n-keep: language-name label
 
   const langToggle = hasBilingual ? (
     <div
@@ -100,7 +101,7 @@ function UpdateToast() {
         className={`yolo-update-toast-lang-option${lang === 'zh' ? ' is-active' : ''}`}
         onClick={() => setLang('zh')}
       >
-        {t('update.languageChinese', '中文')}
+        {chineseLabel}
       </button>
       <button
         type="button"

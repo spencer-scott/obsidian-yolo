@@ -2254,7 +2254,7 @@ export const en: TranslationKeys = {
     goUpdate: 'Update',
     dismiss: 'Dismiss',
     languageEnglish: 'EN',
-    languageChinese: '中文',
+    languageChinese: '中文', // i18n-keep: language-name label, shown verbatim
     viewHistory: 'View update history',
     skipVersion: "Don't remind me for this version",
     historyTitle: 'Release history',

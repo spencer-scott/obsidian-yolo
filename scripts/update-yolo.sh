@@ -82,37 +82,44 @@ merge_upstream() {
   log "Merge successful (no conflicts)."
 }
 
-scan_chinese() {
+# Emit every source line containing Chinese that is NOT allowlisted.
+# Lines allowed to keep Chinese are excluded here:
+#   - src/i18n/locales/zh.ts  the Chinese locale bundle (entirely intentional)
+#   - *.test.ts / *.test.tsx  CJK fixtures; `npm test` guards their correctness
+#   - any line tagged `i18n-keep`  intentional Chinese in otherwise-English
+#                                  source (CJK-detection regexes, the 中文
+#                                  language label, legacy persisted values)
+# To intentionally keep a Chinese line, add a trailing `// i18n-keep: <reason>`
+# comment (or `/* i18n-keep */` inside JSX braces / CSS).
+chinese_hits() {
   cd "$REPO_DIR"
-  local count
-  count=$(grep -rn '[一-鿿㐀-䶿]' src/ --include='*.ts' --include='*.tsx' --include='*.css' \
+  grep -rn '[一-鿿㐀-䶿]' src/ --include='*.ts' --include='*.tsx' --include='*.css' \
     | grep -v 'i18n/locales/zh.ts' \
-    | grep -v 'node_modules' \
-    | grep -v 'textEditEngine.test.ts' \
-    | grep -v 'diff.test.ts' \
-    | grep -v 'inject-annotation-markers.test.ts' \
-    | grep -v 'ProviderPickerModal.tsx' \
-    | grep -v 'setting.types.ts' \
-    | wc -l | tr -d ' ')
+    | grep -vE '\.test\.tsx?:' \
+    | grep -v 'i18n-keep' \
+    || true
+}
+
+scan_chinese() {
+  local hits count
+  hits=$(chinese_hits)
+  if [ -z "$hits" ]; then
+    count=0
+  else
+    count=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+  fi
 
   if [ "$count" -gt 0 ]; then
-    warn "$count lines of new Chinese text found!"
+    warn "$count line(s) of untranslated Chinese found!"
     echo ""
     warn "Run 'claude' in $REPO_DIR to translate."
     warn "Tell Claude: 'Translate all new Chinese to English, then build and deploy'"
+    warn "(If a line is intentional — a CJK regex, a language label — tag it 'i18n-keep'.)"
     echo ""
-    grep -rn '[一-鿿㐀-䶿]' src/ --include='*.ts' --include='*.tsx' --include='*.css' \
-      | grep -v 'i18n/locales/zh.ts' \
-      | grep -v 'node_modules' \
-      | grep -v 'textEditEngine.test.ts' \
-      | grep -v 'diff.test.ts' \
-      | grep -v 'inject-annotation-markers.test.ts' \
-      | grep -v 'ProviderPickerModal.tsx' \
-      | grep -v 'setting.types.ts' \
-      | sed 's/:.*$//' | sort | uniq -c | sort -rn | head -20
+    printf '%s\n' "$hits" | sed 's/:.*$//' | sort | uniq -c | sort -rn | head -20
     return 1
   else
-    log "No new Chinese text detected."
+    log "No untranslated Chinese detected."
     return 0
   fi
 }

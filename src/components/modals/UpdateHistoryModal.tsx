@@ -167,6 +167,7 @@ function UpdateHistoryModalComponent({
     [entries],
   )
   const separator = lang === 'zh' ? '：' : ': '
+  const chineseLabel = t('update.languageChinese', '中文') // i18n-keep: language-name label
   const showPagination = page > 0 || hasNext
   const pageLabel = t('update.historyPage', 'Page {{current}}').replace(
     '{{current}}',
@@ -184,7 +185,7 @@ function UpdateHistoryModalComponent({
         className={`yolo-update-toast-lang-option${lang === 'zh' ? ' is-active' : ''}`}
         onClick={() => setLang('zh')}
       >
-        {t('update.languageChinese', '中文')}
+        {chineseLabel}
       </button>
       <button
         type="button"

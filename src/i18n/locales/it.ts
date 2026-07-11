@@ -2050,7 +2050,7 @@ export const it: TranslationKeys = {
     goUpdate: 'Aggiorna',
     dismiss: 'Chiudi',
     languageEnglish: 'EN',
-    languageChinese: '中文',
+    languageChinese: '中文', // i18n-keep: language-name label, shown verbatim
     viewHistory: 'Visualizza cronologia aggiornamenti',
     skipVersion: 'Non ricordarmelo per questa versione',
     historyTitle: 'Cronologia aggiornamenti',

@@ -302,7 +302,7 @@ export function splitReleaseNotesByLanguage(
 
   for (const segment of segments) {
     const nonWhitespace = segment.replace(/\s/g, '').length
-    const cjkCount = (segment.match(/[一-鿿]/g) ?? []).length
+    const cjkCount = (segment.match(/[一-鿿]/g) ?? []).length // i18n-keep: CJK-range detection
     const cjkRatio = nonWhitespace === 0 ? 0 : cjkCount / nonWhitespace
     if (cjkRatio >= 0.2) {
       zhParts.push(segment)

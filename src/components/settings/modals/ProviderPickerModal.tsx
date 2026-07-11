@@ -280,7 +280,7 @@ function TileIcon({ catalog }: { catalog: ProviderCatalogEntry }) {
       </div>
     )
   }
-  const isCJK = /[一-龥]/.test(catalog.monogram)
+  const isCJK = /[一-龥]/.test(catalog.monogram) // i18n-keep: CJK-range detection
   return (
     <div
       className={`yolo-provider-picker__tile-icon yolo-provider-picker__tile-icon--mono${

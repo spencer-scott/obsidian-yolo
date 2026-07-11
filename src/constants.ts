@@ -15,8 +15,8 @@ export const DEFAULT_UNTITLED_CONVERSATION_TITLE = ''
 // The Chinese values are upstream legacy written before the i18n fix (#352); the
 // English values are legacy defaults this fork wrote in prior releases.
 export const LEGACY_UNTITLED_CONVERSATION_TITLES = [
-  '新消息',
-  '新对话',
+  '新消息', // i18n-keep: legacy persisted title, matched to overwrite old data
+  '新对话', // i18n-keep: legacy persisted title, matched to overwrite old data
   'New Message',
   'New Conversation',
 ] as const
