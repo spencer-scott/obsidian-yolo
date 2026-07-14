@@ -101,6 +101,7 @@ import {
   serializeMentionable,
 } from '../../utils/chat/mentionable'
 import { groupAssistantAndToolMessages } from '../../utils/chat/message-groups'
+import { parseTagContents } from '../../utils/chat/parse-tag-content'
 import { RequestContextBuilder } from '../../utils/chat/requestContextBuilder'
 import { buildChatTimelineItems } from '../../utils/chat/timeline'
 import {
@@ -114,7 +115,7 @@ import { resolveEffectiveMaxContextTokens } from '../../utils/llm/model-capabili
 import { readTFileContent } from '../../utils/obsidian'
 import { stampUserMessageTimeContext } from '../../utils/prompt/timeContext'
 import DotLoader from '../common/DotLoader'
-import { AgentModeWarningModal } from '../modals/AgentModeWarningModal'
+import { AcknowledgementModal } from '../modals/AcknowledgementModal'
 
 // removed Prompt Templates feature
 
@@ -155,6 +156,7 @@ import { useAutoScroll } from './useAutoScroll'
 import { useChatHistoryWindow } from './useChatHistoryWindow'
 import { useChatStreamManager } from './useChatStreamManager'
 import {
+  findAssistantGroupIdForRunAnchor,
   useChatTimelineReadModel,
   useStableChatTimelineItems,
 } from './useChatTimelineReadModel'
@@ -163,7 +165,9 @@ import ViewToggle from './ViewToggle'
 
 const WORKSPACE_WIDE_HEADER_MIN_WIDTH = 1200
 const MESSAGE_NAVIGATOR_MIN_ANCHORS = 7
-const MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH = 90
+const MESSAGE_NAVIGATOR_USER_PREVIEW_MAX_LENGTH = 90
+const MESSAGE_NAVIGATOR_ASSISTANT_PREVIEW_MAX_LENGTH = 180
+const MESSAGE_NAVIGATOR_PREVIEW_SOURCE_MAX_LENGTH = 360
 const MOBILE_KEYBOARD_MIN_INSET_PX = 80
 const MOBILE_CHAT_MIN_VIEWPORT_HEIGHT = 160
 const EMPTY_SELECTED_SKILLS: NonNullable<ChatUserInputProps['selectedSkills']> =
@@ -351,15 +355,61 @@ const getPromptContentText = (
     .join(' ')
 }
 
-const normalizeNavigatorLabel = (text: string, fallback: string): string => {
-  const normalized = text.replace(/\s+/g, ' ').trim()
+const normalizeNavigatorPreview = (
+  text: string,
+  maxLength: number,
+  fallback = '',
+): string => {
+  const normalized = text
+    .replace(/```(?:[A-Za-z0-9_-]+)?/g, ' ')
+    .replace(/!\[([^\]]*)]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)](?:\([^)]*\)|\[[^\]]*])/g, '$1')
+    .replace(/<\/?[A-Za-z][^>]*>/g, ' ')
+    .replace(/<([^>\n]+)>/g, '$1')
+    .replace(/(^|\n)\s{0,3}(?:#{1,6}\s+|>\s?|[-+*]\s+|\d+[.)]\s+)/g, '$1')
+    .replace(/[`*_~|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!normalized) {
     return fallback
   }
-  if (normalized.length <= MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH) {
+  if (normalized.length <= maxLength) {
     return normalized
   }
-  return `${normalized.slice(0, MESSAGE_NAVIGATOR_LABEL_MAX_LENGTH - 1)}…`
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+const getNavigatorAssistantText = (
+  messages: AssistantToolMessageGroup,
+): string => {
+  const parts: string[] = []
+  let remainingLength = MESSAGE_NAVIGATOR_PREVIEW_SOURCE_MAX_LENGTH
+
+  for (const message of messages) {
+    if (remainingLength <= 0) {
+      break
+    }
+    if (message.role !== 'assistant') {
+      continue
+    }
+
+    const contentParts = /<(?:think|yolo_block)\b/i.test(message.content)
+      ? parseTagContents(message.content)
+          .filter((block) => block.type !== 'think')
+          .map((block) => block.content)
+      : [message.content]
+
+    for (const contentPart of contentParts) {
+      if (remainingLength <= 0) {
+        break
+      }
+      const previewPart = contentPart.slice(0, remainingLength)
+      parts.push(previewPart)
+      remainingLength -= previewPart.length
+    }
+  }
+
+  return parts.join(' ')
 }
 
 const isDelegateSubagentToolName = (name: string): boolean => {
@@ -1516,28 +1566,122 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationId: currentConversationId,
     groupedChatMessages,
   })
+  const messageNavigatorUserPreviewCacheRef = useRef(
+    new WeakMap<ChatUserMessage, { emptyLabel: string; preview: string }>(),
+  )
+  const messageNavigatorAssistantPreviewCacheRef = useRef(
+    new WeakMap<
+      AssistantToolMessageGroup,
+      { activeBranchKey: string | null; preview: string }
+    >(),
+  )
+  const messageNavigatorAnchorCacheRef = useRef<
+    Map<string, MessageNavigatorAnchor>
+  >(new Map())
   const messageNavigatorAnchors = useMemo<MessageNavigatorAnchor[]>(() => {
     const emptyLabel = t('chat.messageNavigator.emptyMessage', 'Empty message')
+    const assistantTextByUserMessageId = new Map<string, string[]>()
+    let precedingUserMessageId: string | null = null
+
+    groupedChatMessages.forEach((messageOrGroup) => {
+      if (!Array.isArray(messageOrGroup)) {
+        precedingUserMessageId = messageOrGroup.id
+        return
+      }
+
+      const sourceUserMessageId =
+        getSourceUserMessageIdForGroup(messageOrGroup) ?? precedingUserMessageId
+      if (!sourceUserMessageId) {
+        return
+      }
+
+      const activeBranchKey =
+        activeBranchByUserMessageId.get(sourceUserMessageId) ?? null
+      const cachedPreview =
+        messageNavigatorAssistantPreviewCacheRef.current.get(messageOrGroup)
+      const assistantPreview =
+        cachedPreview?.activeBranchKey === activeBranchKey
+          ? cachedPreview.preview
+          : normalizeNavigatorPreview(
+              getNavigatorAssistantText(
+                getDisplayedAssistantToolMessages(
+                  messageOrGroup,
+                  activeBranchKey,
+                ),
+              ),
+              MESSAGE_NAVIGATOR_ASSISTANT_PREVIEW_MAX_LENGTH,
+            )
+      if (cachedPreview?.activeBranchKey !== activeBranchKey) {
+        messageNavigatorAssistantPreviewCacheRef.current.set(messageOrGroup, {
+          activeBranchKey,
+          preview: assistantPreview,
+        })
+      }
+      if (!assistantPreview) {
+        return
+      }
+
+      const existingText = assistantTextByUserMessageId.get(sourceUserMessageId)
+      if (existingText) {
+        existingText.push(assistantPreview)
+      } else {
+        assistantTextByUserMessageId.set(sourceUserMessageId, [
+          assistantPreview,
+        ])
+      }
+    })
+
     let userMessageIndex = 0
-    return groupedChatMessages.flatMap((messageOrGroup) => {
+    const nextAnchorCache = new Map<string, MessageNavigatorAnchor>()
+    const anchors = groupedChatMessages.flatMap((messageOrGroup) => {
       if (Array.isArray(messageOrGroup)) {
         return []
       }
 
       userMessageIndex += 1
-      const editorText = messageOrGroup.content
-        ? editorStateToPlainText(messageOrGroup.content)
-        : ''
-      const promptText = getPromptContentText(messageOrGroup.promptContent)
-      return [
-        {
-          id: messageOrGroup.id,
-          index: userMessageIndex,
-          label: normalizeNavigatorLabel(editorText || promptText, emptyLabel),
-        },
-      ]
+      const cachedUserPreview =
+        messageNavigatorUserPreviewCacheRef.current.get(messageOrGroup)
+      const userPreview =
+        cachedUserPreview?.emptyLabel === emptyLabel
+          ? cachedUserPreview.preview
+          : normalizeNavigatorPreview(
+              (messageOrGroup.content
+                ? editorStateToPlainText(messageOrGroup.content)
+                : '') || getPromptContentText(messageOrGroup.promptContent),
+              MESSAGE_NAVIGATOR_USER_PREVIEW_MAX_LENGTH,
+              emptyLabel,
+            )
+      if (cachedUserPreview?.emptyLabel !== emptyLabel) {
+        messageNavigatorUserPreviewCacheRef.current.set(messageOrGroup, {
+          emptyLabel,
+          preview: userPreview,
+        })
+      }
+
+      const assistantPreview = normalizeNavigatorPreview(
+        assistantTextByUserMessageId.get(messageOrGroup.id)?.join(' ') ?? '',
+        MESSAGE_NAVIGATOR_ASSISTANT_PREVIEW_MAX_LENGTH,
+      )
+      const previousAnchor = messageNavigatorAnchorCacheRef.current.get(
+        messageOrGroup.id,
+      )
+      const anchor =
+        previousAnchor?.index === userMessageIndex &&
+        previousAnchor.userPreview === userPreview &&
+        previousAnchor.assistantPreview === assistantPreview
+          ? previousAnchor
+          : {
+              id: messageOrGroup.id,
+              index: userMessageIndex,
+              userPreview,
+              assistantPreview,
+            }
+      nextAnchorCache.set(anchor.id, anchor)
+      return [anchor]
     })
-  }, [groupedChatMessages, t])
+    messageNavigatorAnchorCacheRef.current = nextAnchorCache
+    return anchors
+  }, [activeBranchByUserMessageId, groupedChatMessages, t])
 
   const displayedChatMessages = useMemo(() => {
     return groupedChatMessages.flatMap((messageOrGroup): ChatMessage[] => {
@@ -1655,7 +1799,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     ) {
       return t(
         'chat.compaction.dividerDescriptionWithSavings',
-        '{messageCount} messages compacted, saving approximately {tokens} tokens',
+        '{messageCount} messages compacted, saved about {tokens} tokens',
       )
         .replace('{messageCount}', String(compactedMessageCount))
         .replace('{tokens}', formatTokenCount(estimatedTokensSaved))
@@ -1663,7 +1807,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     if (typeof latestCompactionState?.estimatedNextContextTokens === 'number') {
       return t(
         'chat.compaction.dividerDescriptionWithEstimate',
-        'The conversation above has been compacted into a summary. Next round total context is approximately {count} tokens',
+        'Earlier conversation has been compressed into a summary. The next-round total context is estimated at about {count} tokens',
       ).replace(
         '{count}',
         formatTokenCount(latestCompactionState.estimatedNextContextTokens),
@@ -1671,12 +1815,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     }
     return t(
       'chat.compaction.dividerDescription',
-      'The conversation above has been compacted into a summary. Subsequent replies continue from the summary',
+      'Earlier conversation has been compressed into a summary. Replies below continue from that summary',
     )
   })()
   const compactionPendingDescription = t(
     'chat.compaction.pendingStatus',
-    'Organizing context, will continue with the new context shortly.',
+    'Organizing context now. The conversation will continue in a fresh context shortly.',
   )
 
   const displayMentionablesForInput = inputMessage.mentionables
@@ -1700,9 +1844,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     useState<HTMLDivElement | null>(null)
   const [inputOverlayHeight, setInputOverlayHeight] = useState(0)
   const [timelineIsVirtualized, setTimelineIsVirtualized] = useState(false)
-  const [activeNavigatorMessageId, setActiveNavigatorMessageId] = useState<
-    string | null
-  >(null)
+  const [navigatorViewport, setNavigatorViewport] = useState<{
+    activeMessageId: string | null
+    visibleMessageIds: string[]
+  }>({ activeMessageId: null, visibleMessageIds: [] })
   const latexSelectionSyncFrameRef = useRef<number | null>(null)
   const chatSurfacePreset = getChatSurfacePreset('chat')
   const hasStreamingMessages = useMemo(
@@ -1737,7 +1882,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   }, [forceScrollToBottom, resetToLatest])
   const handleNavigateToUserMessage = useCallback(
     (messageId: string) => {
-      setActiveNavigatorMessageId(messageId)
+      setNavigatorViewport((currentViewport) => ({
+        ...currentViewport,
+        activeMessageId: messageId,
+      }))
       stopAutoFollow()
       jumpToUserMessage(messageId)
     },
@@ -2079,14 +2227,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.queueMessage.abortedRestoredMany',
-              'Restored the latest queued message to the input ({{count}} total cancelled)',
+              'Restored the latest queued message to the input box ({{count}} dropped)',
             ).replace('{{count}}', String(messages.length)),
           )
         } else {
           new Notice(
             t(
               'chat.queueMessage.abortedRestoredOne',
-              'Queued message restored to input',
+              'Queued message restored to the input box',
             ),
           )
         }
@@ -2463,7 +2611,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.waitingApproval',
-          'Please handle the pending tool call approvals before compacting context.',
+          'Resolve the current pending tool approval before compacting context.',
         ),
       )
       return
@@ -2473,7 +2621,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.runActive',
-          'Please wait for the current response to complete before compacting context.',
+          'Wait for the current reply to finish before compacting context.',
         ),
       )
       return
@@ -2543,7 +2691,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.success',
-          'Earlier context has been compacted. Subsequent replies will continue from the summary.',
+          'Earlier context has been compressed. Future replies will continue from the summary.',
         ),
       )
     } catch (error) {
@@ -2551,7 +2699,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       new Notice(
         t(
           'chat.compaction.failed',
-          'Context compaction failed. Please try again later.',
+          'Context compaction failed. Please try again shortly.',
         ),
       )
       console.error('Failed to compact conversation context', error)
@@ -3858,7 +4006,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         if (materialized.errors.length > 0) {
           const partialMessage = t(
             'quickAsk.editPartialSuccess',
-            'Applied {appliedCount}/{totalEdits} edits. Check the console for details',
+            'Applied {appliedCount} of {totalEdits} edits. Check console for details.',
           )
             .replace('{appliedCount}', String(materialized.appliedCount))
             .replace('{totalEdits}', String(materialized.totalOperations))
@@ -4081,30 +4229,27 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.undoSuccess',
-              'Undone this round of assistant file changes.',
+              "Undid this assistant turn's file changes.",
             ),
           )
         } else if (appliedCount > 0) {
           new Notice(
             t(
               'chat.editSummary.undoPartial',
-              'Some files have been reverted. Others could not be reverted due to subsequent changes.',
+              'Some files were reverted, while others were skipped because they changed afterward.',
             ),
           )
         } else {
           new Notice(
             t(
               'chat.editSummary.undoUnavailable',
-              'File content has changed. Cannot safely undo this round of modifications.',
+              'File contents have changed, so this turn cannot be safely undone.',
             ),
           )
         }
       } catch (error) {
         new Notice(
-          t(
-            'chat.editSummary.undoFailed',
-            'Undo failed. Please try again later.',
-          ),
+          t('chat.editSummary.undoFailed', 'Undo failed. Please try again.'),
         )
         console.error('Failed to undo assistant edit summary', error)
       } finally {
@@ -4136,7 +4281,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.fileMissing',
-              'File does not exist or has been moved.',
+              'The file no longer exists or has been moved.',
             ),
           )
           return
@@ -4168,7 +4313,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.fileDeleted',
-              'File has been deleted. You can use undo to restore it.',
+              'This file was deleted. Use undo to restore it.',
             ),
           )
           return
@@ -4178,7 +4323,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.fileMissing',
-              'File does not exist or has been moved.',
+              'The file no longer exists or has been moved.',
             ),
           )
           return
@@ -4191,7 +4336,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             t(
               'chat.editSummary.undoUnavailable',
-              'File content has changed. Cannot safely undo this round of modifications.',
+              'File contents have changed, so this turn cannot be safely undone.',
             ),
           )
           return
@@ -4211,7 +4356,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         new Notice(
           t(
             'chat.editSummary.fileMissing',
-            'File does not exist or has been moved.',
+            'The file no longer exists or has been moved.',
           ),
         )
         return
@@ -5174,16 +5319,18 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const handleYoloChange = useCallback(
     (enabled: boolean) => {
       if (enabled && !settings.chatOptions.fullAccessWarningConfirmed) {
-        new AgentModeWarningModal(app, {
+        new AcknowledgementModal(app, {
           title: t(
             'chatMode.fullAccessWarning.title',
             'Please confirm before enabling YOLO Mode',
           ),
-          description: t(
-            'chatMode.fullAccessWarning.description',
-            'YOLO Mode auto-approves all tool calls, including file edits and terminal commands. Review the risks before continuing:',
-          ),
-          risks: [
+          messages: [
+            t(
+              'chatMode.fullAccessWarning.description',
+              'YOLO Mode auto-approves all tool calls, including file edits and terminal commands. Review the risks before continuing:',
+            ),
+          ],
+          items: [
             t(
               'chatMode.fullAccessWarning.permission',
               'Tools run without per-call approval. Dangerous command prefixes are still blocked.',
@@ -5206,6 +5353,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             'chatMode.fullAccessWarning.confirm',
             'Continue with YOLO Mode',
           ),
+          confirmTone: 'warning',
           onConfirm: () => {
             applyYoloChange(true)
             void (async () => {
@@ -5238,73 +5386,11 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
 
   const handleChatModeChange = useCallback(
     (nextMode: ChatMode) => {
-      const resolvedMode = nextMode
+      applyChatModeChange(nextMode)
+      void persistPreferredChatMode(nextMode)
 
       if (
-        resolvedMode === 'agent' &&
-        !settings.chatOptions.agentModeWarningConfirmed
-      ) {
-        new AgentModeWarningModal(app, {
-          title: t(
-            'chatMode.warning.title',
-            'Please confirm before enabling Agent mode',
-          ),
-          description: t(
-            'chatMode.warning.description',
-            'Agent can automatically invoke tools. Please review the following risks before continuing:',
-          ),
-          risks: [
-            t(
-              'chatMode.warning.permission',
-              'Strictly control tool-call permissions and grant only what is necessary.',
-            ),
-            t(
-              'chatMode.warning.cost',
-              'Agent tasks may consume significant model resources and incur higher costs.',
-            ),
-            t(
-              'chatMode.warning.backup',
-              'Back up important content in advance to avoid unintended changes.',
-            ),
-          ],
-          checkboxLabel: t(
-            'chatMode.warning.checkbox',
-            'I understand the risks above and accept responsibility for proceeding',
-          ),
-          cancelText: t('chatMode.warning.cancel', 'Cancel'),
-          confirmText: t(
-            'chatMode.warning.confirm',
-            'Continue and Enable Agent',
-          ),
-          onConfirm: () => {
-            applyChatModeChange('agent')
-            void persistPreferredChatMode('agent')
-            void (async () => {
-              try {
-                await setSettings({
-                  ...settings,
-                  chatOptions: {
-                    ...settings.chatOptions,
-                    agentModeWarningConfirmed: true,
-                  },
-                })
-              } catch (error: unknown) {
-                console.error(
-                  'Failed to persist agent mode warning confirmation',
-                  error,
-                )
-              }
-            })()
-          },
-        }).open()
-        return
-      }
-
-      applyChatModeChange(resolvedMode)
-      void persistPreferredChatMode(resolvedMode)
-
-      if (
-        isAgentChatMode(resolvedMode) &&
+        isAgentChatMode(nextMode) &&
         selectedAssistant?.modelId &&
         conversationModelId === settings.chatModelId
       ) {
@@ -5312,15 +5398,12 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       }
     },
     [
-      app,
       applyAssistantDefaultModel,
       applyChatModeChange,
       conversationModelId,
       selectedAssistant?.modelId,
       persistPreferredChatMode,
-      setSettings,
       settings,
-      t,
     ],
   )
 
@@ -5517,7 +5600,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         new Notice(
           state.t(
             'chat.queueMessage.blockedAwaitingInput',
-            "Please answer the model's question in the conversation before sending a new message.",
+            "Answer the agent's question in the chat before sending a new message.",
           ),
         )
         return
@@ -5527,7 +5610,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         new Notice(
           state.t(
             'chat.queueMessage.blockedApproval',
-            'Please approve or reject the pending tool call before sending a new message.',
+            'Approve or reject the pending tool call before sending a new message.',
           ),
         )
         return
@@ -5568,7 +5651,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           new Notice(
             state.t(
               'chat.queueMessage.blockedApproval',
-              'Please approve or reject the pending tool call before sending a new message.',
+              'Approve or reject the pending tool call before sending a new message.',
             ),
           )
           return
@@ -5767,15 +5850,14 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     updateHistoricalUserMessage,
   })
 
-  const lastAssistantGroupRenderKey = useMemo(() => {
-    for (let i = stableChatTimelineItems.length - 1; i >= 0; i--) {
-      const item = stableChatTimelineItems[i]
-      if (item.kind === 'assistant-group') {
-        return item.renderKey
-      }
-    }
-    return null
-  }, [stableChatTimelineItems])
+  const runSummaryAssistantGroupId = useMemo(
+    () =>
+      findAssistantGroupIdForRunAnchor({
+        groupedChatMessages,
+        anchorMessageId: currentConversationRunSummary.anchorMessageId,
+      }),
+    [currentConversationRunSummary.anchorMessageId, groupedChatMessages],
+  )
 
   // Background task results are re-attached to their corresponding tool card in the render,
   // and subagent/terminal result standalone groups get filtered out of the timeline; so the
@@ -5856,7 +5938,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
             messages={messageOrGroup}
             conversationId={currentConversationId}
             conversationRunSummary={
-              timelineItem.renderKey === lastAssistantGroupRenderKey
+              timelineItem.groupId === runSummaryAssistantGroupId
                 ? currentConversationRunSummary
                 : undefined
             }
@@ -6270,7 +6352,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       handleUserMessageSubmit,
       inputMessage.id,
       isCurrentConversationRunActive,
-      lastAssistantGroupRenderKey,
+      runSummaryAssistantGroupId,
       latestCompactionState?.triggerToolCallId,
       messageModelMap,
       messageReasoningMap,
@@ -6324,8 +6406,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         const shouldSuppressCompactionAnchorFooter =
           containsCompactionAnchor &&
           Boolean(latestCompactionState?.triggerToolCallId)
-        const isLastGroup =
-          timelineItem.renderKey === lastAssistantGroupRenderKey
+        const isRunSummaryGroup =
+          timelineItem.groupId === runSummaryAssistantGroupId
         const isEditingGroup =
           editingAssistantMessageId !== null &&
           timelineItem.messageIds.includes(editingAssistantMessageId)
@@ -6354,12 +6436,16 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           pendingCompactionAnchorMessageId ?? '',
           shouldHidePendingAssistantPlaceholders,
           undoingEditSummaryTarget ?? '',
-          isLastGroup,
-          isLastGroup ? currentConversationRunSummary.status : '',
-          isLastGroup ? currentConversationRunSummary.isRunning : '',
-          isLastGroup ? currentConversationRunSummary.isWaitingApproval : '',
-          isLastGroup ? currentConversationRunSummary.isWaitingUserInput : '',
-          isLastGroup ? currentConversationRunSummary.isAbortable : '',
+          isRunSummaryGroup,
+          isRunSummaryGroup ? currentConversationRunSummary.status : '',
+          isRunSummaryGroup ? currentConversationRunSummary.isRunning : '',
+          isRunSummaryGroup
+            ? currentConversationRunSummary.isWaitingApproval
+            : '',
+          isRunSummaryGroup
+            ? currentConversationRunSummary.isWaitingUserInput
+            : '',
+          isRunSummaryGroup ? currentConversationRunSummary.isAbortable : '',
         ].join('|')
       }
 
@@ -6420,7 +6506,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       focusedMessageId,
       foregroundAgentVisualTurnPlan,
       isCurrentConversationRunActive,
-      lastAssistantGroupRenderKey,
+      runSummaryAssistantGroupId,
       latestCompactionState?.triggerToolCallId,
       messageModelMap,
       messageReasoningMap,
@@ -6449,16 +6535,36 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     messageNavigatorAnchors.length >= MESSAGE_NAVIGATOR_MIN_ANCHORS ? (
       <MessageNavigator
         anchors={messageNavigatorAnchors}
-        activeMessageId={activeNavigatorMessageId}
+        activeMessageId={navigatorViewport.activeMessageId}
+        visibleMessageIds={navigatorViewport.visibleMessageIds}
         itemLabel={getMessageNavigatorItemLabel}
         onSelect={handleNavigateToUserMessage}
       />
     ) : undefined
+  const showEmptyState =
+    groupedChatMessages.length === 0 &&
+    !isCurrentConversationRunActive &&
+    !isLoadingConversation
+  const workspaceTitleParts = t(
+    'chat.emptyState.workspaceTitle',
+    'What would you like to do in {vaultName} today?',
+  ).split('{vaultName}')
+  const workspaceEmptyStateTitle = !isSidebarPlacement ? (
+    <>
+      {workspaceTitleParts[0]}
+      <span className="yolo-chat-empty-state-vault-name">
+        {app.vault.getName()}
+      </span>
+      {workspaceTitleParts.slice(1).join('{vaultName}')}
+    </>
+  ) : undefined
 
   return (
     <div
       ref={handleContainerRef}
-      className={containerClassName}
+      className={`${containerClassName}${
+        showEmptyState ? ' yolo-chat-container--empty-state' : ''
+      }`}
       style={containerStyle}
     >
       {header}
@@ -6470,11 +6576,10 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
         <ChatConversationPane
           chatMode={chatMode}
           yoloEnabled={yoloEnabled}
+          showEmptyState={showEmptyState}
           groupedChatMessagesLength={groupedChatMessages.length}
-          isCurrentConversationRunActive={isCurrentConversationRunActive}
           isAutoFollowEnabled={isAutoFollowEnabled}
           currentConversationId={currentConversationId}
-          isRestoringConversation={isLoadingConversation}
           chatTimelineItems={stableChatTimelineItems}
           timelineRenderVersion={chatTimelineRenderVersion}
           chatMessagesRef={chatMessagesRef}
@@ -6486,11 +6591,6 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           hasNewerMessages={hasNewerMessages}
           onLoadEarlier={loadEarlier}
           onLoadNewer={loadNewer}
-          loadEarlierLabel={t(
-            'chat.loadEarlierMessages',
-            'Loading earlier messages',
-          )}
-          loadNewerLabel={t('chat.loadNewerMessages', 'Loading newer messages')}
           onForceScrollToBottom={handleForceScrollToBottom}
           hasStreamingMessages={hasStreamingMessages}
           scrollToBottomLabel={t('chat.scrollToBottom', 'Scroll to bottom')}
@@ -6504,26 +6604,27 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
           )}
           emptyStateAgentTitle={t(
             'chat.emptyState.agentTitle',
-            'Let AI take action',
+            'Let AI execute',
           )}
           emptyStateAgentFullTitle={t(
             'chat.emptyState.agentFullTitle',
-            'Let AI run autonomously · YOLO mode',
+            'Let AI execute · YOLO Mode',
           )}
+          emptyStateWorkspaceTitle={workspaceEmptyStateTitle}
           emptyStateAskDescription={t(
             'chat.emptyState.askDescription',
-            'Ideal for questions, polishing, and rewriting - focused on expression',
+            'Great for questions, polishing, and rewriting with focus on expression.',
           )}
           emptyStateAgentDescription={t(
             'chat.emptyState.agentDescription',
-            'Enable tool chain for search, read/write, and multi-step tasks',
+            'Enable tools to handle search, read/write operations, and multi-step tasks.',
           )}
           emptyStateAgentFullDescription={t(
             'chat.emptyState.agentFullDescription',
-            'Auto-approve tool calls for search, read/write, and multi-step tasks',
+            'Auto-approve tool calls for search, read/write operations, and multi-step tasks.',
           )}
           onTimelineVirtualizationChange={setTimelineIsVirtualized}
-          onActiveUserMessageChange={setActiveNavigatorMessageId}
+          onUserMessageViewportChange={setNavigatorViewport}
           windowNavigationKey={windowNavigationKey || undefined}
           windowNavigationTargetMessageId={windowNavigationTargetMessageId}
           messageNavigatorContent={messageNavigatorContent}
@@ -6561,7 +6662,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                       <div className="yolo-chat-queued-messages__hint">
                         {t(
                           'chat.queueMessage.hint',
-                          'Waiting for Agent to finish the current step...',
+                          'Waiting for the agent to finish the current step...',
                         )}
                       </div>
                       {queuedUserMessages.map((queued) => {
@@ -6696,6 +6797,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
                   }
                   onAbort={handleMainInputAbort}
                   contextUsage={mainInputContextUsage}
+                  showQuickAccess={showEmptyState && !isSidebarPlacement}
                 />
               </div>
             </>

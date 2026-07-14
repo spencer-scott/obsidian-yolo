@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { resolveWorkspaceScopeForRuntimeInput } from '../../components/chat-view/chat-runtime-inputs'
 import { resolveChatModeRuntime } from '../../components/chat-view/chat-runtime-profiles'
 import type { YoloSettings } from '../../settings/schema/setting.types'
+import type { AssistantWorkspaceScope } from '../../types/assistant.types'
 import type {
   ChatAssistantMessage,
   ChatMessage,
@@ -21,6 +22,7 @@ import { resolveAgentApiContext } from './agent-api-context'
 import { DEFAULT_ASSISTANT_ID } from './default-assistant'
 import type {
   AgentConversationState,
+  AgentRunActivity,
   AgentRunStatus,
   AgentService,
 } from './service'
@@ -36,8 +38,22 @@ export type YoloAgentContext =
   | { type: 'text'; content: string }
 
 export type YoloAgentRunRequest = {
-  prompt: string
+  /**
+   * Single-turn prompt for a new conversation. Mutually exclusive with
+   * `messages`: if `messages` is provided, `prompt` is ignored.
+   * At least one of the two must be provided.
+   */
+  prompt?: string
+  /**
+   * Pre-seeded conversation history (including the final user message to send
+   * to the model this turn). When provided, the runtime uses these messages
+   * directly instead of building a new user message from `prompt`.
+   * Used by chained subagent calls to reuse the prefix cache.
+   */
+  messages?: ChatMessage[]
   assistantId?: string
+  /** Override the assistant model for this run. */
+  modelId?: string
   mode?: 'ask' | 'agent' | 'agent-full'
   /** Auto-approve tool calls (YOLO). Only effective in Agent mode. */
   yolo?: boolean
@@ -45,6 +61,14 @@ export type YoloAgentRunRequest = {
   tools?: {
     allowedToolNames?: string[]
   }
+  /**
+   * Overrides the assistant's workspace scope. Learning-module subagents pass
+   * this dynamically based on their reference-material scope; falls back to
+   * the assistant's scope when omitted.
+   */
+  workspaceScope?: AssistantWorkspaceScope
+  systemPromptOverride?: string
+  activity?: AgentRunActivity
   abortSignal?: AbortSignal
 }
 
@@ -80,6 +104,8 @@ export type YoloAgentEvent =
         | 'completed'
         | 'error'
         | 'awaiting_approval'
+      /** Parsed tool-call arguments (only when arguments are complete). */
+      arguments?: Record<string, unknown>
     }
   | {
       type: 'completed'
@@ -103,6 +129,7 @@ type AgentApiRunInput = {
   sourceUserMessageId: string
   loopConfig: AgentRuntimeLoopConfig
   input: AgentRuntimeRunInput
+  activity?: AgentRunActivity
 }
 
 export type YoloAgentApiServiceOptions = {
@@ -177,6 +204,7 @@ export class YoloAgentApiService implements YoloAgentApi {
         sourceUserMessageId: resolved.sourceUserMessageId,
         loopConfig: resolved.loopConfig,
         input: resolved.input,
+        activity: resolved.activity,
         agentService: this.options.getAgentService(),
       })) {
         yield event
@@ -209,12 +237,14 @@ export async function* streamResolvedAgentRunEvents({
   sourceUserMessageId,
   loopConfig,
   input,
+  activity,
   agentService,
 }: {
   conversationId: string
   sourceUserMessageId: string
   loopConfig: AgentRuntimeLoopConfig
   input: AgentRuntimeRunInput
+  activity?: AgentRunActivity
   agentService: AgentService
 }): AsyncIterable<YoloAgentEvent> {
   const queue = new AsyncEventQueue<YoloAgentEvent>()
@@ -251,6 +281,7 @@ export async function* streamResolvedAgentRunEvents({
       persistState: false,
       loopConfig,
       input,
+      activity,
     })
     .catch((error) => {
       queue.push({
@@ -296,7 +327,8 @@ export async function resolveAgentApiRunInput({
   const assistant =
     settings.assistants.find((candidate) => candidate.id === assistantId) ??
     null
-  const requestedModelId = assistant?.modelId || settings.chatModelId
+  const requestedModelId =
+    request.modelId || assistant?.modelId || settings.chatModelId
   const resolvedClient = getChatModelClient({
     settings,
     modelId: requestedModelId,
@@ -343,28 +375,46 @@ export async function resolveAgentApiRunInput({
     settings,
     context: request.context,
   })
-  const compiledPrompt =
-    await requestContextBuilder.compilePlainUserMessagePrompt({
-      prompt: buildAgentApiPrompt({
-        prompt: request.prompt,
-        context: resolvedContext.textBlocks,
+  let messages: ChatMessage[]
+  let sourceUserMessageId: string
+
+  if (request.messages && request.messages.length > 0) {
+    messages = request.messages
+    const lastUser = [...request.messages]
+      .reverse()
+      .find((message) => message.role === 'user')
+    if (!lastUser) {
+      throw new Error('request.messages must contain at least one user message')
+    }
+    sourceUserMessageId = lastUser.id
+  } else {
+    if (!request.prompt) {
+      throw new Error('Either prompt or messages must be provided')
+    }
+    const compiledPrompt =
+      await requestContextBuilder.compilePlainUserMessagePrompt({
+        prompt: buildAgentApiPrompt({
+          prompt: request.prompt,
+          context: resolvedContext.textBlocks,
+        }),
+        mentionables: resolvedContext.mentionables,
+        selectedSkills: resolvedContext.selectedSkills,
+      })
+    sourceUserMessageId = uuidv4()
+    messages = [
+      buildAgentApiUserMessage({
+        id: sourceUserMessageId,
+        promptContent: compiledPrompt.promptContent,
+        mentionables: resolvedContext.mentionables,
+        selectedSkills: resolvedContext.selectedSkills,
       }),
-      mentionables: resolvedContext.mentionables,
-      selectedSkills: resolvedContext.selectedSkills,
-    })
-  const sourceUserMessageId = uuidv4()
-  const messages = [
-    buildAgentApiUserMessage({
-      id: sourceUserMessageId,
-      promptContent: compiledPrompt.promptContent,
-      mentionables: resolvedContext.mentionables,
-      selectedSkills: resolvedContext.selectedSkills,
-    }),
-  ]
+    ]
+  }
 
   return {
     conversationId,
     sourceUserMessageId,
+    activity: request.activity,
     loopConfig: chatModeRuntime.loopConfig,
     input: {
       providerClient: resolvedClient.providerClient,
@@ -378,12 +428,15 @@ export async function resolveAgentApiRunInput({
       mcpManager,
       abortSignal,
       allowedToolNames,
+      systemPromptOverride: request.systemPromptOverride,
       enableToolDisclosure: settings.mcp.enableToolDisclosure,
       toolPreferences: chatModeRuntime.toolPreferences,
       toolServerPreferences: chatModeRuntime.toolServerPreferences,
-      runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
+      toolCapabilityMode: chatModeRuntime.toolCapabilityMode,
       bypassToolApproval: chatModeRuntime.bypassToolApproval,
-      workspaceScope: resolveWorkspaceScopeForRuntimeInput(assistant),
+      workspaceScope:
+        request.workspaceScope ??
+        resolveWorkspaceScopeForRuntimeInput(assistant),
       allowedSkillPaths,
       requestParams: {
         deliveryMode: 'incremental',
@@ -551,13 +604,16 @@ function findAssistantMessageForUser(
   messages: ChatMessage[],
   sourceUserMessageId: string,
 ): ChatAssistantMessage | null {
-  const metadataMatch = messages.find(
-    (message): message is ChatAssistantMessage =>
+  // In tool-calling loops, multiple assistant messages share the same
+  // sourceUserMessageId. The final output lives in the last one.
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i]
+    if (
       message.role === 'assistant' &&
-      message.metadata?.sourceUserMessageId === sourceUserMessageId,
-  )
-  if (metadataMatch) {
-    return metadataMatch
+      message.metadata?.sourceUserMessageId === sourceUserMessageId
+    ) {
+      return message
+    }
   }
 
   const userIndex = messages.findIndex(
@@ -567,12 +623,9 @@ function findAssistantMessageForUser(
     return null
   }
 
-  for (const message of messages.slice(userIndex + 1)) {
-    if (message.role === 'user') {
-      return null
-    }
-    if (message.role === 'assistant') {
-      return message
+  for (let i = messages.length - 1; i > userIndex; i -= 1) {
+    if (messages[i].role === 'assistant') {
+      return messages[i] as ChatAssistantMessage
     }
   }
 
@@ -601,12 +654,15 @@ function toolEventsFromMessages({
 
   for (const message of relevantToolMessages) {
     for (const toolCall of message.toolCalls) {
+      const args = toolCall.request.arguments
+      const parsedArgs = args?.kind === 'complete' ? args.value : undefined
       const event: YoloAgentEvent & { type: 'tool' } = {
         type: 'tool',
         conversationId,
         toolCallId: toolCall.request.id,
         name: toolCall.request.name,
         status: mapToolStatus(toolCall.response.status),
+        ...(parsedArgs ? { arguments: parsedArgs } : {}),
       }
       const previousEvent = previous.toolStatusById.get(event.toolCallId)
       nextTracker.toolStatusById.set(event.toolCallId, event)

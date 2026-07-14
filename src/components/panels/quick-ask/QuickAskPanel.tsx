@@ -1123,7 +1123,7 @@ export function QuickAskPanel({
             toolPreferences: chatModeRuntime.toolPreferences,
             toolServerPreferences: chatModeRuntime.toolServerPreferences,
             allowedSkillPaths,
-            runtimeModePrompt: chatModeRuntime.runtimeModePrompt,
+            toolCapabilityMode: chatModeRuntime.toolCapabilityMode,
             contextualInjections: editorSnapshotInjection
               ? [editorSnapshotInjection]
               : [],

@@ -7,6 +7,7 @@ import {
   ChatTimelineList,
   type ChatTimelineRenderContext,
   type ChatTimelineRenderVersion,
+  type UserMessageViewportState,
 } from './ChatTimelineList'
 
 type SharedConversationSurfaceProps<TItem extends ChatTimelineItem> = {
@@ -27,7 +28,7 @@ type SharedConversationSurfaceProps<TItem extends ChatTimelineItem> = {
   overscanPx?: number
   atBottomThreshold?: number
   onVirtualizationChange?: (isVirtualized: boolean) => void
-  onActiveUserMessageChange?: (messageId: string | null) => void
+  onUserMessageViewportChange?: (state: UserMessageViewportState) => void
   windowNavigationKey?: number
   windowNavigationTargetMessageId?: string | null
   onRenderStateChange?: (state: {
@@ -39,8 +40,6 @@ type SharedConversationSurfaceProps<TItem extends ChatTimelineItem> = {
   hasNewerMessages?: boolean
   onLoadEarlier?: () => void
   onLoadNewer?: () => void
-  loadEarlierLabel?: string
-  loadNewerLabel?: string
   scrollContainerClassName?: string
   scrollContainerStyle?: CSSProperties
   containerClassName?: string
@@ -65,7 +64,7 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
   overscanPx,
   atBottomThreshold,
   onVirtualizationChange,
-  onActiveUserMessageChange,
+  onUserMessageViewportChange,
   windowNavigationKey,
   windowNavigationTargetMessageId,
   onRenderStateChange,
@@ -73,8 +72,6 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
   hasNewerMessages,
   onLoadEarlier,
   onLoadNewer,
-  loadEarlierLabel,
-  loadNewerLabel,
   scrollContainerClassName,
   scrollContainerStyle,
   containerClassName,
@@ -99,7 +96,7 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
       overscanPx={overscanPx}
       atBottomThreshold={atBottomThreshold}
       onVirtualizationChange={onVirtualizationChange}
-      onActiveUserMessageChange={onActiveUserMessageChange}
+      onUserMessageViewportChange={onUserMessageViewportChange}
       windowNavigationKey={windowNavigationKey}
       windowNavigationTargetMessageId={windowNavigationTargetMessageId}
       onRenderStateChange={onRenderStateChange}
@@ -107,8 +104,6 @@ export function SharedConversationSurface<TItem extends ChatTimelineItem>({
       hasNewerMessages={hasNewerMessages}
       onLoadEarlier={onLoadEarlier}
       onLoadNewer={onLoadNewer}
-      loadEarlierLabel={loadEarlierLabel}
-      loadNewerLabel={loadNewerLabel}
       scrollContainerClassName={scrollContainerClassName}
       scrollContainerStyle={scrollContainerStyle}
       bottomSpacerHeight={bottomSpacerHeight}

@@ -2,6 +2,7 @@ import {
   ChatConversationCompactionLike,
   ChatConversationCompactionState,
   ChatMessage,
+  ChatUserMessage,
 } from '../../types/chat'
 import { ChatModel } from '../../types/chat-model.types'
 import { LLMProvider, LLMProviderApiType } from '../../types/provider.types'
@@ -14,6 +15,7 @@ import { McpManager } from '../mcp/mcpManager'
 
 import type { CitationRegistry } from './citationRegistry'
 import type { AutoContextCompactionChatOptions } from './compaction'
+import type { ToolCapabilityMode } from './tool-capability-prompt'
 
 export type AgentRunContext = {
   citationRegistry: CitationRegistry
@@ -26,6 +28,11 @@ export type AgentRuntimeSnapshot = {
 }
 
 export type AgentRuntimeSubscribe = (snapshot: AgentRuntimeSnapshot) => void
+
+export type AgentPendingUserMessageDrain = {
+  messages: ChatUserMessage[]
+  sourceUserMessageId: string
+}
 
 export type AgentRuntimeRunInput = {
   providerClient: BaseLLMProvider<LLMProvider>
@@ -79,7 +86,7 @@ export type AgentRuntimeRunInput = {
   }
   allowedSkillPaths?: string[]
   contextualInjections?: ContextualInjection[]
-  runtimeModePrompt?: string
+  toolCapabilityMode?: ToolCapabilityMode
   geminiTools?: {
     useWebSearch?: boolean
     useUrlContext?: boolean
@@ -91,12 +98,13 @@ export type AgentRuntimeRunInput = {
   /**
    * Optional hook called at every `llm_request` boundary inside the runtime
    * loop. Returns user messages that should be merged into the response stream
-   * before the next LLM turn. Used to inject mid-run user messages enqueued by
-   * the service layer. Returning an empty array is a no-op.
+   * before the next LLM turn together with the visual-turn anchor they create.
+   * Used to inject mid-run user messages enqueued by the service layer.
+   * Returning null is a no-op.
    *
    * Not invoked by the single-turn fast path (single LLM call, no boundary).
    */
-  drainPendingUserMessages?: () => ChatMessage[]
+  drainPendingUserMessages?: () => AgentPendingUserMessageDrain | null
   /**
    * Per-run side-channel for state that flows down to tool execution but isn't
    * part of the LLM-visible message stream (e.g. the citation registry that

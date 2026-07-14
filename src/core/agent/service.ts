@@ -71,6 +71,14 @@ export type AgentConversationState = {
   pendingCompactionAnchorMessageId?: string | null
   anchorMessageId?: string
   errorMessage?: string
+  activity?: AgentRunActivity
+}
+
+export type AgentRunActivity = {
+  kind: 'learning-agent'
+  title: string
+  detail?: string
+  action?: 'open-learning-view'
 }
 
 const createEmptyConversationState = (
@@ -94,6 +102,8 @@ export type AgentConversationStateFeedSubscriber = (
 
 export type AgentConversationRunSummary = {
   conversationId: string
+  /** User message that owns the currently active visual turn. */
+  anchorMessageId?: string
   status: AgentRunStatus
   isRunning: boolean
   /**
@@ -122,6 +132,7 @@ export type AgentConversationRunSummary = {
    * (the run may have already finalized, leaving only the awaiting tool call).
    */
   isWaitingUserInput: boolean
+  activity?: AgentRunActivity
 }
 
 export type AgentConversationRunSummarySubscriber = (
@@ -677,9 +688,20 @@ export const buildAgentConversationRunSummary = (
   const hasRunningToolCall = hasRunningMainToolCall(state.messages)
   const isRuntimeRunning = state.status === 'running'
   const isActive = isRuntimeRunning || isWaitingApproval || hasRunningToolCall
+  let anchorMessageId = state.anchorMessageId
+  if (!anchorMessageId && isActive) {
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      const message = state.messages[index]
+      if (message.role === 'user') {
+        anchorMessageId = message.id
+        break
+      }
+    }
+  }
 
   return {
     conversationId: state.conversationId,
+    anchorMessageId,
     status: state.status,
     isRunning: isRuntimeRunning && !isWaitingApproval,
     isActive,
@@ -687,6 +709,7 @@ export const buildAgentConversationRunSummary = (
     isQueueable: isRuntimeRunning && !isWaitingApproval,
     isWaitingApproval,
     isWaitingUserInput,
+    activity: state.activity,
   }
 }
 
@@ -1793,7 +1816,10 @@ export class AgentService {
       this.updateToolCallResponse({
         conversationId,
         toolCallId,
-        response: { status: ToolCallResponseStatus.Rejected },
+        response: {
+          status: ToolCallResponseStatus.Rejected,
+          reason: 'The user rejected this tool call.',
+        },
       }),
     )
   }
@@ -1899,6 +1925,7 @@ export class AgentService {
 
     const patched = entry.runtime.setToolCallResponse(toolCallId, {
       status: ToolCallResponseStatus.Rejected,
+      reason: 'The user rejected this tool call.',
     })
     if (patched) {
       void entry.resumeRun()
@@ -2084,11 +2111,13 @@ export class AgentService {
     input,
     loopConfig,
     persistState,
+    activity,
   }: {
     conversationId: string
     input: AgentRuntimeRunInput
     loopConfig: AgentRuntimeLoopConfig
     persistState?: boolean
+    activity?: AgentRunActivity
   }): Promise<void> {
     if (this.droppedConversationIds.has(conversationId)) {
       return
@@ -2137,13 +2166,26 @@ export class AgentService {
       drainPendingUserMessages: () => {
         const queue = this.pendingUserMessagesByKey.get(runKey)
         if (!queue || queue.length === 0) {
-          return []
+          return null
         }
+        const sourceUserMessageId = queue.at(-1)?.id
+        if (!sourceUserMessageId) {
+          return null
+        }
+
         this.pendingUserMessagesByKey.delete(runKey)
-        // Notify so the UI removes the "queued" bubble immediately; the
-        // injected messages will materialize in the runtime snapshot next.
-        this.notifyConversationSubscribers(conversationId)
-        return queue
+        const currentRunEntry = this.runEntriesByKey.get(runKey)
+        if (currentRunEntry?.runToken === runToken) {
+          currentRunEntry.sourceUserMessageId = sourceUserMessageId
+          currentRunEntry.state = {
+            ...currentRunEntry.state,
+            anchorMessageId: sourceUserMessageId,
+          }
+        }
+        // Remove the queued bubble and switch run-summary ownership before the
+        // runtime snapshot materializes the injected messages.
+        this.recomputeConversationState(conversationId)
+        return { messages: queue, sourceUserMessageId }
       },
     }
     // Clear the continuation latch now that the new run is actually starting.
@@ -2157,6 +2199,7 @@ export class AgentService {
       compaction: this.normalizeCompaction(input.compaction, input.messages),
       pendingCompactionAnchorMessageId: null,
       anchorMessageId: input.sourceUserMessageId ?? input.messages.at(-1)?.id,
+      activity,
     }
     this.recomputeConversationState(conversationId)
     let runtimeStateSignature = createRuntimeStateSignature(runEntry.state)
@@ -2539,6 +2582,7 @@ export class AgentService {
       anchorMessageId: runEntries.at(-1)?.state.anchorMessageId,
       errorMessage: runEntries.find((entry) => entry.state.errorMessage)?.state
         .errorMessage,
+      activity: runEntries.at(-1)?.state.activity,
     }
     this.publishConversationState(conversationId, publishMode)
   }
@@ -2690,6 +2734,7 @@ export class AgentService {
         state.pendingCompactionAnchorMessageId ?? null,
       errorMessage: state.errorMessage,
       anchorMessageId: state.anchorMessageId,
+      activity: state.activity,
     }
   }
 

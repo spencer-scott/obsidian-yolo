@@ -24,7 +24,15 @@
   <a href="./README.md">English</a> | <a href="./README_zh-CN.md">Chinese</a> | <b>Italiano</b>
 </p>
 
+<p align="center">
+  <a href="https://discord.gg/d8EHm48ppU">
+    <img src="https://img.shields.io/badge/Discord-Unisciti_alla_community-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Unisciti alla community Discord">
+  </a>
+</p>
+
 ## Novita recenti
+
+- **`1.6`**: Introduce la nuova Modalità di apprendimento: trasforma qualsiasi argomento e materiale di riferimento in un progetto di studio personalizzato con scalette strutturate, concetti chiave, flashcard e una mappa interattiva delle conoscenze. La ripetizione dilazionata FSRS integrata e l'importazione di pacchetti Anki `.apkg` aiutano a trasformare le conoscenze in un percorso di ripasso sostenibile.
 
 - **`1.5`**: Introduce un nuovo runtime Agent che trasforma l'AI da semplice Q&A in collaborazione attiva—con tool calling completo, MCP, Skills, Bash desktop, subagent e ricerca web—oltre a contesto e memoria per sessioni lunghe, RAG ibrido rinnovato, sincronizzazione del focus e consapevolezza PDF, e chat multi-finestra con Agent in background.
 
@@ -99,7 +107,7 @@ Se usi YOLO su mobile, potresti comunque incontrare funzionalità non disponibil
 - [x] Ricerca Vault AI migliore e più forte
 - [x] Agent in Background (automazione task lunghi)
 - [x] Orchestrazione Multi-Agent (tramite subagent)
-- [ ] Learning Mode — una vista di studio dedicata
+- [x] Learning Mode — una vista di studio dedicata
 - [ ] Annotation Mode — annotazioni e suggerimenti AI in tempo reale sulle note
 - [ ] Assistente integrato — helper fissato nell'angolo per config/agent, con compattazione automatica e task programmati
 - [ ] Lavagna AI migliore

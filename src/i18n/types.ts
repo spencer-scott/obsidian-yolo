@@ -1,5 +1,9 @@
 export type Language = 'en' | 'zh' | 'it'
 
+type TranslationBranch = {
+  [key: string]: string | TranslationBranch
+}
+
 export type TranslationKeys = {
   // Commands
   commands: {
@@ -128,6 +132,8 @@ export type TranslationKeys = {
     mentionContextLabel?: string
   }
 
+  learning?: TranslationBranch
+
   // Settings
   settings: {
     title: string
@@ -137,6 +143,7 @@ export type TranslationKeys = {
       knowledge: string
       tools: string
       agent: string
+      learning: string
       others: string
     }
     supportYolo: {
@@ -164,6 +171,11 @@ export type TranslationKeys = {
       chatTitlePromptDesc: string
       tabCompletionSystemPrompt?: string
       tabCompletionSystemPromptDesc?: string
+    }
+    learning: {
+      generationTitle: string
+      generationModel: string
+      generationModelDesc: string
     }
     chatPreferences: {
       title: string
@@ -669,15 +681,6 @@ export type TranslationKeys = {
       geminiOAuthDisconnectedHelp?: string
       geminiOAuthProject?: string
       geminiOAuthStreamingNotice?: string
-      qwenOAuthTitle?: string
-      qwenOAuthConnect?: string
-      qwenOAuthDisconnect?: string
-      qwenOAuthConnecting?: string
-      qwenOAuthLoadingStatus?: string
-      qwenOAuthConnected?: string
-      qwenOAuthExpires?: string
-      qwenOAuthDisconnectedHelp?: string
-      qwenOAuthStreamingNotice?: string
     }
     models: {
       title: string
@@ -1332,8 +1335,6 @@ export type TranslationKeys = {
     newChat: string
     untitledConversation?: string
     continueResponse?: string
-    loadEarlierMessages?: string
-    loadNewerMessages?: string
     messageNavigator?: {
       title?: string
       itemAriaLabel?: string
@@ -1415,6 +1416,7 @@ export type TranslationKeys = {
       createSnippetsFile?: string
     }
     emptyState?: {
+      workspaceTitle?: string
       askTitle?: string
       askDescription?: string
       chatTitle?: string
@@ -1423,6 +1425,13 @@ export type TranslationKeys = {
       agentDescription?: string
       agentFullTitle?: string
       agentFullDescription?: string
+    }
+    quickAccess?: {
+      manage?: string
+      searchPlaceholder?: string
+      skills?: string
+      snippets?: string
+      empty?: string
     }
     compaction?: {
       pendingTitle?: string
@@ -1581,6 +1590,7 @@ export type TranslationKeys = {
       noParameters?: string
       result?: string
       error?: string
+      rejectionReason?: string
       allow?: string
       reject?: string
       abort?: string
@@ -1705,6 +1715,10 @@ export type TranslationKeys = {
     backgroundStatusPanelEmpty?: string
     backgroundTasksRunning?: string
     backgroundTasksNeedAttention?: string
+    learningTasksRunning?: string
+    learningReviewLabel?: string
+    learningReviewTitle?: string
+    learningReviewDetail?: string
     ragAutoUpdateRunning?: string
     ragAutoUpdateRunningDetail?: string
     ragAutoUpdateFailed?: string
@@ -1798,16 +1812,6 @@ export type TranslationKeys = {
     agentFullDesc?: string
     yolo?: string
     yoloDesc?: string
-    warning?: {
-      title?: string
-      description?: string
-      permission?: string
-      cost?: string
-      backup?: string
-      checkbox?: string
-      cancel?: string
-      confirm?: string
-    }
     fullAccessWarning?: {
       title?: string
       description?: string
@@ -1832,13 +1836,15 @@ export type TranslationKeys = {
     low?: string
     medium?: string
     high?: string
-    extraHigh?: string
+    xhigh?: string
+    max?: string
     offDesc?: string
     autoDesc?: string
     lowDesc?: string
     mediumDesc?: string
     highDesc?: string
-    extraHighDesc?: string
+    xhighDesc?: string
+    maxDesc?: string
   }
 
   // Config import / export

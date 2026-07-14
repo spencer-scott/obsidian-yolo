@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 import {
   memo,
   useCallback,
@@ -25,6 +25,29 @@ type AnchorSnapshot = {
   messageId: string
   top: number
 }
+
+export type UserMessageViewportState = {
+  activeMessageId: string | null
+  visibleMessageIds: string[]
+}
+
+export const getVisibleUserMessageIds = ({
+  anchors,
+  contentBottom,
+  viewportTop,
+  viewportBottom,
+}: {
+  anchors: { messageId: string; top: number }[]
+  contentBottom: number
+  viewportTop: number
+  viewportBottom: number
+}): string[] =>
+  anchors.flatMap((anchor, index) => {
+    const turnBottom = anchors[index + 1]?.top ?? contentBottom
+    return anchor.top < viewportBottom && turnBottom > viewportTop
+      ? [anchor.messageId]
+      : []
+  })
 
 type RowProps<TItem extends ChatTimelineItem> = {
   item: TItem
@@ -97,15 +120,13 @@ type ChatTimelineListProps<TItem extends ChatTimelineItem> = {
   atBottomThreshold?: number
   onAtBottomStateChange?: (atBottom: boolean) => void
   onVirtualizationChange?: (isVirtualized: boolean) => void
-  onActiveUserMessageChange?: (messageId: string | null) => void
+  onUserMessageViewportChange?: (state: UserMessageViewportState) => void
   windowNavigationKey?: number
   windowNavigationTargetMessageId?: string | null
   hasEarlierMessages?: boolean
   hasNewerMessages?: boolean
   onLoadEarlier?: () => void
   onLoadNewer?: () => void
-  loadEarlierLabel?: string
-  loadNewerLabel?: string
   /**
    * Additional bottom spacer height (px). Used to keep the last item from
    * being visually obscured by an absolute-positioned overlay (e.g. todo
@@ -129,39 +150,17 @@ function TimelineBottomSpacer({ height }: { height: number }) {
   )
 }
 
-function TimelineLoadMoreButton({
-  label,
-  onClick,
+function TimelineLoadMoreSentinel({
+  elementRef,
 }: {
-  label: string
-  onClick: () => void
+  elementRef?: RefObject<HTMLDivElement>
 }) {
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return
-    }
-
-    event.preventDefault()
-    onClick()
-  }
-
   return (
-    <div className="yolo-chat-history-window-sentinel">
-      <div
-        role="button"
-        tabIndex={0}
-        className="yolo-chat-history-window-sentinel__button"
-        onClick={onClick}
-        onKeyDown={handleKeyDown}
-      >
-        <span>{label}</span>
-        <span className="yolo-chat-history-window-sentinel__dots" aria-hidden>
-          <span>.</span>
-          <span>.</span>
-          <span>.</span>
-        </span>
-      </div>
-    </div>
+    <div
+      ref={elementRef}
+      aria-hidden
+      className="yolo-chat-history-window-sentinel"
+    />
   )
 }
 
@@ -237,24 +236,29 @@ const getVisibleAnchorSnapshot = (
   }
 }
 
-const getActiveUserAnchorSnapshot = (
+const getUserMessageViewportState = (
   scrollerElement: HTMLElement,
-): AnchorSnapshot | null => {
+): UserMessageViewportState => {
   const anchors = Array.from(
     scrollerElement.querySelectorAll<HTMLElement>('[data-yolo-user-anchor-id]'),
   )
   if (anchors.length === 0) {
-    return null
+    return {
+      activeMessageId: null,
+      visibleMessageIds: [],
+    }
   }
 
-  const containerTop = scrollerElement.getBoundingClientRect().top
+  const containerRect = scrollerElement.getBoundingClientRect()
+  const containerTop = containerRect.top
   const activationTop = containerTop + 8
   let activeAnchor: HTMLElement | null = null
   let nearestUpcomingAnchor: HTMLElement | null = null
   let nearestUpcomingDistance = Number.POSITIVE_INFINITY
+  const anchorRects = anchors.map((anchor) => anchor.getBoundingClientRect())
 
-  for (const anchor of anchors) {
-    const anchorTop = anchor.getBoundingClientRect().top
+  for (const [index, anchor] of anchors.entries()) {
+    const anchorTop = anchorRects[index].top
     if (anchorTop <= activationTop) {
       activeAnchor = anchor
       continue
@@ -268,14 +272,27 @@ const getActiveUserAnchorSnapshot = (
   }
 
   const selectedAnchor = activeAnchor ?? nearestUpcomingAnchor
-  const messageId = selectedAnchor?.dataset.yoloUserAnchorId
-  if (!selectedAnchor || !messageId) {
-    return null
-  }
+  const activeMessageId = selectedAnchor?.dataset.yoloUserAnchorId ?? null
+  const timelineRows = scrollerElement.querySelectorAll<HTMLElement>(
+    '.yolo-chat-timeline-row',
+  )
+  const lastTimelineRow = Array.from(timelineRows).at(-1)
+  const contentBottom =
+    lastTimelineRow?.getBoundingClientRect().bottom ??
+    anchorRects.at(-1)?.bottom
+  const visibleMessageIds = getVisibleUserMessageIds({
+    anchors: anchors.flatMap((anchor, index) => {
+      const messageId = anchor.dataset.yoloUserAnchorId
+      return messageId ? [{ messageId, top: anchorRects[index].top }] : []
+    }),
+    contentBottom: contentBottom ?? containerTop,
+    viewportTop: containerTop,
+    viewportBottom: containerRect.bottom,
+  })
 
   return {
-    messageId,
-    top: selectedAnchor.getBoundingClientRect().top,
+    activeMessageId,
+    visibleMessageIds,
   }
 }
 
@@ -317,15 +334,13 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
   atBottomThreshold = DEFAULT_AT_BOTTOM_THRESHOLD,
   onAtBottomStateChange,
   onVirtualizationChange,
-  onActiveUserMessageChange,
+  onUserMessageViewportChange,
   windowNavigationKey,
   windowNavigationTargetMessageId,
   hasEarlierMessages = false,
   hasNewerMessages = false,
   onLoadEarlier,
   onLoadNewer,
-  loadEarlierLabel = 'Load earlier messages',
-  loadNewerLabel = 'Load newer messages',
   bottomSpacerHeight = 0,
 }: ChatTimelineListProps<TItem>) {
   void overscanPx
@@ -335,12 +350,18 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     null,
   )
   const lastAtBottomStateRef = useRef<boolean | null>(null)
+  const lastScrollTopRef = useRef<number | null>(null)
+  const earlierSentinelRef = useRef<HTMLDivElement>(null)
   const renderItemRef = useRef(renderItem)
   renderItemRef.current = renderItem
   const initialBottomKeyRef = useRef<string | null>(null)
   const pendingAnchorSnapshotRef = useRef<AnchorSnapshot | null>(null)
+  const suppressFollowForWindowLoadRef = useRef(false)
   const loadInFlightRef = useRef(false)
-  const lastActiveUserMessageIdRef = useRef<string | null>(null)
+  const lastUserMessageViewportRef = useRef<UserMessageViewportState | null>(
+    null,
+  )
+  const userMessageViewportFrameRef = useRef<number | null>(null)
   const appliedWindowNavigationKeyRef = useRef<number | undefined>(undefined)
   const pendingWindowNavigationRef = useRef<{
     key: number
@@ -361,6 +382,7 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     }
 
     pendingAnchorSnapshotRef.current = getVisibleAnchorSnapshot(scrollerElement)
+    suppressFollowForWindowLoadRef.current = true
   }, [scrollerElement])
 
   const handleLoadEarlier = useCallback(() => {
@@ -383,20 +405,78 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     onLoadNewer()
   }, [captureAnchorBeforeWindowChange, onLoadNewer])
 
-  const emitActiveUserMessage = useCallback(() => {
-    if (!onActiveUserMessageChange || !scrollerElement) {
+  const emitUserMessageViewport = useCallback(() => {
+    if (!onUserMessageViewportChange || !scrollerElement) {
       return
     }
 
-    const activeMessageId =
-      getActiveUserAnchorSnapshot(scrollerElement)?.messageId ?? null
-    if (lastActiveUserMessageIdRef.current === activeMessageId) {
+    const nextState = getUserMessageViewportState(scrollerElement)
+    const previousState = lastUserMessageViewportRef.current
+    if (
+      previousState?.activeMessageId === nextState.activeMessageId &&
+      previousState.visibleMessageIds.length ===
+        nextState.visibleMessageIds.length &&
+      previousState.visibleMessageIds.every(
+        (messageId, index) => messageId === nextState.visibleMessageIds[index],
+      )
+    ) {
       return
     }
 
-    lastActiveUserMessageIdRef.current = activeMessageId
-    onActiveUserMessageChange(activeMessageId)
-  }, [onActiveUserMessageChange, scrollerElement])
+    lastUserMessageViewportRef.current = nextState
+    onUserMessageViewportChange(nextState)
+  }, [onUserMessageViewportChange, scrollerElement])
+
+  const scheduleUserMessageViewport = useCallback(() => {
+    if (userMessageViewportFrameRef.current !== null) {
+      return
+    }
+
+    userMessageViewportFrameRef.current = window.requestAnimationFrame(() => {
+      userMessageViewportFrameRef.current = null
+      emitUserMessageViewport()
+    })
+  }, [emitUserMessageViewport])
+
+  useEffect(
+    () => () => {
+      if (userMessageViewportFrameRef.current !== null) {
+        window.cancelAnimationFrame(userMessageViewportFrameRef.current)
+        userMessageViewportFrameRef.current = null
+      }
+    },
+    [],
+  )
+
+  const firstItemRenderKey = items.at(0)?.renderKey
+  useEffect(() => {
+    const sentinel = earlierSentinelRef.current
+    if (
+      !scrollerElement ||
+      !sentinel ||
+      !hasEarlierMessages ||
+      !onLoadEarlier
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          handleLoadEarlier()
+        }
+      },
+      { root: scrollerElement },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [
+    firstItemRenderKey,
+    handleLoadEarlier,
+    hasEarlierMessages,
+    onLoadEarlier,
+    scrollerElement,
+  ])
 
   const handleScrollerRef = useCallback(
     (element: HTMLElement | null) => {
@@ -421,13 +501,14 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
 
     initialBottomKeyRef.current = timelineKey
     scrollElementToBottom(scrollerElement)
+    lastScrollTopRef.current = scrollerElement.scrollTop
   }, [conversationId, items.length, scrollerElement])
 
   useLayoutEffect(() => {
     loadInFlightRef.current = false
     const snapshot = pendingAnchorSnapshotRef.current
     if (!snapshot || !scrollerElement) {
-      emitActiveUserMessage()
+      scheduleUserMessageViewport()
       return
     }
 
@@ -441,8 +522,9 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
 
     const afterTop = anchor.getBoundingClientRect().top
     scrollerElement.scrollTop += afterTop - snapshot.top
-    emitActiveUserMessage()
-  }, [emitActiveUserMessage, items, scrollerElement])
+    lastScrollTopRef.current = scrollerElement.scrollTop
+    scheduleUserMessageViewport()
+  }, [items, scheduleUserMessageViewport, scrollerElement])
 
   useLayoutEffect(() => {
     if (!scrollerElement || windowNavigationKey === undefined) {
@@ -472,9 +554,10 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     )
     if (!targetAnchor) {
       scrollerElement.scrollTop = 0
+      lastScrollTopRef.current = scrollerElement.scrollTop
       appliedWindowNavigationKeyRef.current = windowNavigationKey
       pendingWindowNavigationRef.current = null
-      emitActiveUserMessage()
+      scheduleUserMessageViewport()
       return
     }
 
@@ -490,12 +573,13 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     )
 
     scrollerElement.scrollTop = Math.min(desiredScrollTop, maxScrollTop)
+    lastScrollTopRef.current = scrollerElement.scrollTop
     appliedWindowNavigationKeyRef.current = windowNavigationKey
     pendingWindowNavigationRef.current = null
-    emitActiveUserMessage()
+    scheduleUserMessageViewport()
   }, [
-    emitActiveUserMessage,
     items,
+    scheduleUserMessageViewport,
     scrollerElement,
     windowNavigationKey,
     windowNavigationTargetMessageId,
@@ -503,6 +587,10 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
 
   useLayoutEffect(() => {
     if (!scrollerElement || !followOutput) {
+      return
+    }
+    if (suppressFollowForWindowLoadRef.current) {
+      suppressFollowForWindowLoadRef.current = false
       return
     }
     if (
@@ -527,6 +615,7 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
       scrollerElement,
       output === 'smooth' ? 'smooth' : 'auto',
     )
+    lastScrollTopRef.current = scrollerElement.scrollTop
   }, [
     atBottomThreshold,
     bottomSpacerHeight,
@@ -562,20 +651,15 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     }
 
     const handleScroll = () => {
+      const previousScrollTop = lastScrollTopRef.current
+      const currentScrollTop = scrollerElement.scrollTop
+      lastScrollTopRef.current = currentScrollTop
+      const isScrollingTowardNewer =
+        previousScrollTop !== null && currentScrollTop > previousScrollTop
+
       emitAtBottomState()
-      emitActiveUserMessage()
+      scheduleUserMessageViewport()
       if (Date.now() < suppressLoadMoreUntilRef.current) {
-        return
-      }
-
-      const loadMoreThreshold = getLoadMoreThreshold(scrollerElement)
-
-      if (
-        hasEarlierMessages &&
-        onLoadEarlier &&
-        scrollerElement.scrollTop <= loadMoreThreshold
-      ) {
-        handleLoadEarlier()
         return
       }
 
@@ -583,20 +667,23 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
         scrollerElement.scrollHeight -
         scrollerElement.scrollTop -
         scrollerElement.clientHeight
+      const loadMoreThreshold = getLoadMoreThreshold(scrollerElement)
       if (
         hasNewerMessages &&
         onLoadNewer &&
+        isScrollingTowardNewer &&
         distanceToBottom <= loadMoreThreshold
       ) {
         handleLoadNewer()
       }
     }
 
-    emitAtBottomState()
-    emitActiveUserMessage()
     scrollerElement.addEventListener('scroll', handleScroll, {
       passive: true,
     })
+    lastScrollTopRef.current = scrollerElement.scrollTop
+    emitAtBottomState()
+    scheduleUserMessageViewport()
 
     if (typeof ResizeObserver === 'undefined') {
       return () => {
@@ -606,7 +693,7 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
 
     const observer = new ResizeObserver(() => {
       emitAtBottomState()
-      emitActiveUserMessage()
+      scheduleUserMessageViewport()
     })
     observer.observe(scrollerElement)
 
@@ -616,14 +703,11 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
     }
   }, [
     atBottomThreshold,
-    handleLoadEarlier,
     handleLoadNewer,
-    hasEarlierMessages,
     hasNewerMessages,
-    emitActiveUserMessage,
     onAtBottomStateChange,
-    onLoadEarlier,
     onLoadNewer,
+    scheduleUserMessageViewport,
     scrollerElement,
   ])
 
@@ -656,10 +740,7 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
       style={scrollContainerStyle}
     >
       {hasEarlierMessages && onLoadEarlier ? (
-        <TimelineLoadMoreButton
-          label={loadEarlierLabel}
-          onClick={handleLoadEarlier}
-        />
+        <TimelineLoadMoreSentinel elementRef={earlierSentinelRef} />
       ) : null}
       {items.map((item, index) => (
         <TimelineRow
@@ -670,12 +751,6 @@ export function ChatTimelineList<TItem extends ChatTimelineItem>({
           renderVersion={resolveRenderVersion(item, index)}
         />
       ))}
-      {hasNewerMessages && onLoadNewer ? (
-        <TimelineLoadMoreButton
-          label={loadNewerLabel}
-          onClick={handleLoadNewer}
-        />
-      ) : null}
       <TimelineBottomSpacer height={safeSpacerHeight} />
     </div>
   )

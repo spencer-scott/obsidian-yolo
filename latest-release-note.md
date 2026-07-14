@@ -1,45 +1,41 @@
-## 1.5.13 Agent Chat Performance ✨
+## 1.6.0.2 Chat Polish & Workflow Reliability 🛠️
 
-### ⚡ Agent Performance (#420)
+### 💬 Chat & Navigation
 
-- Improved streaming refresh performance during long conversations, reducing UI re-render pressure when models output quickly.
-- Fixed memory growth after heavy Subagent use: completed task execution history could be duplicated and kept accumulating.
-- Smoother typing in long sessions by cutting unnecessary re-renders of the history area and input editor.
-- Fixed Agent runtime state lingering in memory after deleting long conversations.
-- Faster timeline rendering for long chats and Agent streaming: history now uses a more stable row-level layout, with less churn on older messages while a reply is generating; Chat and Quick Ask history paths are also improved for input, retry, branching, and tool results.
+- Redesigned desktop message navigation as a smooth waveform track on the left, with visible-turn indicators and hover previews for user messages and model responses. Also fixed older history failing to load automatically after switching to a conversation that was too short to scroll.
+- Reworked the standalone Chat empty state with searchable, drag-and-drop quick access to frequently used Skills and snippets.
+- Fixed content jumping when sending a new message, flashing history-loading indicators, and historical conversations occasionally opening to a blank screen after restart.
+- Fixed the response footer appearing before the model had finished generating or running tools.
 
-### 🚀 Startup
+### 🤖 Agent & Input
 
-- Reduced initialization work at plugin startup (#425).
+- Agent terminal commands such as Git, curl, and npm now automatically follow the system proxy across platforms, including PAC routing, without requiring manual proxy environment variables (#460).
+- Skills and snippets in the chat input menu now open submenus on hover like the reference menu, and redundant tooltips have been removed.
+- Aligned the Ask and Agent options in the chat mode menu so both rows use consistent height and text positioning.
+- Removed the risk confirmation shown the first time Agent mode is enabled.
 
-### ✨ Experience Improvements
+### 🎓 Learning Experience
 
-- Removed misleading skill-read prompts when all Skills are disabled, so the model is no longer nudged to read non-existent skill paths.
-- Improved Tab completion context so the model better understands cursor position and surrounding text; more leading context is kept so suggestions fit headings, paragraphs, and prior context more naturally.
-- Removed the empty-state card shadow that showed as clipped gray edges on narrow mobile screens (#430).
-- Fixed some OpenAI-compatible models rejecting plain-text-only messages: text-only requests now fall back to a more compatible legacy string format without affecting image or PDF inputs.
-- Better Obsidian pop-out window behavior: fixed the Agent settings dropdown and opening chat in a right split incorrectly jumping back to the main window (#432) (#434).
+- Fixed flashcard review shortcuts remaining active after the Learning view lost focus, preventing accidental card flips or ratings while typing elsewhere.
 
 ---
 
-## 1.5.13 Agent 对话性能优化 ✨
+## 1.6.0.2 对话体验与工作流可靠性 🛠️
 
-### ⚡ Agent 性能 (#420)
+### 💬 对话与导航
 
-- 优化长对话生成期间的流式刷新性能，减少快速模型输出时的界面重渲压力。
-- 修复长时间使用 Agent 并频繁派遣 Subagent 后，已完成任务的执行历史可能被重复保留、导致内存持续增长的问题。
-- 优化长对话中的输入体验，减少输入时历史消息区和编辑器组件的无意义重渲，缓解长会话下输入框卡顿。
-- 修复删除长对话后部分 Agent 运行时状态仍留在内存中的问题，降低长期使用后的内存累积风险。
-- 优化长对话和 Agent 流式回复时的时间线渲染：历史消息以更稳定的行级结构展示，减少当前回复生成时对旧消息列表的无意义刷新；同时改进 Chat 与 Quick Ask 的历史消息渲染路径，降低长会话中输入、重试、分支和工具结果展示时的卡顿风险。
+- 桌面端消息导航升级为流畅的左侧波形轨道，可直观看到当前可见的对话轮次，并在悬停时预览用户消息与模型回复。同时修复切换到内容过短、无法滚动的对话后，更早历史无法自动加载的问题。
+- 重新设计独立 Chat 的空会话界面，新增可搜索、拖拽排序的常用 Skills 与快捷指令。
+- 修复发送新消息时内容上下跳动、历史加载提示闪现，以及重启后打开历史对话偶尔白屏的问题。
+- 修复模型仍在生成或执行工具时，底部信息栏提前出现的问题。
 
-### 🚀 启动优化
+### 🤖 Agent 与输入体验
 
-- 优化插件启动时的初始化工作，减少启动阶段的加载开销 (#425)。
+- Agent 终端中的 Git、curl、npm 等命令现在可跨平台自动遵循系统代理，并支持 PAC 分流，无需手动配置代理环境变量 (#460)。
+- 聊天输入菜单中的 Skills 与快捷指令现在可像引用菜单一样悬停展开子菜单，并移除了多余的悬浮提示。
+- 统一聊天模式菜单中 Ask 与 Agent 选项的高度和文字对齐。
+- 移除首次启用 Agent 模式时的风险确认提示。
 
-### ✨ 体验改进
+### 🎓 学习体验
 
-- 移除无技能场景下的技能读取误导提示，避免关闭全部 Skills 后模型仍被提示尝试读取不存在的 skill path。
-- 优化 Tab 补全的上下文设计，让模型更明确地理解光标位置与前后文关系；保留更完整的光标前内容，使补全结果更容易贴合标题、段落结构和前文语境。
-- 移除聊天空状态卡片的阴影样式，修复移动端窄屏下左右被裁切成灰边的视觉问题 (#430)。
-- 修复部分 OpenAI-compatible 模型无法处理纯文本消息的问题：纯文本请求会自动使用兼容性更好的旧式字符串格式，同时不影响图片和 PDF 等多模态输入。
-- 改进 Obsidian 弹出窗口兼容性：修复 Agent 设置下拉菜单和右侧分屏打开聊天时错误回到主窗口的问题 (#432) (#434)。
+- 修复学习界面失去焦点后卡片复习快捷键仍会响应的问题，切换到其他编辑区输入时不再误触发卡片翻面或评分。

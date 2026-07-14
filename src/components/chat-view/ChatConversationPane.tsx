@@ -1,3 +1,4 @@
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowDown,
   Bot,
@@ -11,18 +12,20 @@ import type { ChatTimelineItem } from '../../types/chat-timeline'
 
 import type { ChatMode } from './chat-input/ChatModeSelect'
 import { isAgentChatMode } from './chat-input/ChatModeSelect'
-import type { ChatTimelineRenderVersion } from './ChatTimelineList'
+import type {
+  ChatTimelineRenderVersion,
+  UserMessageViewportState,
+} from './ChatTimelineList'
 import { InstallationIncompleteBanner } from './InstallationIncompleteBanner'
 import { SharedConversationSurface } from './SharedConversationSurface'
 
 type ChatConversationPaneProps = {
   chatMode: ChatMode
   yoloEnabled: boolean
+  showEmptyState: boolean
   groupedChatMessagesLength: number
-  isCurrentConversationRunActive: boolean
   isAutoFollowEnabled: boolean
   currentConversationId: string
-  isRestoringConversation?: boolean
   chatTimelineItems: ChatTimelineItem[]
   chatMessagesRef: RefObject<HTMLDivElement>
   renderChatTimelineItem: (timelineItem: ChatTimelineItem) => ReactNode
@@ -37,12 +40,13 @@ type ChatConversationPaneProps = {
   emptyStateAskTitle: string
   emptyStateAgentTitle: string
   emptyStateAgentFullTitle: string
+  emptyStateWorkspaceTitle?: ReactNode
   emptyStateAskDescription: string
   emptyStateAgentDescription: string
   emptyStateAgentFullDescription: string
   footerContent: ReactNode
   onTimelineVirtualizationChange?: (isVirtualized: boolean) => void
-  onActiveUserMessageChange?: (messageId: string | null) => void
+  onUserMessageViewportChange?: (state: UserMessageViewportState) => void
   windowNavigationKey?: number
   windowNavigationTargetMessageId?: string | null
   messageNavigatorContent?: ReactNode
@@ -50,19 +54,16 @@ type ChatConversationPaneProps = {
   hasNewerMessages?: boolean
   onLoadEarlier?: () => void
   onLoadNewer?: () => void
-  loadEarlierLabel?: string
-  loadNewerLabel?: string
   bottomSpacerHeight?: number
 }
 
 export function ChatConversationPane({
   chatMode,
   yoloEnabled,
+  showEmptyState,
   groupedChatMessagesLength,
-  isCurrentConversationRunActive,
   isAutoFollowEnabled,
   currentConversationId,
-  isRestoringConversation = false,
   chatTimelineItems,
   chatMessagesRef,
   renderChatTimelineItem,
@@ -77,12 +78,13 @@ export function ChatConversationPane({
   emptyStateAskTitle,
   emptyStateAgentTitle,
   emptyStateAgentFullTitle,
+  emptyStateWorkspaceTitle,
   emptyStateAskDescription,
   emptyStateAgentDescription,
   emptyStateAgentFullDescription,
   footerContent,
   onTimelineVirtualizationChange,
-  onActiveUserMessageChange,
+  onUserMessageViewportChange,
   windowNavigationKey,
   windowNavigationTargetMessageId,
   messageNavigatorContent,
@@ -90,25 +92,22 @@ export function ChatConversationPane({
   hasNewerMessages,
   onLoadEarlier,
   onLoadNewer,
-  loadEarlierLabel,
-  loadNewerLabel,
   bottomSpacerHeight,
 }: ChatConversationPaneProps) {
-  const showEmptyState =
-    groupedChatMessagesLength === 0 &&
-    !isCurrentConversationRunActive &&
-    !isRestoringConversation
+  const reduceMotion = useReducedMotion()
   const showScrollToBottomButton =
     !showEmptyState &&
     groupedChatMessagesLength > 0 &&
     (!isAutoFollowEnabled || hasNewerMessages)
 
   const isYoloAgent = isAgentChatMode(chatMode) && yoloEnabled
-  const emptyStateTitle = isYoloAgent
-    ? emptyStateAgentFullTitle
-    : isAgentChatMode(chatMode)
-      ? emptyStateAgentTitle
-      : emptyStateAskTitle
+  const emptyStateTitle =
+    emptyStateWorkspaceTitle ??
+    (isYoloAgent
+      ? emptyStateAgentFullTitle
+      : isAgentChatMode(chatMode)
+        ? emptyStateAgentTitle
+        : emptyStateAskTitle)
   const emptyStateDescription = isYoloAgent
     ? emptyStateAgentFullDescription
     : isAgentChatMode(chatMode)
@@ -119,6 +118,7 @@ export function ChatConversationPane({
     <>
       <InstallationIncompleteBanner />
       <SharedConversationSurface
+        key={`${currentConversationId}:${groupedChatMessagesLength > 0 ? 'ready' : 'empty'}`}
         items={chatTimelineItems}
         conversationId={currentConversationId}
         scrollContainerRef={chatMessagesRef}
@@ -132,10 +132,20 @@ export function ChatConversationPane({
         }
         containerClassName="yolo-chat-conversation-surface"
         overlaySlot={
-          showEmptyState || messageNavigatorContent ? (
-            <>
+          <>
+            <AnimatePresence initial={false}>
               {showEmptyState ? (
-                <div className="yolo-chat-empty-state-overlay">
+                <motion.div
+                  key="empty-state"
+                  className="yolo-chat-empty-state-overlay"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.12,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
                   <div className="yolo-chat-empty-state-overlay-inner">
                     <div className="yolo-chat-empty-state">
                       <div
@@ -159,26 +169,33 @@ export function ChatConversationPane({
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ) : null}
-              {messageNavigatorContent}
-            </>
-          ) : undefined
+            </AnimatePresence>
+            {messageNavigatorContent}
+          </>
         }
         scrollContainerClassName="yolo-chat-messages"
         onVirtualizationChange={onTimelineVirtualizationChange}
-        onActiveUserMessageChange={onActiveUserMessageChange}
+        onUserMessageViewportChange={onUserMessageViewportChange}
         windowNavigationKey={windowNavigationKey}
         windowNavigationTargetMessageId={windowNavigationTargetMessageId}
         hasEarlierMessages={hasEarlierMessages}
         hasNewerMessages={hasNewerMessages}
         onLoadEarlier={onLoadEarlier}
         onLoadNewer={onLoadNewer}
-        loadEarlierLabel={loadEarlierLabel}
-        loadNewerLabel={loadNewerLabel}
         bottomSpacerHeight={bottomSpacerHeight}
       />
-      <div className="yolo-chat-footer">
+      <motion.div
+        layout="position"
+        className="yolo-chat-footer"
+        transition={{
+          layout: {
+            duration: reduceMotion ? 0 : 0.28,
+            ease: [0.22, 1, 0.36, 1],
+          },
+        }}
+      >
         {showScrollToBottomButton && (
           <div className="yolo-chat-floating-actions">
             <button
@@ -196,7 +213,7 @@ export function ChatConversationPane({
           </div>
         )}
         {footerContent}
-      </div>
+      </motion.div>
     </>
   )
 }

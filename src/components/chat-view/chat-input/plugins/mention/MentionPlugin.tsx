@@ -25,13 +25,10 @@ import {
   type RefObject,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 import type { JSX as ReactJSX } from 'react/jsx-runtime'
-import { createPortal } from 'react-dom'
 
 import { PROVIDER_PRESET_INFO } from '../../../../../constants'
 import { useApp } from '../../../../../contexts/app-context'
@@ -52,6 +49,10 @@ import {
 import { SearchableMentionable } from '../../../../../utils/fuzzy-search'
 import { CHAT_MODES, type ChatMode } from '../../ChatModeSelect'
 import { getMentionableIcon } from '../../utils/get-metionable-icon'
+import {
+  CascadingTypeaheadItemProps,
+  useCascadingTypeaheadMenu,
+} from '../shared/CascadingTypeaheadMenu'
 import { MenuOption, MenuTextMatch } from '../shared/LexicalMenu'
 import {
   LexicalTypeaheadMenuPlugin,
@@ -254,12 +255,13 @@ class MentionTypeaheadOption extends MenuOption {
 }
 
 function MentionsTypeaheadMenuItem({
-  index,
+  id,
   isSelected,
   onClick,
   onMouseEnter,
   option,
 }: {
+  id: string
   index: number
   isSelected: boolean
   onClick: () => void
@@ -346,7 +348,7 @@ function MentionsTypeaheadMenuItem({
       ref={(el) => option.setRefElement(el)}
       role="option"
       aria-selected={isSelected}
-      id={`typeahead-item-${index}`}
+      id={id}
       onMouseDown={(event) => event.preventDefault()}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
@@ -389,26 +391,6 @@ function MentionsTypeaheadMenuItem({
       )}
     </button>
   )
-}
-
-/**
- * Syncs the LexicalMenu internal selectedIndex to outer state so that
- * customKeyHandlers / sub-panel derivation logic can decide preview based
- * on the main panel's keyboard-highlighted item. Wrapped in a standalone
- * component with useEffect to avoid setState cycles in the menuRenderFn
- * render path.
- */
-function MainSelectedIndexSync({
-  selectedIndex,
-  setMainSelectedIndex,
-}: {
-  selectedIndex: number | null
-  setMainSelectedIndex: (index: number | null) => void
-}): null {
-  useEffect(() => {
-    setMainSelectedIndex(selectedIndex)
-  }, [selectedIndex, setMainSelectedIndex])
-  return null
 }
 
 export default function NewMentionsPlugin({
@@ -456,36 +438,6 @@ export default function NewMentionsPlugin({
     direction: MentionMenuTransitionDirection
     nonce: number
   }>({ direction: 'none', nonce: 0 })
-  // Hover/arrow-key preview sub-panel state (only active when menuScope === 'root'
-  // and not in search/direct-search mode).
-  // - hoveredEntry: the top-level entry currently hovered by mouse, written by a ~100ms open timer.
-  // - focusSide: which panel has keyboard focus ('main' = default main panel, 'sub' = entered sub-panel).
-  // - subHighlightedIndex: keyboard-highlighted item index in the sub-panel.
-  // - previewEntry derived: hover takes priority; otherwise the main panel's currently
-  //   highlighted entry (if it's an entry type).
-  const [hoveredEntry, setHoveredEntry] =
-    useState<MentionEntryOptionType | null>(null)
-  const [focusSide, setFocusSide] = useState<'main' | 'sub'>('main')
-  const [subHighlightedIndex, setSubHighlightedIndex] = useState(0)
-  // Current keyboard-highlighted index of the main panel. selectedIndex is available
-  // inside menuRenderFn, but customKeyHandlers and sub-panel derivation live in
-  // closures outside the render path. Synced via state to drive sub-panel preview
-  // when keyboard-navigating the main panel.
-  const [mainSelectedIndex, setMainSelectedIndex] = useState<number | null>(
-    null,
-  )
-  // Shared close timer: main panel leave starts it, sub-panel enter cancels it,
-  // treating main+sub panels as a single hover region so crossing the gap doesn't trigger close.
-  const closeTimerRef = useRef<number | null>(null)
-  const openTimerRef = useRef<number | null>(null)
-  // Sub-panel DOM container ref, used to measure viewport space and decide flip direction.
-  const subPanelRef = useRef<HTMLDivElement | null>(null)
-  const mainPanelRef = useRef<HTMLDivElement | null>(null)
-  // Popover root container (position:relative), used as the reference for sub-panel
-  // absolute positioning; also hosts --yolo-sub-anchor-top / --yolo-sub-anchor-bottom CSS vars.
-  const popoverRef = useRef<HTMLDivElement | null>(null)
-  // 'right' = default right side; 'left' = flipped to left when space is insufficient; 'hidden' = neither side fits, don't render.
-  const [subSide, setSubSide] = useState<'right' | 'left' | 'hidden'>('right')
   const { t } = useLanguage()
   const mentionableUnitLabels = useMemo(
     () => ({
@@ -504,25 +456,6 @@ export default function NewMentionsPlugin({
     }
   }, [onMenuOpenChange])
 
-  const clearHoverTimers = useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-    if (openTimerRef.current !== null) {
-      window.clearTimeout(openTimerRef.current)
-      openTimerRef.current = null
-    }
-  }, [])
-
-  const resetSubPreviewState = useCallback(() => {
-    clearHoverTimers()
-    setHoveredEntry(null)
-    setFocusSide('main')
-    setSubHighlightedIndex(0)
-    setMainSelectedIndex(null)
-  }, [clearHoverTimers])
-
   const animateMenuContent = useCallback(
     (direction: MentionMenuTransitionDirection) => {
       setMenuContentTransition((prev) => ({
@@ -536,16 +469,8 @@ export default function NewMentionsPlugin({
   useEffect(() => {
     if (queryString === null) {
       setMenuScope('root')
-      resetSubPreviewState()
     }
-  }, [queryString, resetSubPreviewState])
-
-  // Clean up timers on unmount to avoid React warnings or setState on unmounted components.
-  useEffect(() => {
-    return () => {
-      clearHoverTimers()
-    }
-  }, [clearHoverTimers])
+  }, [queryString])
 
   const normalizedQuery = useMemo(
     () => (queryString ?? '').trim().toLowerCase(),
@@ -836,15 +761,15 @@ export default function NewMentionsPlugin({
         },
         {
           entryType: 'assistant',
-          label: t('chat.mentionMenu.entryAssistant', 'Assistants'),
+          label: t('chat.mentionMenu.entryAssistant', 'Assistant'),
         },
         {
           entryType: 'file',
-          label: t('chat.mentionMenu.entryFile', 'Files'),
+          label: t('chat.mentionMenu.entryFile', 'File'),
         },
         {
           entryType: 'folder',
-          label: t('chat.mentionMenu.entryFolder', 'Folders'),
+          label: t('chat.mentionMenu.entryFolder', 'Folder'),
         },
       ]
       if (onSelectChatMode) {
@@ -855,7 +780,7 @@ export default function NewMentionsPlugin({
       }
       entryOptions.push({
         entryType: 'model',
-        label: t('chat.mentionMenu.entryModel', 'Models'),
+        label: t('chat.mentionMenu.entryModel', 'Model'),
       })
       return entryOptions
         .map(
@@ -984,8 +909,6 @@ export default function NewMentionsPlugin({
         }
         animateMenuContent('forward')
         setMenuScope(nextScope)
-        // After drill-down the sub-panel's semantics are replaced by the main panel, so hover preview state must be cleared.
-        resetSubPreviewState()
         return
       }
 
@@ -1046,217 +969,37 @@ export default function NewMentionsPlugin({
       onSelectAssistant,
       onSelectChatMode,
       onSelectMentionable,
-      resetSubPreviewState,
       t,
     ],
   )
 
-  // Derive the currently previewed entry: no preview during search/direct-search/after drill-down.
-  // Otherwise hover takes priority; when hover is inactive (keyboard-only scenario), use the
-  // main panel's current selectedIndex entry option so the sub-panel refreshes as arrow keys move.
-  const shouldRenderSubpanel =
-    !normalizedQuery && menuMode !== 'direct-search' && menuScope === 'root'
-  let previewEntry: MentionEntryOptionType | null = null
-  if (shouldRenderSubpanel) {
-    if (hoveredEntry !== null) {
-      previewEntry = hoveredEntry
-    } else if (mainSelectedIndex !== null) {
-      const candidate = options[mainSelectedIndex]
-      if (candidate && candidate.payload.kind === 'entry') {
-        previewEntry = candidate.payload.entryType
+  const getCascadeEntryKey = useCallback(
+    (option: MentionTypeaheadOption): MentionEntryOptionType | null => {
+      if (
+        option.payload.kind !== 'entry' ||
+        option.payload.entryType === 'current-file'
+      ) {
+        return null
       }
-    }
-  }
-  // Leaf entries don't get a sub-panel.
-  const previewEntryEffective =
-    previewEntry && previewEntry !== 'current-file' ? previewEntry : null
-  const subOptions = useMemo(
-    () =>
-      previewEntryEffective
-        ? getSubOptionsForEntry(previewEntryEffective, '').slice(
-            0,
-            SUGGESTION_LIST_LENGTH_LIMIT,
-          )
-        : ([] as MentionTypeaheadOption[]),
-    [getSubOptionsForEntry, previewEntryEffective],
-  )
-
-  // Enter keyboard sub-panel focus only when the sub-panel is visible; revert to main when going sub -> main or when the sub-panel disappears.
-  useEffect(() => {
-    if (subOptions.length === 0 || !previewEntryEffective) {
-      if (focusSide === 'sub') setFocusSide('main')
-      if (subHighlightedIndex !== 0) setSubHighlightedIndex(0)
-    } else if (subHighlightedIndex >= subOptions.length) {
-      setSubHighlightedIndex(0)
-    }
-  }, [subOptions.length, previewEntryEffective, focusSide, subHighlightedIndex])
-
-  // Flip measurement: recalculated each time the sub-panel appears, main panel resizes,
-  // or viewport resizes. The required width matches the actual rule in popover.css for
-  // .yolo-smart-space-mention-subpanel:
-  //   width: min(480px, calc(100vw - 24px))
-  // Constrained within the Chat container boundary set by LexicalMenu; sidebar Chat does
-  // not expand across panes. If neither side has enough space, set to 'hidden' and fall
-  // back to drill-down.
-  useLayoutEffect(() => {
-    if (!previewEntryEffective || subOptions.length === 0) return
-    const main = mainPanelRef.current
-    if (!main) return
-    const win = main.ownerDocument?.defaultView ?? window
-    // Parse CSS variable --yolo-chat-typeahead-max-width; only px values are supported.
-    // Falls back to 480 on parse failure, consistent with the default in popover.css.
-    const parseMaxWidthPx = (raw: string): number => {
-      const trimmed = raw.trim()
-      if (!trimmed) return 480
-      const match = /^(-?\d+(?:\.\d+)?)px$/.exec(trimmed)
-      if (!match) return 480
-      const value = Number.parseFloat(match[1])
-      return Number.isFinite(value) && value > 0 ? value : 480
-    }
-    const parseOptionalPx = (raw: string): number | null => {
-      const trimmed = raw.trim()
-      const match = /^(-?\d+(?:\.\d+)?)px$/.exec(trimmed)
-      if (!match) return null
-      const value = Number.parseFloat(match[1])
-      return Number.isFinite(value) ? value : null
-    }
-    const measure = () => {
-      const mainRect = main.getBoundingClientRect()
-      const viewportWidth = win.innerWidth
-      const gap = 6
-      const style = win.getComputedStyle(main)
-      // Synced with CSS min(var(--yolo-chat-typeahead-max-width, 480px), 100vw - 24px).
-      const maxWidthPx = parseMaxWidthPx(
-        style.getPropertyValue('--yolo-chat-typeahead-max-width'),
-      )
-      const requiredWidth = Math.min(
-        maxWidthPx,
-        Math.max(0, viewportWidth - 24),
-      )
-      const boundaryLeft =
-        parseOptionalPx(
-          style.getPropertyValue('--yolo-typeahead-boundary-left'),
-        ) ?? 0
-      const boundaryRight =
-        parseOptionalPx(
-          style.getPropertyValue('--yolo-typeahead-boundary-right'),
-        ) ?? viewportWidth
-      const effectiveLeft = Math.max(0, boundaryLeft)
-      const effectiveRight = Math.min(viewportWidth, boundaryRight)
-      const spaceRight = effectiveRight - mainRect.right - gap
-      const spaceLeft = mainRect.left - effectiveLeft - gap
-      if (spaceRight >= requiredWidth) {
-        setSubSide('right')
-      } else if (spaceLeft >= requiredWidth) {
-        setSubSide('left')
-      } else {
-        setSubSide('hidden')
-      }
-    }
-    measure()
-    win.addEventListener('resize', measure)
-    return () => {
-      win.removeEventListener('resize', measure)
-    }
-  }, [previewEntryEffective, subOptions.length, hoveredEntry])
-
-  // Sub-panel anchor measurement: write the current preview entry's top/bottom relative
-  // to the popover container as CSS variables. The sub-panel uses placement (top/bottom)
-  // to decide bottom-align (top placement, expand upward) or top-align (bottom placement,
-  // expand downward). Industry convention: sub-menu expands in the same direction as
-  // the main menu. With placement='top', main menu opens upward, so sub-menu also
-  // opens upward, bottom-aligned to the hovered item.
-  const previewAnchorIndex = useMemo(() => {
-    if (!previewEntryEffective) return -1
-    return options.findIndex(
-      (o) =>
-        o.payload.kind === 'entry' &&
-        o.payload.entryType === previewEntryEffective,
-    )
-  }, [options, previewEntryEffective])
-
-  useLayoutEffect(() => {
-    const popover = popoverRef.current
-    const main = mainPanelRef.current
-    if (!popover || !main) return
-    if (
-      previewAnchorIndex < 0 ||
-      subOptions.length === 0 ||
-      subSide === 'hidden'
-    )
-      return
-    const items = main.querySelectorAll<HTMLElement>('[role="option"]')
-    const item = items[previewAnchorIndex]
-    if (!item) return
-    const popoverRect = popover.getBoundingClientRect()
-    const itemRect = item.getBoundingClientRect()
-    const top = Math.round(itemRect.top - popoverRect.top)
-    const bottom = Math.round(itemRect.bottom - popoverRect.top)
-    popover.setCssProps({
-      '--yolo-sub-anchor-top': `${top}px`,
-      '--yolo-sub-anchor-bottom': `${bottom}px`,
-    })
-  }, [previewAnchorIndex, subOptions.length, subSide, placement])
-
-  // Sub-panel item selection: reuses onSelectOption's downstream logic (mode / assistant / mentionable).
-  // But this path has no `nodeToReplace` concept since sub-panel items don't come from the main
-  // panel's selectOptionAndCleanUp. Solution: call selectOptionAndCleanUp (injected by LexicalMenu)
-  // with the sub-panel option. LexicalMenu handles split text node + calls our onSelectOption,
-  // producing mention node / badge identical to drill-down.
-
-  // Sub-panel Enter/click selection goes through selectOptionAndCleanUp (provided by
-  // LexicalMenu's menuRenderFn). But customKeyHandlers are declared at the
-  // LexicalTypeaheadMenuPlugin level, in a different closure from menuRenderFn.
-  // Use a ref to expose the latest selectOptionAndCleanUp.
-  const selectOptionAndCleanUpRef = useRef<
-    ((option: MentionTypeaheadOption) => void) | null
-  >(null)
-  // Same as above: expose setHighlightedIndex to top-level effects for syncing main panel highlight when hoveredEntry changes.
-  const setHighlightedIndexRef = useRef<((index: number) => void) | null>(null)
-
-  // hover open/close helpers
-  const HOVER_OPEN_MS = 100
-  const HOVER_CLOSE_MS = 150
-  const cancelHoverOpen = useCallback(() => {
-    if (openTimerRef.current !== null) {
-      window.clearTimeout(openTimerRef.current)
-      openTimerRef.current = null
-    }
-  }, [])
-  const scheduleHoverOpen = useCallback(
-    (entryType: MentionEntryOptionType, delayMs: number = HOVER_OPEN_MS) => {
-      if (closeTimerRef.current !== null) {
-        window.clearTimeout(closeTimerRef.current)
-        closeTimerRef.current = null
-      }
-      cancelHoverOpen()
-      openTimerRef.current = window.setTimeout(() => {
-        openTimerRef.current = null
-        setHoveredEntry(entryType)
-      }, delayMs)
+      return option.payload.entryType
     },
-    [cancelHoverOpen],
+    [],
   )
-  const scheduleHoverClose = useCallback(() => {
-    if (openTimerRef.current !== null) {
-      window.clearTimeout(openTimerRef.current)
-      openTimerRef.current = null
-    }
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current)
-    }
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null
-      setHoveredEntry(null)
-      setFocusSide('main')
-    }, HOVER_CLOSE_MS)
-  }, [])
-  const cancelHoverClose = useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-  }, [])
+
+  const getCascadeSubOptions = useCallback(
+    (entry: MentionEntryOptionType) =>
+      getSubOptionsForEntry(entry, '').slice(0, SUGGESTION_LIST_LENGTH_LIMIT),
+    [getSubOptionsForEntry],
+  )
+
+  const cascadingMenu = useCascadingTypeaheadMenu({
+    enabled:
+      !normalizedQuery && menuMode !== 'direct-search' && menuScope === 'root',
+    getEntryKey: getCascadeEntryKey,
+    getSubOptions: getCascadeSubOptions,
+    options,
+    placement,
+  })
 
   const checkForMentionMatch = useCallback(
     (text: string) => {
@@ -1284,167 +1027,6 @@ export default function NewMentionsPlugin({
     [menuMode, menuScope],
   )
 
-  // scrollIntoView for the sub-panel's keyboard-highlighted item, preventing it from scrolling out of the visible area in long lists.
-  useEffect(() => {
-    if (focusSide !== 'sub') return
-    const option = subOptions[subHighlightedIndex]
-    const el = option?.ref?.current
-    if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ block: 'nearest' })
-    }
-  }, [focusSide, subHighlightedIndex, subOptions])
-
-  // When switching the previewed entry, reset the sub-panel scroll to top to avoid leftover scrollTop from a previous long list.
-  useEffect(() => {
-    if (subPanelRef.current) {
-      subPanelRef.current.scrollTop = 0
-    }
-  }, [previewEntryEffective])
-
-  // Only intercept keyboard when the sub-panel is visible and not hidden. Always pass through during IME composition.
-  const subPanelActive =
-    shouldRenderSubpanel &&
-    previewEntryEffective !== null &&
-    subOptions.length > 0 &&
-    subSide !== 'hidden'
-
-  // Safe triangle: when the mouse moves diagonally from the current hover item to the sub-panel,
-  // it passes over other main menu items. A triangle (midpoint of the hovered item's "sub-panel side"
-  // edge + the top/bottom endpoints of the sub-panel's "main panel side" edge) determines whether
-  // the mouse is on the path toward the sub-panel; when inside the triangle, other entry hovers
-  // don't trigger a preview switch.
-  // Mouse position recorded when hover is triggered on the anchor item; serves as triangle vertex A.
-  // Reset when hoveredEntry changes (see effect below).
-  const anchorCursorPosRef = useRef<{ x: number; y: number } | null>(null)
-  const lastCursorPosRef = useRef<{ x: number; y: number } | null>(null)
-  // Sync ref state to React state so the popover's data-safe-active attribute update drives CSS :hover suppression.
-  const [safeActive, setSafeActive] = useState(false)
-
-  // When hoveredEntry changes, use the previous frame's mouse position as vertex A
-  // of the new triangle (equivalent to "user's position when entering the anchor",
-  // similar to floating-ui's safePolygon approach). Also sync the main panel highlight
-  // to the new entry's index (visual catches up after buffer commit).
-  // useLayoutEffect prevents a one-frame visual artifact.
-  useLayoutEffect(() => {
-    if (hoveredEntry !== null && lastCursorPosRef.current) {
-      anchorCursorPosRef.current = { ...lastCursorPosRef.current }
-    } else if (hoveredEntry === null) {
-      anchorCursorPosRef.current = null
-      setSafeActive(false)
-    }
-    if (hoveredEntry !== null && setHighlightedIndexRef.current) {
-      const idx = options.findIndex(
-        (o) =>
-          o.payload.kind === 'entry' && o.payload.entryType === hoveredEntry,
-      )
-      if (idx >= 0) setHighlightedIndexRef.current(idx)
-    }
-  }, [hoveredEntry, options])
-
-  // Extracted safe triangle check shared by mousemove and mouseenter,
-  // preventing event ordering from causing mouseenter to see stale safe state.
-  const updateSafeTriangle = useCallback(
-    (px: number, py: number): boolean => {
-      if (!subPanelActive || !subPanelRef.current) {
-        return false
-      }
-      const anchor = anchorCursorPosRef.current
-      if (!anchor) {
-        return false
-      }
-      const subRect = subPanelRef.current.getBoundingClientRect()
-      const ax = anchor.x
-      const ay = anchor.y
-      const bx = subSide === 'right' ? subRect.left : subRect.right
-      const by = subRect.top
-      const cx = bx
-      const cy = subRect.bottom
-      const sign = (
-        x1: number,
-        y1: number,
-        x2: number,
-        y2: number,
-        x3: number,
-        y3: number,
-      ) => (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
-      const d1 = sign(px, py, ax, ay, bx, by)
-      const d2 = sign(px, py, bx, by, cx, cy)
-      const d3 = sign(px, py, cx, cy, ax, ay)
-      const hasNeg = d1 < 0 || d2 < 0 || d3 < 0
-      const hasPos = d1 > 0 || d2 > 0 || d3 > 0
-      return !(hasNeg && hasPos)
-    },
-    [subPanelActive, subSide],
-  )
-
-  const handlePopoverMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      lastCursorPosRef.current = { x: event.clientX, y: event.clientY }
-      const active = updateSafeTriangle(event.clientX, event.clientY)
-      if (active) {
-        cancelHoverOpen()
-      }
-      setSafeActive(active)
-    },
-    [cancelHoverOpen, updateSafeTriangle],
-  )
-
-  const customKeyHandlers = useMemo(
-    () => ({
-      onArrowRight: (event: KeyboardEvent): boolean => {
-        if (event.isComposing) return false
-        if (focusSide === 'main' && subPanelActive) {
-          setFocusSide('sub')
-          // Always start from the semantically first item: sub-menu content is physically
-          // ordered top-to-bottom in list order regardless of whether the menu expands
-          // upward or downward. The first item is what the user expects (matching macOS menu behavior).
-          setSubHighlightedIndex(0)
-          return true
-        }
-        return false
-      },
-      onArrowLeft: (event: KeyboardEvent): boolean => {
-        if (event.isComposing) return false
-        if (focusSide === 'sub') {
-          setFocusSide('main')
-          return true
-        }
-        return false
-      },
-      onArrowDown: (event: KeyboardEvent): boolean => {
-        if (event.isComposing) return false
-        if (focusSide === 'sub' && subOptions.length > 0) {
-          setSubHighlightedIndex((prev) => (prev + 1) % subOptions.length)
-          return true
-        }
-        return false
-      },
-      onArrowUp: (event: KeyboardEvent): boolean => {
-        if (event.isComposing) return false
-        if (focusSide === 'sub' && subOptions.length > 0) {
-          setSubHighlightedIndex((prev) =>
-            prev === 0 ? subOptions.length - 1 : prev - 1,
-          )
-          return true
-        }
-        return false
-      },
-      onEnter: (event: KeyboardEvent | null): boolean => {
-        if (event?.isComposing) return false
-        if (focusSide === 'sub' && subOptions.length > 0) {
-          const option = subOptions[subHighlightedIndex]
-          const select = selectOptionAndCleanUpRef.current
-          if (option && select) {
-            select(option)
-            return true
-          }
-        }
-        return false
-      },
-    }),
-    [focusSide, subOptions, subPanelActive, subHighlightedIndex],
-  )
-
   return (
     <LexicalTypeaheadMenuPlugin<MentionTypeaheadOption>
       onQueryChange={setQueryString}
@@ -1456,157 +1038,35 @@ export default function NewMentionsPlugin({
       onOpen={() => onMenuOpenChange?.(true)}
       onClose={() => {
         onMenuOpenChange?.(false)
-        resetSubPreviewState()
+        cascadingMenu.reset()
       }}
-      customKeyHandlers={customKeyHandlers}
-      menuRenderFn={(
-        anchorElementRef,
-        { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex },
-      ) => {
-        // Sync the latest selectOptionAndCleanUp to the ref on each render, for use by customKeyHandlers.
-        selectOptionAndCleanUpRef.current = selectOptionAndCleanUp
-        setHighlightedIndexRef.current = setHighlightedIndex
-        if (!anchorElementRef.current || !options.length) return null
-        const showSubpanel = subPanelActive
-        return createPortal(
-          <div
-            ref={popoverRef}
-            className="yolo-smart-space-mention-popover"
-            data-placement={placement}
-            data-safe-active={safeActive ? 'true' : undefined}
-            onPointerLeave={() => scheduleHoverClose()}
-            onPointerEnter={() => cancelHoverClose()}
-            onMouseMove={handlePopoverMouseMove}
-          >
-            <MainSelectedIndexSync
-              selectedIndex={selectedIndex}
-              setMainSelectedIndex={setMainSelectedIndex}
+      customKeyHandlers={cascadingMenu.customKeyHandlers}
+      menuRenderFn={(anchorElementRef, itemProps) =>
+        cascadingMenu.renderMenu({
+          anchorElementRef,
+          itemProps,
+          mainListKey: `main:${menuContentTransition.nonce}`,
+          mainListTransition:
+            menuContentTransition.direction === 'none'
+              ? undefined
+              : menuContentTransition.direction,
+          menuContainer: menuContainerRef?.current,
+          onMainListAnimationEnd: () =>
+            setMenuContentTransition((current) =>
+              current.direction === 'none'
+                ? current
+                : { ...current, direction: 'none' },
+            ),
+          renderItem: (
+            props: CascadingTypeaheadItemProps<MentionTypeaheadOption>,
+          ) => (
+            <MentionsTypeaheadMenuItem
+              {...props}
+              key={`${props.id}:${props.option.key}`}
             />
-            <div
-              ref={mainPanelRef}
-              className="yolo-popover-surface yolo-popover-surface--smart-space yolo-smart-space-mention-dropdown"
-            >
-              <div
-                key={`main:${menuContentTransition.nonce}`}
-                className="yolo-smart-space-mention-list"
-                role="listbox"
-                data-transition={
-                  menuContentTransition.direction === 'none'
-                    ? undefined
-                    : menuContentTransition.direction
-                }
-                onAnimationEnd={() =>
-                  setMenuContentTransition((prev) =>
-                    prev.direction === 'none'
-                      ? prev
-                      : { ...prev, direction: 'none' },
-                  )
-                }
-              >
-                {options.map((option, i: number) => {
-                  const entryType =
-                    option.payload.kind === 'entry'
-                      ? option.payload.entryType
-                      : null
-                  const isEntryOption = entryType !== null
-                  const isLeaf = entryType === 'current-file'
-                  return (
-                    <MentionsTypeaheadMenuItem
-                      index={i}
-                      isSelected={selectedIndex === i}
-                      onClick={() => {
-                        setHighlightedIndex(i)
-                        if (
-                          shouldRenderSubpanel &&
-                          isEntryOption &&
-                          !isLeaf &&
-                          entryType !== null &&
-                          subSide !== 'hidden'
-                        ) {
-                          cancelHoverOpen()
-                          cancelHoverClose()
-                          setFocusSide('main')
-                          setSubHighlightedIndex(0)
-                          setHoveredEntry(entryType)
-                          return
-                        }
-                        selectOptionAndCleanUp(option)
-                      }}
-                      onMouseEnter={(e) => {
-                        // Proactively compute safe triangle with current mouse position to avoid
-                        // relying on mousemove event timing that could cause mouseenter to see stale safe state.
-                        lastCursorPosRef.current = {
-                          x: e.clientX,
-                          y: e.clientY,
-                        }
-                        const inSafe = updateSafeTriangle(e.clientX, e.clientY)
-                        setSafeActive(inSafe)
-                        if (focusSide === 'sub') setFocusSide('main')
-                        // Main panel highlight: skip when inside safe triangle to keep visual following hoveredEntry.
-                        if (!inSafe) {
-                          setHighlightedIndex(i)
-                        }
-                        if (
-                          shouldRenderSubpanel &&
-                          isEntryOption &&
-                          !isLeaf &&
-                          entryType !== null
-                        ) {
-                          if (inSafe) {
-                            // Safe triangle is a true protection zone: while the mouse is still
-                            // within the triangle path, other main menu items cannot trigger
-                            // a switch via the timer delay.
-                            cancelHoverOpen()
-                          } else {
-                            scheduleHoverOpen(entryType)
-                          }
-                        } else if (shouldRenderSubpanel && isLeaf) {
-                          scheduleHoverClose()
-                        }
-                      }}
-                      key={option.key}
-                      option={option}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-            {showSubpanel && (
-              <div
-                key={`sub:${previewEntryEffective}:${subSide}`}
-                ref={subPanelRef}
-                className="yolo-popover-surface yolo-popover-surface--smart-space yolo-smart-space-mention-dropdown yolo-smart-space-mention-subpanel"
-                data-side={subSide}
-                role="listbox"
-                onPointerEnter={() => cancelHoverClose()}
-                onPointerLeave={() => scheduleHoverClose()}
-              >
-                <div className="yolo-smart-space-mention-list">
-                  {subOptions.map((option, i: number) => (
-                    <MentionsTypeaheadMenuItem
-                      index={i}
-                      isSelected={
-                        focusSide === 'sub' && subHighlightedIndex === i
-                      }
-                      onClick={() => {
-                        selectOptionAndCleanUp(option)
-                      }}
-                      onMouseEnter={() => {
-                        setFocusSide('sub')
-                        setSubHighlightedIndex(i)
-                        cancelHoverClose()
-                      }}
-                      key={`sub:${option.key}`}
-                      option={option}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>,
-          menuContainerRef?.current ?? anchorElementRef.current,
-        )
-      }}
+          ),
+        })
+      }
     />
   )
 }
