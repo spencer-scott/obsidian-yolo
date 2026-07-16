@@ -4,10 +4,12 @@ import {
   Editor,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   TFile,
   TFolder,
   type WorkspaceLeaf,
+  addIcon,
   getLanguage,
   normalizePath,
   setIcon,
@@ -59,6 +61,10 @@ import type { ProjectEventBus } from './core/learning/projectEventBus'
 import { LearningSrsStore } from './core/learning/srs/srsStore'
 import { setLLMDebugCaptureEnabled } from './core/llm/debugCapture'
 import { clearRequestTransportMemory } from './core/llm/requestTransport'
+import type {
+  LocalMcpServerRuntime,
+  LocalMcpServerState,
+} from './core/mcp/localMcpServerConfig'
 import type { McpCoordinator } from './core/mcp/mcpCoordinator'
 import type { McpManager } from './core/mcp/mcpManager'
 import { AgentNotificationCoordinator } from './core/notifications/agentNotificationCoordinator'
@@ -165,6 +171,7 @@ import { stableStringify } from './utils/json/stableStringify'
 import { applyKnownMaxContextTokensToChatModels } from './utils/llm/model-capability-registry'
 import { getMentionableBlockData } from './utils/obsidian'
 import { ensureBufferByteLengthCompat } from './utils/runtime/ensureBufferByteLengthCompat'
+import { YOLO_ICON_ID, YOLO_ICON_SVG } from './yoloIcon'
 
 export type {
   YoloAgentApi,
@@ -227,6 +234,8 @@ export default class YoloPlugin extends Plugin {
   private ragCoordinator: RagCoordinator | null = null
   private ragIndexService: RagIndexService | null = null
   private mcpCoordinator: McpCoordinator | null = null
+  private localMcpServer: LocalMcpServerRuntime | null = null
+  private localMcpSettingsUnsubscribe: (() => void) | null = null
   private webviewSelectionBridge: WebviewSelectionBridge | null = null
   private writeAssistController: WriteAssistController | null = null
   private learningEventBus: ProjectEventBus | null = null
@@ -940,6 +949,49 @@ export default class YoloPlugin extends Plugin {
     return this.mcpCoordinator
   }
 
+  private async initializeLocalMcpServer(): Promise<void> {
+    if (!Platform.isDesktop || this.localMcpServer) return
+    const { DesktopLocalMcpServer } = await import(
+      './core/mcp/desktopLocalMcpServer'
+    )
+    const runtime = new DesktopLocalMcpServer({
+      app: this.app,
+      getSettings: () => this.settings,
+      getAgentService: () => this.warmupAgentService(),
+      getMcpManager: () => this.getMcpManager(),
+      getRagEngine: () => this.getRAGEngine(),
+      openConversation: (conversationId) =>
+        this.openChatView({ initialConversationId: conversationId }),
+    })
+    this.localMcpServer = runtime
+    this.localMcpSettingsUnsubscribe = this.addSettingsChangeListener(
+      (settings) => {
+        void runtime.updateSettings(settings)
+      },
+    )
+    await runtime.initialize()
+    await runtime.updateSettings(this.settings)
+  }
+
+  getLocalMcpServerState(): LocalMcpServerState {
+    return (
+      this.localMcpServer?.getState() ?? {
+        status: 'stopped',
+        url: '',
+      }
+    )
+  }
+
+  subscribeLocalMcpServerState(
+    listener: (state: LocalMcpServerState) => void,
+  ): () => void {
+    if (!this.localMcpServer) {
+      listener(this.getLocalMcpServerState())
+      return () => undefined
+    }
+    return this.localMcpServer.subscribe(listener)
+  }
+
   private startWebviewSelectionBridge(): void {
     this.webviewSelectionBridge?.destroy()
     this.webviewSelectionBridge = new WebviewSelectionBridge(this.app, {
@@ -1402,13 +1454,6 @@ export default class YoloPlugin extends Plugin {
 
     this.backgroundStatusBarLabel.setText(label)
     this.backgroundStatusBarItem.removeAttribute('title')
-    this.backgroundStatusBarItem.setAttribute(
-      'aria-label',
-      this.t(
-        'statusBar.backgroundStatusAriaLabel',
-        'Activity and reminders, click for details',
-      ),
-    )
     this.backgroundStatusBarRing.empty()
     this.backgroundStatusBarRing.classList.remove(
       'is-running',
@@ -2036,6 +2081,7 @@ export default class YoloPlugin extends Plugin {
     this.isUnloaded = false
     ensureBufferByteLengthCompat()
     clearRequestTransportMemory()
+    addIcon(YOLO_ICON_ID, YOLO_ICON_SVG)
 
     await this.loadSettings()
     await loadLocale(this.resolveObsidianLanguage())
@@ -2043,6 +2089,9 @@ export default class YoloPlugin extends Plugin {
     await this.migrateLegacyVaultMirrorIfNeeded()
     this.warnIfInstallationIncomplete()
     this.syncOAuthRuntimesFromSettings()
+    await this.initializeLocalMcpServer().catch((error) => {
+      console.error('[YOLO] Failed to initialize local MCP server', error)
+    })
 
     // Prune stale image cache entries (>30 days) on startup
     void pruneImageCache(this.app, 30, this.settings)
@@ -2113,12 +2162,16 @@ export default class YoloPlugin extends Plugin {
     )
 
     // This creates an icon in the left ribbon.
-    this.addRibbonIcon('wand-sparkles', this.t('commands.openChat'), () => {
+    this.addRibbonIcon(YOLO_ICON_ID, 'YOLO Chat', () => {
       void this.openChatView({ placement: this.resolveRibbonPlacement() })
     })
-    this.addRibbonIcon('graduation-cap', 'Open learning mode', () => {
-      void this.openLearningView()
-    })
+    this.addRibbonIcon(
+      'graduation-cap',
+      this.t('commands.learningModeLabel'),
+      () => {
+        void this.openLearningView()
+      },
+    )
 
     this.setupBackgroundActivityStatusBar()
     this.actionToastController = mountActionToast()
@@ -2196,7 +2249,7 @@ export default class YoloPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-learning-mode',
-      name: 'Open learning mode',
+      name: this.t('commands.openLearningMode'),
       callback: () => {
         void this.openLearningView()
       },
@@ -2549,6 +2602,10 @@ export default class YoloPlugin extends Plugin {
     this.dbManager = null
 
     // McpManager cleanup
+    this.localMcpSettingsUnsubscribe?.()
+    this.localMcpSettingsUnsubscribe = null
+    void this.localMcpServer?.close()
+    this.localMcpServer = null
     this.mcpCoordinator?.cleanup()
     this.mcpCoordinator = null
     this.mcpManager = null

@@ -4,6 +4,8 @@ export const zh: TranslationKeys = {
   commands: {
     openChat: '打开聊天',
     openChatSidebar: '打开聊天（侧栏）',
+    openLearningMode: '打开学习模式',
+    learningModeLabel: 'YOLO：学习模式',
     newChatCurrentView: '新建聊天',
     openYoloNewChat: 'YOLO:打开聊天窗口',
     openNewChatTab: '在新标签页打开新对话',
@@ -68,6 +70,13 @@ export const zh: TranslationKeys = {
     chatList: {
       searchPlaceholder: '搜索聊天记录',
       empty: '暂无聊天记录',
+      noTaskConversations: '暂无任务会话',
+      historySections: '会话分类',
+      myConversations: '我的对话',
+      taskConversations: '任务会话',
+      taskConversationSources: '任务会话来源',
+      allSources: '全部',
+      externalAgent: '外部 Agent',
       current: '当前',
       pinConversation: '置顶',
       unpinConversation: '取消置顶',
@@ -875,6 +884,16 @@ export const zh: TranslationKeys = {
       autoContextCompactionThresholdRatioPercent: '上下文窗口占用（%）',
       autoContextCompactionThresholdRatioPercentDesc:
         '当 prompt_tokens 除以当前聊天模型配置的最大上下文窗口达到该比例时触发（需在模型中填写 max context）。',
+      mcpServerBlockTitle: '外部 Agent 接入',
+      mcpServerEnabled: '允许外部 Agent 访问',
+      mcpServerDesc:
+        '允许外部 Agent 通过 MCP 搜索 Vault，并向已配置的 YOLO Agent 委派任务。',
+      mcpServerDesktopOnly: 'MCP 服务仅支持桌面端。',
+      mcpServerClientConfig: 'MCP 连接配置',
+      mcpServerCopyConfig: '复制',
+      mcpServerError: '启动失败',
+      mcpServerConfigCopied: '已复制 MCP 配置。',
+      mcpServerCopyFailed: '复制 MCP 配置失败。',
       jsSandboxExtTitle: '扩展能力',
       jsSandboxAllowFetch: '允许网络请求',
       jsSandboxAllowFetchDesc:
@@ -2176,7 +2195,6 @@ export const zh: TranslationKeys = {
     agentStatusRunning: '运行中',
     agentStatusWaitingApproval: '待审批',
     agentStatusFallbackConversationTitle: '运行中的对话',
-    backgroundStatusAriaLabel: '活动与提醒，点击查看详情',
     backgroundStatusPanelTitle: '活动与提醒',
     backgroundStatusPanelEmpty: '当前没有活动或提醒',
     backgroundTasksRunning: '当前有 {count} 个后台任务正在运行',

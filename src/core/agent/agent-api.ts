@@ -1,3 +1,8 @@
+import type {
+  SerializedEditorState,
+  SerializedElementNode,
+  SerializedTextNode,
+} from 'lexical'
 import type { App } from 'obsidian'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -404,6 +409,7 @@ export async function resolveAgentApiRunInput({
     messages = [
       buildAgentApiUserMessage({
         id: sourceUserMessageId,
+        content: createPlainTextEditorState(request.prompt),
         promptContent: compiledPrompt.promptContent,
         mentionables: resolvedContext.mentionables,
         selectedSkills: resolvedContext.selectedSkills,
@@ -479,13 +485,48 @@ export function buildAgentApiPrompt({
     .join('\n\n')
 }
 
+function createPlainTextEditorState(text: string): SerializedEditorState {
+  const textNode: SerializedTextNode = {
+    detail: 0,
+    format: 0,
+    mode: 'normal',
+    style: '',
+    text,
+    type: 'text',
+    version: 1,
+  }
+  const paragraph = {
+    children: [textNode],
+    direction: 'ltr',
+    format: '',
+    indent: 0,
+    type: 'paragraph',
+    version: 1,
+    textFormat: 0,
+    textStyle: '',
+  } as SerializedElementNode<SerializedTextNode>
+
+  return {
+    root: {
+      children: [paragraph],
+      direction: 'ltr',
+      format: '',
+      indent: 0,
+      type: 'root',
+      version: 1,
+    },
+  }
+}
+
 export function buildAgentApiUserMessage({
   id,
+  content,
   promptContent,
   mentionables,
   selectedSkills,
 }: {
   id: string
+  content?: ChatUserMessage['content']
   promptContent: ChatUserMessage['promptContent']
   mentionables: ChatUserMessage['mentionables']
   selectedSkills?: ChatUserMessage['selectedSkills']
@@ -493,7 +534,7 @@ export function buildAgentApiUserMessage({
   return {
     role: 'user',
     id,
-    content: null,
+    content: content ?? null,
     promptContent,
     mentionables,
     selectedSkills,

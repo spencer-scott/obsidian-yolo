@@ -172,6 +172,7 @@ type QuickAskPanelPropsBase = {
   autoSend?: boolean
   initialAssistantId?: string
   onClose: () => void
+  messageInputRef?: React.RefObject<MessageInputCoreRef>
   containerRef?: React.RefObject<HTMLDivElement>
   onOverlayStateChange?: (isOverlayActive: boolean) => void
   onDragOffset?: (offsetX: number, offsetY: number) => void
@@ -209,6 +210,7 @@ export function QuickAskPanel({
   autoSend,
   initialAssistantId,
   onClose,
+  messageInputRef: externalMessageInputRef,
   containerRef,
   onOverlayStateChange,
   onDragOffset,
@@ -346,15 +348,16 @@ export function QuickAskPanel({
   const modelTriggerRef = useRef<HTMLButtonElement | null>(null)
   const modeTriggerRef = useRef<HTMLButtonElement | null>(null)
   const inputRowRef = useRef<HTMLDivElement | null>(null)
-  const messageInputRef = useRef<MessageInputCoreRef>(null)
+  const internalMessageInputRef = useRef<MessageInputCoreRef>(null)
+  const messageInputRef = externalMessageInputRef ?? internalMessageInputRef
   const latestEditorStateRef = useRef<SerializedEditorState | null>(null)
   const chatUserInputRefs = useRef<Map<string, ChatUserInputRef>>(new Map())
   const chatAreaRef = useRef<HTMLDivElement>(null)
   const [chatAreaElement, setChatAreaElement] = useState<HTMLElement | null>(
     null,
   )
-  const bottomAnchorRef = useRef<HTMLDivElement>(null)
-  const [timelineIsVirtualized, setTimelineIsVirtualized] = useState(false)
+  const [chatContentElement, setChatContentElement] =
+    useState<HTMLElement | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const applyAbortControllerRef = useRef<AbortController | null>(null)
   const autoSendRef = useRef(false)
@@ -658,19 +661,11 @@ export function QuickAskPanel({
       sourceFilePath,
     ])
 
-  const {
-    autoScrollToBottom,
-    followOutput,
-    onAtBottomStateChange,
-    forceScrollToBottom,
-    isAutoFollowEnabled,
-  } = useAutoScroll({
+  const { forceScrollToBottom, isAutoFollowEnabled } = useAutoScroll({
     scrollContainerRef: chatAreaRef,
     scrollContainerElement: chatAreaElement,
-    bottomAnchorRef,
-    isStreaming,
-    contentFollowMode: timelineIsVirtualized ? 'explicit' : 'observer',
-    followFromReactCommitsOnly: !timelineIsVirtualized,
+    contentElement: chatContentElement,
+    followKey: conversationId,
   })
 
   useEffect(() => {
@@ -703,8 +698,8 @@ export function QuickAskPanel({
   ])
 
   // Arrow keys focus assistant trigger; Enter on the trigger will open the menu
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  const handlePanelKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isAssistantMenuOpen || isModelMenuOpen || isModeMenuOpen) return
       const active = document.activeElement
       if (
@@ -719,10 +714,9 @@ export function QuickAskPanel({
       event.preventDefault()
       event.stopPropagation()
       assistantTriggerRef.current?.focus()
-    }
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [isAssistantMenuOpen, isModelMenuOpen, isModeMenuOpen])
+    },
+    [isAssistantMenuOpen, isModelMenuOpen, isModeMenuOpen],
+  )
 
   // When focus is on the assistant button but menu is not open, ArrowUp sends focus back to input (fallback)
   useEffect(() => {
@@ -1766,8 +1760,8 @@ export function QuickAskPanel({
   const quickAskChatShellClassName = 'yolo-quick-ask-chat-shell'
   const quickAskChatAreaClassName = useMemo(
     () =>
-      `yolo-chat-messages yolo-quick-ask-chat-area yolo-quick-ask-chat-area--shared${hideScrollbarWhileFollowing ? ' yolo-quick-ask-chat-area--hide-scrollbar' : ''}`,
-    [hideScrollbarWhileFollowing],
+      `yolo-chat-messages yolo-quick-ask-chat-area yolo-quick-ask-chat-area--shared${isAutoFollowEnabled ? ' yolo-chat-messages--following' : ''}${hideScrollbarWhileFollowing ? ' yolo-quick-ask-chat-area--hide-scrollbar' : ''}`,
+    [hideScrollbarWhileFollowing, isAutoFollowEnabled],
   )
   const latestTimelineAssistantToolGroupKey = useMemo(() => {
     for (
@@ -1783,25 +1777,6 @@ export function QuickAskPanel({
 
     return null
   }, [stableQuickAskTimelineItems])
-  useLayoutEffect(() => {
-    if (timelineIsVirtualized) {
-      return
-    }
-
-    if (chatMessages.length === 0 || !isStreaming) {
-      return
-    }
-
-    autoScrollToBottom()
-  }, [
-    activeStreamingMessageId,
-    autoScrollToBottom,
-    chatMessages,
-    isAutoFollowEnabled,
-    isStreaming,
-    timelineIsVirtualized,
-  ])
-
   // Global key handling to match palette UX (Esc closes, even when dropdown is open)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2196,13 +2171,7 @@ export function QuickAskPanel({
       }
 
       if (timelineItem.kind === 'bottom-anchor') {
-        return (
-          <div
-            ref={bottomAnchorRef}
-            className="yolo-chat-bottom-anchor"
-            aria-hidden="true"
-          />
-        )
+        return <div className="yolo-chat-bottom-anchor" aria-hidden="true" />
       }
 
       return null
@@ -2288,6 +2257,7 @@ export function QuickAskPanel({
     <div
       className={`yolo-quick-ask-panel ${hasMessages ? 'has-messages' : ''} ${isResizedEmptyState ? 'is-resized-empty' : ''} ${isDragging ? 'is-dragging' : ''} ${isResizing ? 'is-resizing' : ''}`}
       ref={containerRef ?? undefined}
+      onKeyDown={handlePanelKeyDown}
       style={
         panelSize
           ? {
@@ -2329,18 +2299,16 @@ export function QuickAskPanel({
           conversationId={conversationId}
           scrollContainerRef={chatAreaRef}
           onScrollContainerChange={setChatAreaElement}
+          onContentElementChange={setChatContentElement}
           containerClassName={quickAskChatShellClassName}
           renderItem={renderQuickAskTimelineItem}
           renderVersion={quickAskTimelineRenderVersion}
           forceRenderItemIds={['bottom-anchor']}
-          followOutput={followOutput}
-          onAtBottomStateChange={onAtBottomStateChange}
           virtualizationThreshold={
             focusedUserMessageId
               ? stableQuickAskTimelineItems.length
               : undefined
           }
-          onVirtualizationChange={setTimelineIsVirtualized}
           scrollContainerClassName={quickAskChatAreaClassName}
         />
       )}

@@ -190,7 +190,17 @@ describe('agent api helpers', () => {
     expect(result.input.messages).toHaveLength(1)
     expect(result.input.messages[0]).toMatchObject({
       role: 'user',
-      content: null,
+      content: {
+        root: {
+          children: [
+            {
+              children: [{ text: 'Summarize these materials', type: 'text' }],
+              type: 'paragraph',
+            },
+          ],
+          type: 'root',
+        },
+      },
       mentionables: [
         { type: 'file', file },
         { type: 'folder', folder },

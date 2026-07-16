@@ -4,6 +4,8 @@ export const en: TranslationKeys = {
   commands: {
     openChat: 'Open chat',
     openChatSidebar: 'Open chat (sidebar)',
+    openLearningMode: 'Open learning mode',
+    learningModeLabel: 'YOLO: Learning mode',
     newChatCurrentView: 'New chat',
     openYoloNewChat: 'YOLO: Open chat window',
     openNewChatTab: 'Open new chat (new tab)',
@@ -68,6 +70,13 @@ export const en: TranslationKeys = {
     chatList: {
       searchPlaceholder: 'Search conversations',
       empty: 'No conversations',
+      noTaskConversations: 'No task conversations',
+      historySections: 'Conversation categories',
+      myConversations: 'My conversations',
+      taskConversations: 'Task conversations',
+      taskConversationSources: 'Task conversation sources',
+      allSources: 'All',
+      externalAgent: 'External Agent',
       current: 'Current',
       pinConversation: 'Pin',
       unpinConversation: 'Unpin',
@@ -938,6 +947,16 @@ export const en: TranslationKeys = {
       autoContextCompactionThresholdRatioPercent: 'Context window usage (%)',
       autoContextCompactionThresholdRatioPercentDesc:
         "Trigger when prompt_tokens divided by the chat model's max context window reaches this percentage. Requires max context tokens on the model.",
+      mcpServerBlockTitle: 'External agent access',
+      mcpServerEnabled: 'Allow external agent access',
+      mcpServerDesc:
+        'Allow external agents to search the Vault through MCP and delegate tasks to configured YOLO agents.',
+      mcpServerDesktopOnly: 'The MCP service is available on desktop only.',
+      mcpServerClientConfig: 'MCP connection configuration',
+      mcpServerCopyConfig: 'Copy',
+      mcpServerError: 'Failed to start',
+      mcpServerConfigCopied: 'MCP configuration copied.',
+      mcpServerCopyFailed: 'Failed to copy MCP configuration.',
       jsSandboxExtTitle: 'Extension capabilities',
       jsSandboxAllowFetch: 'Allow Network Fetch',
       jsSandboxAllowFetchDesc:
@@ -2321,7 +2340,6 @@ export const en: TranslationKeys = {
     agentStatusRunning: 'Running',
     agentStatusWaitingApproval: 'Awaiting approval',
     agentStatusFallbackConversationTitle: 'Running conversation',
-    backgroundStatusAriaLabel: 'Activity and reminders, click for details',
     backgroundStatusPanelTitle: 'Activity and reminders',
     backgroundStatusPanelEmpty: 'There is no activity or reminder',
     backgroundTasksRunning:

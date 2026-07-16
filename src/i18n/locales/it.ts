@@ -4,6 +4,8 @@ export const it: TranslationKeys = {
   commands: {
     openChat: 'Apri chat',
     openChatSidebar: 'Apri chat (barra laterale)',
+    openLearningMode: 'Apri modalità di apprendimento',
+    learningModeLabel: 'YOLO: Modalità di apprendimento',
     newChatCurrentView: 'Nuova chat',
     openYoloNewChat: 'YOLO: Apri finestra chat',
     openNewChatTab: 'Apri nuova chat (nuova scheda)',
@@ -65,6 +67,13 @@ export const it: TranslationKeys = {
     chatList: {
       searchPlaceholder: 'Cerca conversazioni',
       empty: 'Nessuna conversazione',
+      noTaskConversations: 'Nessuna conversazione di attività',
+      historySections: 'Categorie di conversazioni',
+      myConversations: 'Le mie conversazioni',
+      taskConversations: 'Conversazioni di attività',
+      taskConversationSources: 'Origini delle conversazioni di attività',
+      allSources: 'Tutte',
+      externalAgent: 'Agent esterno',
       current: 'Attuale',
       pinConversation: 'Fissa',
       unpinConversation: 'Rimuovi fissaggio',
@@ -922,6 +931,16 @@ export const it: TranslationKeys = {
         'Uso finestra di contesto (%)',
       autoContextCompactionThresholdRatioPercentDesc:
         'Attiva quando prompt_tokens diviso per la finestra massima del modello di chat raggiunge questa percentuale. Richiede max context sul modello.',
+      mcpServerBlockTitle: 'Accesso per agenti esterni',
+      mcpServerEnabled: 'Consenti accesso agli agenti esterni',
+      mcpServerDesc:
+        'Consenti agli agenti esterni di cercare nel Vault tramite MCP e delegare attivita agli agenti YOLO configurati.',
+      mcpServerDesktopOnly: 'Il servizio MCP e disponibile solo su desktop.',
+      mcpServerClientConfig: 'Configurazione connessione MCP',
+      mcpServerCopyConfig: 'Copia',
+      mcpServerError: 'Avvio non riuscito',
+      mcpServerConfigCopied: 'Configurazione MCP copiata.',
+      mcpServerCopyFailed: 'Impossibile copiare la configurazione MCP.',
     },
     terminalCommand: {
       openSettings: 'Configura comando terminale',
@@ -2222,7 +2241,6 @@ export const it: TranslationKeys = {
     agentStatusRunning: 'In esecuzione',
     agentStatusWaitingApproval: 'In attesa di approvazione',
     agentStatusFallbackConversationTitle: 'Conversazione in esecuzione',
-    backgroundStatusAriaLabel: 'Attivita e promemoria, clicca per i dettagli',
     backgroundStatusPanelTitle: 'Attivita e promemoria',
     backgroundStatusPanelEmpty: 'Non ci sono attivita o promemoria',
     backgroundTasksRunning:

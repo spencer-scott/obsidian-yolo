@@ -113,6 +113,7 @@ type UseChatHistory = {
   getConversationById: (id: string) => Promise<{
     messages: ChatMessage[]
     overrides: ConversationOverrideSettings | null | undefined
+    assistantId?: string
     conversationModelId?: string
     messageModelMap?: Record<string, string>
     activeBranchByUserMessageId?: Record<string, string>
@@ -404,6 +405,7 @@ export function useChatHistory(): UseChatHistory {
     ): Promise<{
       messages: ChatMessage[]
       overrides: ConversationOverrideSettings | null | undefined
+      assistantId?: string
       conversationModelId?: string
       messageModelMap?: Record<string, string>
       activeBranchByUserMessageId?: Record<string, string>
@@ -420,6 +422,7 @@ export function useChatHistory(): UseChatHistory {
       return {
         messages,
         overrides: conversation.overrides,
+        assistantId: conversation.assistantId,
         conversationModelId: conversation.conversationModelId,
         messageModelMap: conversation.messageModelMap,
         activeBranchByUserMessageId: conversation.activeBranchByUserMessageId,

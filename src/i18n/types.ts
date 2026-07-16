@@ -9,6 +9,8 @@ export type TranslationKeys = {
   commands: {
     openChat: string
     openChatSidebar: string
+    openLearningMode: string
+    learningModeLabel: string
     newChatCurrentView: string
     openYoloNewChat: string
     openNewChatTab: string
@@ -75,6 +77,13 @@ export type TranslationKeys = {
     chatList?: {
       searchPlaceholder?: string
       empty?: string
+      noTaskConversations?: string
+      historySections?: string
+      myConversations?: string
+      taskConversations?: string
+      taskConversationSources?: string
+      allSources?: string
+      externalAgent?: string
       current?: string
       pinConversation?: string
       unpinConversation?: string
@@ -467,6 +476,15 @@ export type TranslationKeys = {
       autoContextCompactionThresholdTokensDesc?: string
       autoContextCompactionThresholdRatioPercent?: string
       autoContextCompactionThresholdRatioPercentDesc?: string
+      mcpServerBlockTitle?: string
+      mcpServerDesc?: string
+      mcpServerDesktopOnly?: string
+      mcpServerEnabled?: string
+      mcpServerClientConfig?: string
+      mcpServerCopyConfig?: string
+      mcpServerError?: string
+      mcpServerConfigCopied?: string
+      mcpServerCopyFailed?: string
       jsSandboxExtTitle?: string
       jsSandboxAllowFetch?: string
       jsSandboxAllowFetchDesc?: string
@@ -1710,7 +1728,6 @@ export type TranslationKeys = {
     agentStatusRunning?: string
     agentStatusWaitingApproval?: string
     agentStatusFallbackConversationTitle?: string
-    backgroundStatusAriaLabel?: string
     backgroundStatusPanelTitle?: string
     backgroundStatusPanelEmpty?: string
     backgroundTasksRunning?: string
